@@ -25,8 +25,10 @@ export const wagmiConfig = createConfig({
     [mantleTestnet.id]: fallback([
       http(process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz"),
       http("https://mantle-sepolia.drpc.org"),
+      http("https://rpc.ankr.com/mantle_sepolia"),
+      http("https://mantle-sepolia-rpc.publicnode.com"),
       http("https://rpc.sepolia.mantle.xyz"),
-    ]),
+    ], { rank: false }),
     [mantleL1Source.id]: http(sepoliaRpc),
     [mantleMainnet.id]: http(mantleMainnetRpc),
   },
