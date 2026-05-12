@@ -11,6 +11,7 @@ const SECTIONS = [
   { id:"shield-doc",       label:"Shield" },
   { id:"yield-doc",        label:"Yield" },
   { id:"atlas-doc",        label:"Atlas" },
+  { id:"portfolio-doc",    label:"Portfolio" },
   { id:"erc8004",          label:"ERC-8004" },
   { id:"contracts",        label:"Contracts" },
   { id:"orchestration",    label:"Orchestration" },
@@ -57,6 +58,12 @@ const CONTENT: Record<string, SectionContent> = {
     kicker: "AGENTS · ATLAS", title: ["Strategy,", "orchestrated."],
     body: "Atlas talks with users, plans allocations under risk constraints, and delegates execution to the other agents. The only agent that can call other agents.",
     code: { title: "atlas.plan()", body: `const plan = await atlas.plan({\n  amount: 10_000,\n  risk: 'conservative',\n  horizon: '24mo'\n});\n// Delegates: shield.kyc() → yield.feed() → nexus.register()\n// → PortfolioVault.sol updated on Mantle\n// → AI reasoning stored in AgentExecutor.sol` },
+  },
+  "portfolio-doc": {
+    kicker: "FEATURES · PORTFOLIO",
+    title: ["Your RWA portfolio,", "Atlas managed."],
+    body: "The Portfolio page shows your live RWA allocation across 4 assets (USDY, mUSD, mETH, fBTC) deployed on Mantle Sepolia. Atlas — your AI portfolio agent — determines the optimal allocation based on your risk score, then writes every decision permanently on-chain via AgentExecutor.sol. All rebalance reasoning is publicly verifiable on Mantlescan.\n\nTo grant Atlas autonomous control, click 'Enable Atlas': your wallet signs an EIP-712 AgentConsent that caps the allowance (amount + expiry). Atlas can then execute rebalancing within those limits — no further wallet prompts needed until the consent expires.",
+    code: { title: "portfolio flow", body: `// 1. Atlas builds strategy (POST /api/agents/portfolio/plan)\n{\n  strategyType: "conservative",\n  allocations: [\n    { asset: "USDY", bps: 5000 },  // 50%\n    { asset: "mETH", bps: 2500 },  // 25%\n    { asset: "mUSD", bps: 1500 },  // 15%\n    { asset: "fBTC", bps: 1000 },  // 10%\n  ],\n  blendedApyBps: 457,\n  onChainTx: "0x..."  // written to AgentExecutor\n}\n\n// 2. User enables Atlas autonomy (EIP-712)\nconst consent = await vault.consent({\n  token:  "0xcE265E23...",  // mock USDY\n  amount: parseEther("100"),\n  expiry: now + 7 * 86400,\n});\nconst sig = await wallet.signTypedData(consent.typedData);\nawait vault.relayAllowance({ ...consent, sig });\n// → HybridVault.sol stores capped allowance on Mantle\n\n// 3. On-chain history — all actions indexed live\nGET /api/agents/stats/actions\n// → [{agent:"atlas", action:"portfolio_allocation", tx:"0x..."}]` },
   },
   "erc8004": {
     kicker: "PROTOCOL · ERC-8004", title: ["Reputation,", "on-chain."],
