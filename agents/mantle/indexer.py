@@ -27,21 +27,21 @@ _stop_event = threading.Event()
 # ── ABIs (minimal — only indexed events) ─────────────────────────
 
 REGISTRY_ABI = [
-    {"type":"event","name":"AssetRegistered",
+    {"type":"event","name":"AssetRegistered","anonymous":False,
      "inputs":[{"name":"assetId","type":"uint256","indexed":True},
                {"name":"tokenAddress","type":"address","indexed":False},
                {"name":"owner","type":"address","indexed":False},
                {"name":"assetType","type":"string","indexed":False}]},
-    {"type":"event","name":"ComplianceUpdated",
+    {"type":"event","name":"ComplianceUpdated","anonymous":False,
      "inputs":[{"name":"assetId","type":"uint256","indexed":True},
                {"name":"score","type":"uint256","indexed":False},
                {"name":"docHash","type":"bytes32","indexed":False}]},
-    {"type":"event","name":"AssetDeactivated",
+    {"type":"event","name":"AssetDeactivated","anonymous":False,
      "inputs":[{"name":"assetId","type":"uint256","indexed":True}]},
 ]
 
 EXECUTOR_ABI = [
-    {"type":"event","name":"AgentActionExecuted",
+    {"type":"event","name":"AgentActionExecuted","anonymous":False,
      "inputs":[{"name":"actionId","type":"uint256","indexed":True},
                {"name":"agentId","type":"uint256","indexed":True},
                {"name":"agentName","type":"string","indexed":False},
@@ -50,14 +50,14 @@ EXECUTOR_ABI = [
 ]
 
 VAULT_ABI = [
-    {"type":"event","name":"AllocationExecuted",
+    {"type":"event","name":"AllocationExecuted","anonymous":False,
      "inputs":[{"name":"user","type":"address","indexed":True},
                {"name":"allocationId","type":"uint256","indexed":False},
                {"name":"totalValue","type":"uint256","indexed":False}]},
 ]
 
 YIELD_ABI = [
-    {"type":"event","name":"YieldUpdated",
+    {"type":"event","name":"YieldUpdated","anonymous":False,
      "inputs":[{"name":"asset","type":"address","indexed":True},
                {"name":"apyBps","type":"uint256","indexed":False},
                {"name":"agentNote","type":"string","indexed":False}]},

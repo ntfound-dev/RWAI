@@ -66,10 +66,12 @@ export default function PortfolioPage() {
     agentApi<{ actions: OnChainAction[] }>("/stats/actions?limit=10")
       .then(d => { if (d.actions?.length) setOnChainActions(d.actions); })
       .catch(() => {});
+  }, []);
 
+  useEffect(() => {
     agentApi<{ allocations?: { asset: string; bps: number }[]; strategyType?: string }>("/portfolio/plan", {
       method: "POST",
-      body: JSON.stringify({ user_address: "0x0000000000000000000000000000000000000000", risk_score: 3, amount_usd: TOTAL_VALUE }),
+      body: JSON.stringify({ user_address: address ?? "0x0000000000000000000000000000000000000000", amount: TOTAL_VALUE }),
     }).then(d => {
       if (!d.allocations?.length) return;
       const total_bps = d.allocations.reduce((s, a) => s + a.bps, 0) || 10000;
@@ -82,7 +84,7 @@ export default function PortfolioPage() {
         });
       if (next.length) setAllocations(next);
     }).catch(() => {});
-  }, []);
+  }, [address]);
 
   const sendAtlas = async () => {
     if (!atlasInput.trim()) return;
