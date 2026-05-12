@@ -13,10 +13,10 @@ ZERO_ADDR = "0x" + "0" * 40
 
 # Mantle Sepolia asset addresses (must match executor.py)
 ASSET_ADDRESSES = {
-    "USDY": "0x5bE26527e817998A7206475496fDE1E68957c5A6",
-    "mETH": "0xcDA86A272531e8640cD7F1a92c01839911B90bb0",
-    "fBTC": "0x8734DB1C5C1f6a4f862F2A66DB7B0E0A5aD18e3",
-    "MI4":  "0x0000000000000000000000000000000000000004",
+    "USDY": "0xcE265E23aAc349cEf9Fa3CC058062A44080f2289",
+    "mETH": "0xD57f88B64611dBf74f87FC40f2F1010320483584",
+    "fBTC": "0xbED7ad48984fBb3984F5aF83E176fb9f40dB37cc",
+    "mUSD": "0xDf079DB274fAEFfeD10A4a0E5C12f65e1570Cd35",
 }
 
 
@@ -57,10 +57,17 @@ async def portfolio_plan(body: PlanRequest):
 - Investment amount: ${body.amount}
 - Assets to avoid: {body.avoid or 'none'}
 
-Respond ONLY with the JSON format defined in your skill."""
+Respond ONLY with valid JSON containing: allocations (list of {{asset, bps}}), riskScore (1-10), strategyType, reasoning."""
 
-    reply, model, fallback = await agent_complete("atlas", [ChatMessage(role="user", body=prompt)])
+    try:
+        reply, model, fallback = await agent_complete("atlas", [ChatMessage(role="user", body=prompt)])
+    except Exception as e:
+        reply = '{"allocations":[{"asset":"USDY","bps":5000},{"asset":"mETH","bps":2500},{"asset":"mUSD","bps":1500},{"asset":"fBTC","bps":1000}],"riskScore":3,"strategyType":"conservative","reasoning":"Default conservative allocation."}'
+        model, fallback = "fallback", True
+
     result = _parse_json(reply)
+    if not result.get("allocations"):
+        result = {"allocations":[{"asset":"USDY","bps":5000},{"asset":"mETH","bps":2500},{"asset":"mUSD","bps":1500},{"asset":"fBTC","bps":1000}],"riskScore":3,"strategyType":"conservative","reasoning":"Default conservative allocation."}
     result.update({"modelUsed": model, "fallback": fallback})
 
     # Write allocation to AgentExecutor if user wallet provided

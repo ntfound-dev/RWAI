@@ -4,8 +4,18 @@ import type { Address } from "viem";
 import { sepolia } from "viem/chains";
 
 export const mantleMainnet = mantle;
-export const mantleTestnet = mantleSepoliaTestnet;
 export const mantleL1Source = sepolia;
+
+const INFURA_RPC = process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz";
+
+export const mantleTestnet = {
+  ...mantleSepoliaTestnet,
+  rpcUrls: {
+    ...mantleSepoliaTestnet.rpcUrls,
+    default: { http: [INFURA_RPC, "https://mantle-sepolia.drpc.org", "https://rpc.ankr.com/mantle_sepolia"] as const },
+    public:  { http: [INFURA_RPC, "https://mantle-sepolia.drpc.org", "https://rpc.ankr.com/mantle_sepolia"] as const },
+  },
+} as const;
 
 export const MANTLE_BRIDGE_DOC_URL =
   "https://docs.mantle.xyz/network/for-developers/how-to-guides/how-to-use-mantle-sdk/bridging-mnt-with-the-mantle-sdk";
