@@ -101,31 +101,26 @@ export default function PortfolioPage() {
     }
   };
 
-  const ensureInfuraNetwork = async () => {
-    if (typeof window === "undefined" || !(window as any).ethereum) return;
+  useEffect(() => {
+    if (!isConnected || typeof window === "undefined" || !(window as any).ethereum) return;
     const infuraRpc = process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz";
-    try {
-      await (window as any).ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: "0x138B",
-          chainName: "Mantle Sepolia Testnet",
-          nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-          rpcUrls: [infuraRpc],
-          blockExplorerUrls: ["https://sepolia.mantlescan.xyz"],
-        }],
-      });
-    } catch {
-      // already configured or user dismissed — proceed anyway
-    }
-  };
+    (window as any).ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: "0x138B",
+        chainName: "Mantle Sepolia Testnet",
+        nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
+        rpcUrls: [infuraRpc],
+        blockExplorerUrls: ["https://sepolia.mantlescan.xyz"],
+      }],
+    }).catch(() => {});
+  }, [isConnected]);
 
   const depositToVault = async () => {
     if (!address) return;
     setDepositBusy(true);
     setDepositStatus("Approving USDY...");
     try {
-      await ensureInfuraNetwork();
       const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
       const token = MANTLE_ASSETS.USDY.address;
       const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
@@ -161,7 +156,6 @@ export default function PortfolioPage() {
     setWithdrawBusy(true);
     setWithdrawStatus("Sending withdraw...");
     try {
-      await ensureInfuraNetwork();
       const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
       const token = MANTLE_ASSETS.USDY.address;
       const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
