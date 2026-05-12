@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { getWalletClient } from "wagmi/actions";
 import { AgentMonogram } from "@/components/agents/AgentMonogram";
 import { useAccount } from "wagmi";
-import { parseEther, type Address } from "viem";
+import { parseEther, type Address, encodeFunctionData } from "viem";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { MANTLE_ASSETS } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
@@ -44,6 +44,10 @@ export default function PortfolioPage() {
   const [autonomyBusy, setAutonomyBusy] = useState(false);
   const [autonomyStatus, setAutonomyStatus] = useState("Atlas autonomy is not enabled for this wallet.");
   const [autonomyTx, setAutonomyTx] = useState("");
+  const [depositAmount, setDepositAmount] = useState("100");
+  const [depositBusy, setDepositBusy] = useState(false);
+  const [depositTx, setDepositTx] = useState("");
+  const [depositStatus, setDepositStatus] = useState("");
   const [atlasMessages, setAtlasMessages] = useState<Array<{ role: string; body: string }>>([
     { role:"agent", body:"Your portfolio is performing well. USDY at 4.20%, MI4 up 14bps this week. Blended yield: 4.71%. No rebalance needed today — all allocations within 10% threshold." }
   ]);
@@ -90,6 +94,41 @@ export default function PortfolioPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Atlas temporarily offline.";
       setAtlasMessages(prev => [...prev, { role:"agent", body:`Production backend error: ${message}` }]);
+    }
+  };
+
+  const depositToVault = async () => {
+    if (!address) return;
+    setDepositBusy(true);
+    setDepositStatus("Approving USDY...");
+    try {
+      const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
+      const token = MANTLE_ASSETS.USDY.address;
+      const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
+      const amount = parseEther(depositAmount || "100");
+
+      // 1. Approve
+      const approveData = encodeFunctionData({
+        abi: [{ name:"approve", type:"function", inputs:[{name:"spender",type:"address"},{name:"amount",type:"uint256"}], outputs:[{type:"bool"}] }],
+        functionName: "approve",
+        args: [vault, amount],
+      });
+      const approveTx = await walletClient.sendTransaction({ to: token, data: approveData, account: address as Address, chain: mantleTestnet });
+      setDepositStatus("Approve sent, depositing...");
+
+      // 2. Deposit
+      const depositData = encodeFunctionData({
+        abi: [{ name:"deposit", type:"function", inputs:[{name:"token",type:"address"},{name:"amount",type:"uint256"}], outputs:[] }],
+        functionName: "deposit",
+        args: [token, amount],
+      });
+      const depTx = await walletClient.sendTransaction({ to: vault, data: depositData, account: address as Address, chain: mantleTestnet });
+      setDepositTx(depTx);
+      setDepositStatus(`Deposited ${depositAmount} USDY to HybridVault.`);
+    } catch (err) {
+      setDepositStatus(err instanceof Error ? err.message : "Deposit failed.");
+    } finally {
+      setDepositBusy(false);
     }
   };
 
@@ -190,26 +229,51 @@ export default function PortfolioPage() {
           </div>
           <span className="mono-sm" style={{ color:"var(--atlas)" }}>EIP-712 capped consent</span>
         </div>
-        <div style={{ padding:"16px", display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
-          <label style={{ display:"grid", gap:6 }}>
-            <span className="mono-sm">USDY allowance</span>
-            <input className="input-field" value={autonomyAmount} onChange={e => setAutonomyAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
-          </label>
-          <label style={{ display:"grid", gap:6 }}>
-            <span className="mono-sm">Expiry days</span>
-            <input className="input-field" value={autonomyDays} onChange={e => setAutonomyDays(e.target.value.replace(/[^\d]/g, ""))}/>
-          </label>
-          <button className="btn btn-primary" onClick={enableAtlasAutonomy} disabled={!isConnected || autonomyBusy}>
-            {autonomyBusy ? "Signing..." : "Enable Atlas"}
-          </button>
-        </div>
-        <div style={{ padding:"0 16px 16px", display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
-          <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{autonomyStatus}</span>
-          {autonomyTx && (
-            <a href={`https://sepolia.mantlescan.xyz/tx/${autonomyTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
-              ↗ {autonomyTx.slice(0, 10)}...{autonomyTx.slice(-6)}
-            </a>
+
+        {/* Step 1: Deposit */}
+        <div style={{ padding:"12px 16px", borderBottom:"1px solid var(--line)", background:"var(--bg-1)" }}>
+          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:8 }}>STEP 1 · Deposit USDY to vault</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:10, alignItems:"end" }}>
+            <label style={{ display:"grid", gap:6 }}>
+              <span className="mono-sm">Amount (mock USDY)</span>
+              <input className="input-field" value={depositAmount} onChange={e => setDepositAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
+            </label>
+            <button className="btn btn-ghost" onClick={depositToVault} disabled={!isConnected || depositBusy} style={{ fontSize:11 }}>
+              {depositBusy ? "Depositing..." : "Deposit →"}
+            </button>
+          </div>
+          {(depositStatus || depositTx) && (
+            <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{depositStatus}</span>
+              {depositTx && <a href={`https://sepolia.mantlescan.xyz/tx/${depositTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>↗ {depositTx.slice(0,10)}…</a>}
+            </div>
           )}
+        </div>
+
+        {/* Step 2: Enable Atlas */}
+        <div style={{ padding:"12px 16px" }}>
+          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:8 }}>STEP 2 · Grant Atlas capped allowance</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
+            <label style={{ display:"grid", gap:6 }}>
+              <span className="mono-sm">USDY allowance</span>
+              <input className="input-field" value={autonomyAmount} onChange={e => setAutonomyAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
+            </label>
+            <label style={{ display:"grid", gap:6 }}>
+              <span className="mono-sm">Expiry days</span>
+              <input className="input-field" value={autonomyDays} onChange={e => setAutonomyDays(e.target.value.replace(/[^\d]/g, ""))}/>
+            </label>
+            <button className="btn btn-primary" onClick={enableAtlasAutonomy} disabled={!isConnected || autonomyBusy}>
+              {autonomyBusy ? "Signing..." : "Enable Atlas"}
+            </button>
+          </div>
+          <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
+            <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{autonomyStatus}</span>
+            {autonomyTx && (
+              <a href={`https://sepolia.mantlescan.xyz/tx/${autonomyTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
+                ↗ {autonomyTx.slice(0, 10)}...{autonomyTx.slice(-6)}
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
