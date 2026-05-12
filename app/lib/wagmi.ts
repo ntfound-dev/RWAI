@@ -23,12 +23,12 @@ export const wagmiConfig = createConfig({
   ],
   transports: {
     [mantleTestnet.id]: fallback([
-      http(process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz"),
-      http("https://mantle-sepolia.drpc.org"),
-      http("https://rpc.ankr.com/mantle_sepolia"),
-      http("https://mantle-sepolia-rpc.publicnode.com"),
-      http("https://rpc.sepolia.mantle.xyz"),
-    ], { rank: false }),
+      http(process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz", { retryCount: 0 }),
+      http("https://mantle-sepolia.drpc.org", { retryCount: 0 }),
+      http("https://rpc.ankr.com/mantle_sepolia", { retryCount: 0 }),
+      http("https://mantle-sepolia-rpc.publicnode.com", { retryCount: 0 }),
+      http("https://rpc.sepolia.mantle.xyz", { retryCount: 0 }),
+    ], { rank: false, retryCount: 3 }),
     [mantleL1Source.id]: http(sepoliaRpc),
     [mantleMainnet.id]: http(mantleMainnetRpc),
   },
