@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getWalletClient } from "wagmi/actions";
 import { AgentMonogram } from "@/components/agents/AgentMonogram";
 import { useAccount } from "wagmi";
@@ -15,11 +15,14 @@ const ALLOCATIONS = [
   { symbol:"mETH", name:"Mantle Staked ETH",     pct:15, apy:6.12, color:"var(--atlas)",   value:1500 },
 ];
 
-const REBALANCES = [
-  { date:"2026/05/07 14:22", from:"USDY",  to:"mETH",  pct:"5%",  reason:"mETH yield delta +0.8% triggered rebalance threshold", tx:"0x9af2…3c12" },
-  { date:"2026/05/03 09:01", from:"mETH",  to:"MI4",   pct:"3%",  reason:"MI4 APY improved +0.14% WoW, rebalancing for efficiency", tx:"0x7d3e…8b21" },
-  { date:"2026/04/28 11:44", from:"MI4",   to:"USDY",  pct:"8%",  reason:"Risk-off signal: USDY stability preferred in volatile period", tx:"0x2f1a…4c09" },
-];
+interface OnChainAction {
+  action_id: number;
+  agent_name: string;
+  action_type: string;
+  tx_hash: string;
+  ts: number;
+  success: boolean;
+}
 
 const BLENDED_APY = ALLOCATIONS.reduce((acc, a) => acc + (a.pct/100) * a.apy, 0);
 const TOTAL_VALUE = 10000;
@@ -37,6 +40,13 @@ export default function PortfolioPage() {
   const [atlasMessages, setAtlasMessages] = useState<Array<{ role: string; body: string }>>([
     { role:"agent", body:"Your portfolio is performing well. USDY at 4.20%, MI4 up 14bps this week. Blended yield: 4.71%. No rebalance needed today — all allocations within 10% threshold." }
   ]);
+  const [onChainActions, setOnChainActions] = useState<OnChainAction[]>([]);
+
+  useEffect(() => {
+    agentApi<{ actions: OnChainAction[] }>("/stats/actions?limit=10")
+      .then(d => { if (d.actions?.length) setOnChainActions(d.actions); })
+      .catch(() => {});
+  }, []);
 
   const sendAtlas = async () => {
     if (!atlasInput.trim()) return;
@@ -223,25 +233,35 @@ export default function PortfolioPage() {
           {/* Rebalance history */}
           <div className="panel">
             <div className="panel-header">
-              <span className="mono">Rebalance history · Atlas on-chain reasoning</span>
+              <span className="mono">Agent action history · on-chain reasoning</span>
               <span className="mono-sm" style={{ color:"var(--fg-3)" }}>All stored on Mantle</span>
             </div>
-            {REBALANCES.map((r, i) => (
-              <div key={i} style={{ display:"grid", gridTemplateColumns:"28px 1fr auto", alignItems:"start", gap:12, padding:"14px 16px", borderBottom: i < 2 ? "1px solid var(--line)" : "none" }}>
-                <AgentMonogram agent="atlas" active/>
-                <div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                    <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{r.date}</span>
-                    <span className="tag" style={{ fontSize:9 }}>{r.from} → {r.to}</span>
-                    <span className="tag" style={{ fontSize:9, color:"var(--atlas)", borderColor:"rgba(168,85,247,0.3)" }}>{r.pct}</span>
+            {onChainActions.length > 0 ? onChainActions.map((r, i) => {
+              const date = new Date(r.ts * 1000).toLocaleString("sv-SE").replace("T", " ").slice(0, 16);
+              const shortTx = r.tx_hash ? `${r.tx_hash.slice(0, 6)}…${r.tx_hash.slice(-4)}` : "—";
+              return (
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"28px 1fr auto", alignItems:"start", gap:12, padding:"14px 16px", borderBottom: i < onChainActions.length - 1 ? "1px solid var(--line)" : "none" }}>
+                  <AgentMonogram agent={r.agent_name as "atlas"|"nexus"|"shield"|"yield"} active/>
+                  <div>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                      <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{date}</span>
+                      <span className="tag" style={{ fontSize:9 }}>{r.agent_name}</span>
+                      <span className="tag" style={{ fontSize:9, color: r.success ? "var(--accent)" : "var(--warn)", borderColor: r.success ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)" }}>{r.action_type}</span>
+                    </div>
+                    <p style={{ fontSize:12, color:"var(--fg-1)", lineHeight:1.5 }}>Action #{r.action_id} · {r.success ? "Success" : "Failed"}</p>
                   </div>
-                  <p style={{ fontSize:12, color:"var(--fg-1)", lineHeight:1.5 }}>{r.reason}</p>
+                  {r.tx_hash ? (
+                    <a href={`https://sepolia.mantlescan.xyz/tx/${r.tx_hash}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
+                      ↗ {shortTx}
+                    </a>
+                  ) : <span className="mono-sm" style={{ color:"var(--fg-3)" }}>—</span>}
                 </div>
-                <a href={`https://sepolia.mantlescan.xyz/tx/${r.tx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
-                  ↗ {r.tx}
-                </a>
+              );
+            }) : (
+              <div style={{ padding:"24px 16px", textAlign:"center", color:"var(--fg-3)", fontSize:12 }}>
+                No on-chain actions yet. Agent actions will appear here after Atlas executes.
               </div>
-            ))}
+            )}
           </div>
         </div>
 

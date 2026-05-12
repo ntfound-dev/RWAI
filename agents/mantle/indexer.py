@@ -16,8 +16,8 @@ from .db import (
 
 log = logging.getLogger("rwai.indexer")
 
-POLL_INTERVAL   = 30    # seconds between polls
-BLOCK_CHUNK     = 500   # max blocks per fetch (avoids RPC timeout)
+POLL_INTERVAL   = 15    # seconds between polls
+BLOCK_CHUNK     = 2000  # max blocks per fetch (avoids RPC timeout)
 CONFIRMATIONS   = 2     # wait N blocks before indexing (reorg safety)
 
 _indexer_thread: Optional[threading.Thread] = None

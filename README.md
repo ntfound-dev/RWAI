@@ -4,7 +4,7 @@
 
 **Track:** AI & RWA Track · DoraHacks Turing Test Hackathon  
 **Chain:** Mantle Sepolia Testnet (chainId 5003)  
-**Stack:** Next.js 14 · FastAPI · Ollama (Qwen3) + Claude fallback · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004
+**Stack:** Next.js 14 · FastAPI · OpenClaw/CMDOP + Groq fallback · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004
 
 ---
 
@@ -36,8 +36,8 @@ Browser
 Next.js 14 (app/)          ← wagmi v2 + viem, Mantle Sepolia
   │
   ▼
-FastAPI Backend (agents/)  ← Ollama (Qwen3) primary + Claude Sonnet fallback
-  │  confidence < 0.80 → Claude; both fail → graceful degradation
+FastAPI Backend (agents/)  ← OpenClaw/CMDOP → Groq (llama-3.3-70b) → Claude
+  │  4-level fallback chain; every decision logged on-chain
   │
   ▼
 Mantle Sepolia (chainId 5003)
@@ -74,12 +74,13 @@ rwai/
 ├── agents/                 # FastAPI — 4 AI agent backend
 │   ├── api/
 │   │   ├── app.py          # FastAPI app + health + status
-│   │   ├── core.py         # Ollama + Claude inference with fallback
+│   │   ├── core.py         # OpenClaw → Groq → Claude fallback chain
 │   │   └── routes/         # chat, tokenize, compliance, yield, portfolio
 │   ├── mantle/
 │   │   ├── client.py       # Web3 + deployments.json reader
 │   │   ├── contracts.py    # Contract ABIs
 │   │   ├── executor.py     # On-chain write helpers
+│   │   ├── openclaw.py     # OpenClaw/CMDOP integration (primary AI layer)
 │   │   ├── pyth.py         # Hermes price update fetcher
 │   │   └── reputation.py   # Live reputation reader
 │   ├── skills/             # nexus.md, shield.md, yield.md, atlas.md
@@ -169,16 +170,28 @@ make help
 
 | Contract | Address |
 |----------|---------|
-| ComplianceLog | — |
-| YieldOracle | — |
-| RWAiRegistry | — |
-| AgentReputationManager | — |
-| AgentExecutor | — |
-| PortfolioVault | — |
-| HybridVault | — |
-| AssetToken (MANHATTAN demo) | — |
+| ComplianceLog | `0xCc6296557c05ca02f3258DEd19f4104a9C19a80B` |
+| YieldOracle | `0x1288dF9F55673cBFc97BCe7aD5445D77B9029B92` |
+| RWAiRegistry | `0xeE7a50936a25a375143b75b7Ca743B9513368680` |
+| AgentReputationManager | `0xfFE21EC80012D3Bf00F5eE20a400C94455F32D32` |
+| AgentExecutor | `0x9a822B9A50D090CfcCa1e6474efCd653112d8501` |
+| PortfolioVault | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` |
+| HybridVault | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` |
+| AssetToken | `0x80E0e5f6488FA2726c042a204344281974f72609` |
 | ERC-8004 Identity *(pre-deployed)* | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | ERC-8004 Reputation *(pre-deployed)* | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+
+**Mock RWA Tokens (Mantle Sepolia)**
+
+| Token | Address | Supply |
+|-------|---------|--------|
+| Mock USDY | `0xcE265E23aAc349cEf9Fa3CC058062A44080f2289` | 1,000,000 |
+| Mock mUSD | `0xDf079DB274fAEFfeD10A4a0E5C12f65e1570Cd35` | 1,000,000 |
+| Mock mETH | `0xD57f88B64611dBf74f87FC40f2F1010320483584` | 100 |
+| Mock fBTC | `0xbED7ad48984fBb3984F5aF83E176fb9f40dB37cc` | 10 |
+
+**Agent Wallet:** `0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7`  
+**Agent IDs (ERC-8004):** nexus=41, shield=42, yield=43, atlas=44
 
 Mantle Sepolia Explorer: https://sepolia.mantlescan.xyz
 
@@ -210,12 +223,17 @@ Swagger docs: http://localhost:8001/docs
 
 ## Hackathon Checklist
 
-- [ ] 8 contracts deployed + verified on Mantle Sepolia testnet production
-- [ ] 4 agents registered on ERC-8004 Identity Registry
+- [x] 8 contracts deployed on Mantle Sepolia (chainId 5003)
+- [x] 4 agents registered on ERC-8004 Identity Registry (nexus=41, shield=42, yield=43, atlas=44)
+- [x] 4 mock RWA tokens deployed + minted (USDY, mUSD, mETH, fBTC)
+- [x] 5 assets registered in RWAiRegistry on-chain
+- [x] On-chain action log working (logTokenization, logComplianceReview, executeAllocation)
+- [x] Agent reputation system live (nexus score: 85, others: 75)
+- [x] OpenClaw/CMDOP integration as primary AI execution layer
 - [ ] Live frontend on Vercel
-- [ ] Agent backend running (Railway / Render / self-hosted)
+- [ ] Agent backend running (Railway)
 - [ ] Demo video (3–4 min) — tokenization + portfolio flow + on-chain proof
-- [ ] Open-source GitHub repo
+- [ ] Public GitHub repo at submission
 
 ---
 
