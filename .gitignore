@@ -47,3 +47,8 @@ contracts/typechain-types/
 .DS_Store
 Thumbs.db
 .claude/
+
+# Contracts secrets
+contracts/.env
+contracts/.env.local
+contracts/.env.production
