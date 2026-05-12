@@ -1,0 +1,49 @@
+# Environment & secrets — JANGAN UPLOAD
+agents/.env
+agents/.env.local
+agents/.env.production
+.env
+.env.local
+.env.production
+*.pem
+
+# Whitelist contoh
+!agents/.env.example
+!.env.example
+
+# Plan & internal docs
+plan.md
+production.md
+backend-design.md
+backend-implementation.md
+frontend-design.md
+frontend-implementation.md
+smart-contracts-design.md
+smart-contracts-implementation.md
+implementation-overview.md
+agents/hybrid-vault-plan.md
+
+# Python
+__pycache__/
+**/__pycache__/
+.venv/
+*.pyc
+agents/rwai_index.json
+
+# Node
+app/node_modules/
+app/.next/
+app/.env.local
+app/.env*.local
+
+# Hardhat
+contracts/node_modules/
+contracts/cache/
+contracts/artifacts/
+contracts/typechain-types/
+
+# OS & logs
+*.log
+.DS_Store
+Thumbs.db
+.claude/
