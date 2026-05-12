@@ -48,6 +48,10 @@ export default function PortfolioPage() {
   const [depositBusy, setDepositBusy] = useState(false);
   const [depositTx, setDepositTx] = useState("");
   const [depositStatus, setDepositStatus] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("100");
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawTx, setWithdrawTx] = useState("");
+  const [withdrawStatus, setWithdrawStatus] = useState("");
   const [atlasMessages, setAtlasMessages] = useState<Array<{ role: string; body: string }>>([
     { role:"agent", body:"Your portfolio is performing well. USDY at 4.20%, MI4 up 14bps this week. Blended yield: 4.71%. No rebalance needed today — all allocations within 10% threshold." }
   ]);
@@ -129,6 +133,31 @@ export default function PortfolioPage() {
       setDepositStatus(err instanceof Error ? err.message : "Deposit failed.");
     } finally {
       setDepositBusy(false);
+    }
+  };
+
+  const withdrawFromVault = async () => {
+    if (!address) return;
+    setWithdrawBusy(true);
+    setWithdrawStatus("Sending withdraw...");
+    try {
+      const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
+      const token = MANTLE_ASSETS.USDY.address;
+      const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
+      const amount = parseEther(withdrawAmount || "0");
+
+      const data = encodeFunctionData({
+        abi: [{ name:"withdraw", type:"function", inputs:[{name:"token",type:"address"},{name:"amount",type:"uint256"}], outputs:[] }],
+        functionName: "withdraw",
+        args: [token, amount],
+      });
+      const tx = await walletClient.sendTransaction({ to: vault, data, account: address as Address, chain: mantleTestnet });
+      setWithdrawTx(tx);
+      setWithdrawStatus(`Withdrawn ${withdrawAmount} USDY back to wallet.`);
+    } catch (err) {
+      setWithdrawStatus(err instanceof Error ? err.message : "Withdraw failed.");
+    } finally {
+      setWithdrawBusy(false);
     }
   };
 
@@ -246,6 +275,26 @@ export default function PortfolioPage() {
             <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{depositStatus}</span>
               {depositTx && <a href={`https://sepolia.mantlescan.xyz/tx/${depositTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>↗ {depositTx.slice(0,10)}…</a>}
+            </div>
+          )}
+        </div>
+
+        {/* Withdraw */}
+        <div style={{ padding:"12px 16px", borderBottom:"1px solid var(--line)", background:"var(--bg-1)" }}>
+          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:8 }}>WITHDRAW · Pull USDY back to wallet</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:10, alignItems:"end" }}>
+            <label style={{ display:"grid", gap:6 }}>
+              <span className="mono-sm">Amount (mock USDY)</span>
+              <input className="input-field" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
+            </label>
+            <button className="btn btn-ghost" onClick={withdrawFromVault} disabled={!isConnected || withdrawBusy} style={{ fontSize:11 }}>
+              {withdrawBusy ? "Withdrawing..." : "Withdraw ←"}
+            </button>
+          </div>
+          {(withdrawStatus || withdrawTx) && (
+            <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{withdrawStatus}</span>
+              {withdrawTx && <a href={`https://sepolia.mantlescan.xyz/tx/${withdrawTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>↗ {withdrawTx.slice(0,10)}…</a>}
             </div>
           )}
         </div>
