@@ -1,4 +1,4 @@
-import { createConfig, http } from "wagmi";
+import { createConfig, http, fallback } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 import { mantleL1Source, mantleMainnet, mantleTestnet } from "@/lib/mantle";
 
@@ -11,7 +11,6 @@ const hasWalletConnectProject =
   walletConnectProjectId !== "your_walletconnect_project_id";
 
 const sepoliaRpc = process.env.NEXT_PUBLIC_SEPOLIA_RPC || "https://rpc.sepolia.org";
-const mantleTestnetRpc = process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz";
 const mantleMainnetRpc = process.env.NEXT_PUBLIC_MANTLE_MAINNET_RPC || "https://rpc.mantle.xyz";
 
 export const wagmiConfig = createConfig({
@@ -23,7 +22,11 @@ export const wagmiConfig = createConfig({
       : []),
   ],
   transports: {
-    [mantleTestnet.id]: http(mantleTestnetRpc),
+    [mantleTestnet.id]: fallback([
+      http(process.env.NEXT_PUBLIC_MANTLE_TESTNET_RPC || "https://rpc.sepolia.mantle.xyz"),
+      http("https://mantle-sepolia.drpc.org"),
+      http("https://rpc.sepolia.mantle.xyz"),
+    ]),
     [mantleL1Source.id]: http(sepoliaRpc),
     [mantleMainnet.id]: http(mantleMainnetRpc),
   },
