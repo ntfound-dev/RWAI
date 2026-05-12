@@ -16,12 +16,34 @@ const ASSET_META: Record<string, { name: string; color: string; apy: number }> =
   fBTC: { name:"Mantle Wrapped BTC",   color:"var(--warn)",    apy:3.50 },
 };
 
-const DEFAULT_ALLOCATIONS = [
-  { symbol:"USDY", pct:50 },
-  { symbol:"mETH", pct:25 },
-  { symbol:"mUSD", pct:15 },
-  { symbol:"fBTC", pct:10 },
-];
+const PLANS = [
+  {
+    id: "conservative", label: "Conservative", riskScore: 3,
+    goal: "income", horizon: "medium", risk_answer: "hold",
+    allocations: [
+      { symbol:"USDY", pct:50 }, { symbol:"mETH", pct:25 },
+      { symbol:"mUSD", pct:15 }, { symbol:"fBTC", pct:10 },
+    ],
+  },
+  {
+    id: "balanced", label: "Balanced", riskScore: 5,
+    goal: "growth", horizon: "medium", risk_answer: "hold",
+    allocations: [
+      { symbol:"USDY", pct:35 }, { symbol:"mETH", pct:30 },
+      { symbol:"mUSD", pct:20 }, { symbol:"fBTC", pct:15 },
+    ],
+  },
+  {
+    id: "aggressive", label: "Aggressive", riskScore: 8,
+    goal: "growth", horizon: "long", risk_answer: "buy more",
+    allocations: [
+      { symbol:"USDY", pct:20 }, { symbol:"mETH", pct:40 },
+      { symbol:"mUSD", pct:15 }, { symbol:"fBTC", pct:25 },
+    ],
+  },
+] as const;
+
+const DEFAULT_ALLOCATIONS = PLANS[0].allocations;
 
 interface Allocation { symbol: string; pct: number; apy: number; name: string; color: string; value: number; }
 interface OnChainAction {
@@ -53,38 +75,64 @@ export default function PortfolioPage() {
   const [withdrawTx, setWithdrawTx] = useState("");
   const [withdrawStatus, setWithdrawStatus] = useState("");
   const [atlasMessages, setAtlasMessages] = useState<Array<{ role: string; body: string }>>([
-    { role:"agent", body:"Your portfolio is performing well. USDY at 4.20%, MI4 up 14bps this week. Blended yield: 4.71%. No rebalance needed today — all allocations within 10% threshold." }
+    { role:"agent", body:"Choose a plan below — Conservative, Balanced, or Aggressive. I'll execute the allocation on Mantle and write my reasoning on-chain. You can also deposit USDY to HybridVault and enable my autonomous mode." }
   ]);
   const [onChainActions, setOnChainActions] = useState<OnChainAction[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<string>("conservative");
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planTx, setPlanTx] = useState("");
+  const [planStatus, setPlanStatus] = useState("");
   const [allocations, setAllocations] = useState<Allocation[]>(
     DEFAULT_ALLOCATIONS.map(a => ({
       ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
     }))
   );
 
-  useEffect(() => {
+  const refreshActions = () => {
     agentApi<{ actions: OnChainAction[] }>("/stats/actions?limit=10")
       .then(d => { if (d.actions?.length) setOnChainActions(d.actions); })
       .catch(() => {});
-  }, []);
+  };
 
-  useEffect(() => {
-    agentApi<{ allocations?: { asset: string; bps: number }[]; strategyType?: string }>("/portfolio/plan", {
-      method: "POST",
-      body: JSON.stringify({ user_address: address ?? "0x0000000000000000000000000000000000000000", amount: TOTAL_VALUE }),
-    }).then(d => {
-      if (!d.allocations?.length) return;
-      const total_bps = d.allocations.reduce((s, a) => s + a.bps, 0) || 10000;
-      const next = d.allocations
-        .filter(a => ASSET_META[a.asset])
-        .map(a => {
-          const pct = Math.round(a.bps / total_bps * 100);
-          const meta = ASSET_META[a.asset];
-          return { symbol: a.asset, pct, ...meta, value: TOTAL_VALUE * pct / 100 };
-        });
-      if (next.length) setAllocations(next);
-    }).catch(() => {});
-  }, [address]);
+  useEffect(() => { refreshActions(); }, []);
+
+  const activatePlan = async (planId: string) => {
+    const plan = PLANS.find(p => p.id === planId);
+    if (!plan || !isConnected || !address) return;
+
+    // Optimistic UI update
+    setSelectedPlan(planId);
+    setAllocations(plan.allocations.map(a => ({
+      ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
+    })));
+
+    setPlanBusy(true);
+    setPlanTx("");
+    setPlanStatus("Atlas is writing allocation to Mantle...");
+    try {
+      const d = await agentApi<{ onChainTx?: string; reasoning?: string }>("/portfolio/plan", {
+        method: "POST",
+        body: JSON.stringify({
+          user_address: address,
+          amount: TOTAL_VALUE,
+          goal: plan.goal,
+          horizon: plan.horizon,
+          risk_answer: plan.risk_answer,
+        }),
+      });
+      if (d.onChainTx) {
+        setPlanTx(d.onChainTx);
+        setPlanStatus(`${plan.label} plan activated — reasoning stored on-chain.`);
+        setTimeout(refreshActions, 3000);
+      } else {
+        setPlanStatus(`${plan.label} plan set. (On-chain write pending — backend signing.)`);
+      }
+    } catch {
+      setPlanStatus("Plan set locally. Backend unavailable.");
+    } finally {
+      setPlanBusy(false);
+    }
+  };
 
   const sendAtlas = async () => {
     if (!atlasInput.trim()) return;
@@ -252,19 +300,85 @@ export default function PortfolioPage() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:24 }}>
-        {[
-          { label:"Portfolio Value", value:`$${TOTAL_VALUE.toLocaleString()}`, sub:"Conservative strategy" },
-          { label:"Blended APY",     value:`${allocations.reduce((s,a)=>s+(a.pct/100)*a.apy,0).toFixed(2)}%`, sub:"Atlas optimized" },
-          { label:"Monthly Income",  value:`$${((TOTAL_VALUE * allocations.reduce((s,a)=>s+(a.pct/100)*a.apy,0)/100)/12).toFixed(2)}`, sub:"Est. distribution" },
-          { label:"Risk Score",      value:"3 / 10",                            sub:"Low risk" },
-        ].map(({ label, value, sub }, i) => (
-          <div key={i} style={{ padding:"16px 18px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-            <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
-            <div style={{ fontFamily:"var(--font-mono)", fontSize:28, color:"var(--fg-0)" }}>{value}</div>
-            <div className="mono-sm" style={{ color:"var(--accent)", marginTop:4 }}>{sub}</div>
+      {(() => {
+        const plan = PLANS.find(p => p.id === selectedPlan) ?? PLANS[0];
+        const blended = allocations.reduce((s,a) => s + (a.pct/100)*a.apy, 0);
+        return (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:24 }}>
+            {[
+              { label:"Portfolio Value", value:`$${TOTAL_VALUE.toLocaleString()}`, sub:`${plan.label} strategy` },
+              { label:"Blended APY",     value:`${blended.toFixed(2)}%`,           sub:"Atlas optimized" },
+              { label:"Monthly Income",  value:`$${((TOTAL_VALUE * blended/100)/12).toFixed(2)}`, sub:"Est. distribution" },
+              { label:"Risk Score",      value:`${plan.riskScore} / 10`,           sub: plan.riskScore <= 3 ? "Low risk" : plan.riskScore <= 6 ? "Medium risk" : "High risk" },
+            ].map(({ label, value, sub }, i) => (
+              <div key={i} style={{ padding:"16px 18px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+                <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
+                <div style={{ fontFamily:"var(--font-mono)", fontSize:28, color:"var(--fg-0)" }}>{value}</div>
+                <div className="mono-sm" style={{ color:"var(--accent)", marginTop:4 }}>{sub}</div>
+              </div>
+            ))}
           </div>
-        ))}
+        );
+      })()}
+
+      {/* Plan selector */}
+      <div className="panel" style={{ marginBottom:24 }}>
+        <div className="panel-header">
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <AgentMonogram agent="atlas" active/>
+            <span className="mono">Select a plan · Atlas executes on Mantle</span>
+          </div>
+          {planBusy && <span className="mono-sm" style={{ color:"var(--atlas)" }}>Writing to chain…</span>}
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0 }}>
+          {PLANS.map((plan, i) => {
+            const blended = plan.allocations.reduce((s,a) => s + (a.pct/100)*(ASSET_META[a.symbol]?.apy ?? 0), 0);
+            const active = selectedPlan === plan.id;
+            return (
+              <div key={plan.id} style={{
+                padding:"16px", borderRight: i < 2 ? "1px solid var(--line)" : "none",
+                background: active ? "var(--bg-2)" : "transparent",
+                borderTop: active ? "2px solid var(--atlas)" : "2px solid transparent",
+                transition:"all 0.15s",
+              }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                  <div>
+                    <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color: active ? "var(--atlas)" : "var(--fg-0)", marginBottom:2 }}>{plan.label}</div>
+                    <div className="mono-sm" style={{ color:"var(--fg-3)" }}>Risk {plan.riskScore}/10</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontFamily:"var(--font-mono)", fontSize:18, color:"var(--accent)" }}>{blended.toFixed(2)}%</div>
+                    <div className="mono-sm" style={{ color:"var(--fg-3)" }}>APY</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:4, marginBottom:12 }}>
+                  {plan.allocations.map(a => (
+                    <div key={a.symbol} style={{ flex:a.pct, height:4, borderRadius:1, background:ASSET_META[a.symbol]?.color ?? "var(--fg-3)", opacity:0.7 }}/>
+                  ))}
+                </div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:12 }}>
+                  {plan.allocations.map(a => (
+                    <span key={a.symbol} className="mono-sm" style={{ color:"var(--fg-2)" }}>{a.symbol} {a.pct}%</span>
+                  ))}
+                </div>
+                <button
+                  className={active ? "btn btn-primary" : "btn btn-ghost"}
+                  style={{ width:"100%", fontSize:11 }}
+                  onClick={() => activatePlan(plan.id)}
+                  disabled={planBusy || !isConnected}
+                >
+                  {active ? (planBusy ? "Activating…" : "Active ✓") : "Activate Plan →"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {(planStatus || planTx) && (
+          <div style={{ padding:"10px 16px", borderTop:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{planStatus}</span>
+            {planTx && <a href={`https://sepolia.mantlescan.xyz/tx/${planTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>↗ {planTx.slice(0,10)}…{planTx.slice(-6)}</a>}
+          </div>
+        )}
       </div>
 
       <div className="panel" style={{ marginBottom:24 }}>
