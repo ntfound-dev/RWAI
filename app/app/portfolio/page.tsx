@@ -9,12 +9,21 @@ import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { MANTLE_ASSETS } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
 
-const ALLOCATIONS = [
-  { symbol:"USDY", name:"Ondo US Dollar Yield", pct:60, apy:4.20, color:"var(--accent)",  value:6000 },
-  { symbol:"MI4",  name:"Mantle Index 4",        pct:25, apy:5.81, color:"var(--shield)",  value:2500 },
-  { symbol:"mETH", name:"Mantle Staked ETH",     pct:15, apy:6.12, color:"var(--atlas)",   value:1500 },
+const ASSET_META: Record<string, { name: string; color: string; apy: number }> = {
+  USDY: { name:"Ondo US Dollar Yield", color:"var(--accent)",  apy:4.20 },
+  mUSD: { name:"Mantle USD",           color:"var(--nexus)",   apy:3.90 },
+  mETH: { name:"Mantle Staked ETH",    color:"var(--atlas)",   apy:6.12 },
+  fBTC: { name:"Mantle Wrapped BTC",   color:"var(--warn)",    apy:3.50 },
+};
+
+const DEFAULT_ALLOCATIONS = [
+  { symbol:"USDY", pct:50 },
+  { symbol:"mETH", pct:25 },
+  { symbol:"mUSD", pct:15 },
+  { symbol:"fBTC", pct:10 },
 ];
 
+interface Allocation { symbol: string; pct: number; apy: number; name: string; color: string; value: number; }
 interface OnChainAction {
   action_id: number;
   agent_name: string;
@@ -24,9 +33,7 @@ interface OnChainAction {
   success: boolean;
 }
 
-const BLENDED_APY = ALLOCATIONS.reduce((acc, a) => acc + (a.pct/100) * a.apy, 0);
 const TOTAL_VALUE = 10000;
-const MONTHLY_INCOME = (TOTAL_VALUE * BLENDED_APY / 100) / 12;
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
@@ -41,11 +48,32 @@ export default function PortfolioPage() {
     { role:"agent", body:"Your portfolio is performing well. USDY at 4.20%, MI4 up 14bps this week. Blended yield: 4.71%. No rebalance needed today — all allocations within 10% threshold." }
   ]);
   const [onChainActions, setOnChainActions] = useState<OnChainAction[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>(
+    DEFAULT_ALLOCATIONS.map(a => ({
+      ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
+    }))
+  );
 
   useEffect(() => {
     agentApi<{ actions: OnChainAction[] }>("/stats/actions?limit=10")
       .then(d => { if (d.actions?.length) setOnChainActions(d.actions); })
       .catch(() => {});
+
+    agentApi<{ allocations?: { asset: string; bps: number }[]; strategyType?: string }>("/portfolio/plan", {
+      method: "POST",
+      body: JSON.stringify({ user_address: "0x0000000000000000000000000000000000000000", risk_score: 3, amount_usd: TOTAL_VALUE }),
+    }).then(d => {
+      if (!d.allocations?.length) return;
+      const total_bps = d.allocations.reduce((s, a) => s + a.bps, 0) || 10000;
+      const next = d.allocations
+        .filter(a => ASSET_META[a.asset])
+        .map(a => {
+          const pct = Math.round(a.bps / total_bps * 100);
+          const meta = ASSET_META[a.asset];
+          return { symbol: a.asset, pct, ...meta, value: TOTAL_VALUE * pct / 100 };
+        });
+      if (next.length) setAllocations(next);
+    }).catch(() => {});
   }, []);
 
   const sendAtlas = async () => {
@@ -142,8 +170,8 @@ export default function PortfolioPage() {
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:24 }}>
         {[
           { label:"Portfolio Value", value:`$${TOTAL_VALUE.toLocaleString()}`, sub:"Conservative strategy" },
-          { label:"Blended APY",     value:`${BLENDED_APY.toFixed(2)}%`,       sub:"Atlas optimized" },
-          { label:"Monthly Income",  value:`$${MONTHLY_INCOME.toFixed(2)}`,     sub:"Est. distribution" },
+          { label:"Blended APY",     value:`${allocations.reduce((s,a)=>s+(a.pct/100)*a.apy,0).toFixed(2)}%`, sub:"Atlas optimized" },
+          { label:"Monthly Income",  value:`$${((TOTAL_VALUE * allocations.reduce((s,a)=>s+(a.pct/100)*a.apy,0)/100)/12).toFixed(2)}`, sub:"Est. distribution" },
           { label:"Risk Score",      value:"3 / 10",                            sub:"Low risk" },
         ].map(({ label, value, sub }, i) => (
           <div key={i} style={{ padding:"16px 18px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
@@ -190,7 +218,7 @@ export default function PortfolioPage() {
           {/* Allocation chart */}
           <div className="panel" style={{ marginBottom:24 }}>
             <div className="panel-header">
-              <span className="mono">Allocation · {ALLOCATIONS.length} assets</span>
+              <span className="mono">Allocation · {allocations.length} assets</span>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 <AgentMonogram agent="atlas" active/>
                 <span className="mono-sm" style={{ color:"var(--atlas)" }}>Atlas managed</span>
@@ -199,14 +227,14 @@ export default function PortfolioPage() {
             <div style={{ padding:"20px" }}>
               {/* Bar chart */}
               <div style={{ display:"flex", height:40, borderRadius:2, overflow:"hidden", marginBottom:20, gap:2 }}>
-                {ALLOCATIONS.map(a => (
+                {allocations.map(a => (
                   <div key={a.symbol} style={{ flex:a.pct, background:a.color, opacity:0.7, display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--bg-0)", fontWeight:600 }}>{a.pct}%</span>
                   </div>
                 ))}
               </div>
               {/* Asset rows */}
-              {ALLOCATIONS.map(a => (
+              {allocations.map(a => (
                 <div key={a.symbol} style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 80px 80px", alignItems:"center", gap:14, padding:"12px 0", borderBottom:"1px solid var(--line)" }}>
                   <div style={{ width:12, height:12, borderRadius:2, background:a.color, opacity:0.8 }}/>
                   <div>
