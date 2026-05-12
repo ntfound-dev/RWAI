@@ -1,0 +1,59 @@
+type Asset @entity {
+  id: ID!                    # assetId as string
+  tokenAddress: Bytes!
+  owner: Bytes!
+  assetType: String!
+  complianceScore: Int!
+  active: Boolean!
+  registeredAt: BigInt!
+  txHash: Bytes!
+}
+
+type AgentAction @entity {
+  id: ID!                    # actionId as string
+  agentId: BigInt!
+  agentName: String!
+  actionType: String!
+  success: Boolean!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  timestamp: BigInt!
+}
+
+type TvlSnapshot @entity {
+  id: ID!                    # txHash-logIndex
+  user: Bytes!
+  totalValue: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+type YieldSnapshot @entity {
+  id: ID!                    # txHash-logIndex
+  asset: Bytes!
+  apyBps: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+# Aggregated stats — one entity, id = "global"
+type GlobalStats @entity {
+  id: ID!
+  assetCount: Int!
+  activeAssetCount: Int!
+  totalAgentRuns: Int!
+  successfulAgentRuns: Int!
+  cumulativeTvlWei: BigInt!
+  avgComplianceScore: Int!
+  lastUpdated: BigInt!
+}
+
+# Daily rollup — id = "YYYY-MM-DD"
+type DailyStats @entity {
+  id: ID!
+  date: String!
+  newAssets: Int!
+  agentRuns: Int!
+  tvlUSD: BigInt!
+  timestamp: BigInt!
+}

@@ -1,0 +1,88 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  - kind: ethereum
+    name: RWAiRegistry
+    network: mantle-sepolia
+    source:
+      address: "0xeE7a50936a25a375143b75b7Ca743B9513368680"
+      abi: RWAiRegistry
+      startBlock: 38500000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities: [Asset, GlobalStats, DailyStats]
+      abis:
+        - name: RWAiRegistry
+          file: ../artifacts/contracts/RWAiRegistry.sol/RWAiRegistry.json
+      eventHandlers:
+        - event: AssetRegistered(indexed uint256,address,address,string)
+          handler: handleAssetRegistered
+        - event: ComplianceUpdated(indexed uint256,uint256,bytes32)
+          handler: handleComplianceUpdated
+        - event: AssetDeactivated(indexed uint256)
+          handler: handleAssetDeactivated
+      file: ./src/registry.ts
+
+  - kind: ethereum
+    name: AgentExecutor
+    network: mantle-sepolia
+    source:
+      address: "0x9a822B9A50D090CfcCa1e6474efCd653112d8501"
+      abi: AgentExecutor
+      startBlock: 38500000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities: [AgentAction, GlobalStats, DailyStats]
+      abis:
+        - name: AgentExecutor
+          file: ../artifacts/contracts/AgentExecutor.sol/AgentExecutor.json
+      eventHandlers:
+        - event: AgentActionExecuted(indexed uint256,indexed uint256,string,string,bool)
+          handler: handleAgentActionExecuted
+      file: ./src/executor.ts
+
+  - kind: ethereum
+    name: PortfolioVault
+    network: mantle-sepolia
+    source:
+      address: "0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4"
+      abi: PortfolioVault
+      startBlock: 38500000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities: [TvlSnapshot, GlobalStats]
+      abis:
+        - name: PortfolioVault
+          file: ../artifacts/contracts/PortfolioVault.sol/PortfolioVault.json
+      eventHandlers:
+        - event: AllocationExecuted(indexed address,uint256,uint256)
+          handler: handleAllocationExecuted
+      file: ./src/vault.ts
+
+  - kind: ethereum
+    name: YieldOracle
+    network: mantle-sepolia
+    source:
+      address: "0x1288dF9F55673cBFc97BCe7aD5445D77B9029B92"
+      abi: YieldOracle
+      startBlock: 38500000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities: [YieldSnapshot]
+      abis:
+        - name: YieldOracle
+          file: ../artifacts/contracts/YieldOracle.sol/YieldOracle.json
+      eventHandlers:
+        - event: YieldUpdated(indexed address,uint256,string)
+          handler: handleYieldUpdated
+      file: ./src/yield_oracle.ts
