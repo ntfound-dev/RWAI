@@ -39,7 +39,7 @@ const STEP_LABELS: Record<Step, string> = {
 };
 
 export default function TokenizePage() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [step, setStep] = useState<Step>("upload");
   const [files, setFiles] = useState<File[]>([]);
   const [nexusResult, setNexusResult] = useState<NexusResult | null>(null);
@@ -121,6 +121,7 @@ export default function TokenizePage() {
           asset_type: nexusResult.assetType,
           asset_id: 0,
           token_address: tokenAddress,
+          owner_address: address ?? "",
         }),
       });
       const tx = result.onChainTx ?? "";
@@ -184,8 +185,8 @@ export default function TokenizePage() {
             >
               <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
               <div className="display" style={{ fontSize:24, marginBottom:8 }}>Drop documents here</div>
-              <p className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>PDF, DOCX, images · deed, income statement, appraisal</p>
-              <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.webp" style={{ display:"none" }} onChange={e => handleFiles(e.target.files)}/>
+              <p className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>PDF, DOCX · deed, income statement, appraisal</p>
+              <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.doc" style={{ display:"none" }} onChange={e => handleFiles(e.target.files)}/>
             </div>
             {files.length > 0 && (
               <div style={{ marginBottom:20 }}>

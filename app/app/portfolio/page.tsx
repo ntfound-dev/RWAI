@@ -54,6 +54,22 @@ interface OnChainAction {
   ts: number;
   success: boolean;
 }
+interface TokenizedAsset {
+  asset_id: number | null;
+  token_address: string;
+  owner: string;
+  asset_type: string;
+  compliance_score: number;
+  active: boolean;
+  block_number: number;
+  tx_hash: string;
+  ts: number;
+  token_name: string;
+  token_symbol: string;
+  apy_bps: number;
+  value_usd: number;
+  _source?: string;
+}
 
 const TOTAL_VALUE = 10000;
 
@@ -87,6 +103,7 @@ export default function PortfolioPage() {
       ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
     }))
   );
+  const [myAssets, setMyAssets] = useState<TokenizedAsset[]>([]);
 
   const refreshActions = () => {
     agentApi<{ actions: OnChainAction[] }>("/stats/actions?limit=10")
@@ -94,7 +111,17 @@ export default function PortfolioPage() {
       .catch(() => {});
   };
 
+  const refreshMyAssets = (addr: string) => {
+    agentApi<{ assets: TokenizedAsset[] }>(`/stats/assets?owner=${addr}&limit=20`)
+      .then(d => { if (d.assets) setMyAssets(d.assets); })
+      .catch(() => {});
+  };
+
   useEffect(() => { refreshActions(); }, []);
+  useEffect(() => {
+    if (address) refreshMyAssets(address);
+    else setMyAssets([]);
+  }, [address]);
 
   const activatePlan = async (planId: string) => {
     const plan = PLANS.find(p => p.id === planId);
@@ -501,6 +528,71 @@ export default function PortfolioPage() {
               ))}
             </div>
           </div>
+
+          {/* My Tokenized Assets */}
+          {(myAssets.length > 0 || isConnected) && (
+            <div className="panel" style={{ marginBottom:24 }}>
+              <div className="panel-header">
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <AgentMonogram agent="nexus" active/>
+                  <span className="mono">My Tokenized Assets · Nexus issued</span>
+                </div>
+                <span className="mono-sm" style={{ color:"var(--nexus)" }}>ERC-20 on Mantle</span>
+              </div>
+              {myAssets.length === 0 ? (
+                <div style={{ padding:"24px 16px", textAlign:"center", color:"var(--fg-3)", fontSize:12 }}>
+                  No tokenized assets yet.{" "}
+                  <a href="/tokenize" style={{ color:"var(--accent)", textDecoration:"none" }}>Tokenize an asset →</a>
+                </div>
+              ) : myAssets.map((a, i) => {
+                const date = new Date(a.ts * 1000).toLocaleString("sv-SE").replace("T"," ").slice(0,16);
+                const symbol = a.token_symbol || (a.asset_id != null ? `RWA-${a.asset_id}` : "RWA");
+                const name = a.token_name || a.asset_type?.replace(/_/g," ") || "Real World Asset";
+                const apy = a.apy_bps ? (a.apy_bps / 100).toFixed(2) : null;
+                const value = a.value_usd ? `$${Number(a.value_usd).toLocaleString()}` : null;
+                const score = a.compliance_score;
+                const shortAddr = `${a.token_address.slice(0,8)}…${a.token_address.slice(-6)}`;
+                return (
+                  <div key={`${a.tx_hash}-${i}`} style={{ display:"grid", gridTemplateColumns:"auto 1fr auto", alignItems:"start", gap:14, padding:"14px 16px", borderBottom: i < myAssets.length - 1 ? "1px solid var(--line)" : "none" }}>
+                    <div style={{ width:36, height:36, borderRadius:2, background:"var(--bg-2)", border:"1px solid var(--line-strong)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--nexus)", fontWeight:600 }}>{symbol.slice(0,4)}</span>
+                    </div>
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                        <span style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--fg-0)" }}>{symbol}</span>
+                        <span className="tag" style={{ fontSize:9 }}>{name}</span>
+                        <span className="tag" style={{ fontSize:9, color: score >= 70 ? "var(--accent)" : "var(--warn)", borderColor: score >= 70 ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)" }}>
+                          Score {score}/100
+                        </span>
+                      </div>
+                      <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+                        <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{date}</span>
+                        {value && <span className="mono-sm" style={{ color:"var(--fg-2)" }}>Value {value}</span>}
+                        {apy && <span className="mono-sm" style={{ color:"var(--accent)" }}>APY {apy}%</span>}
+                        <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Token {shortAddr}</span>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
+                      {a.tx_hash && (
+                        <a href={`https://sepolia.mantlescan.xyz/tx/${a.tx_hash}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
+                          ↗ {a.tx_hash.slice(0,6)}…{a.tx_hash.slice(-4)}
+                        </a>
+                      )}
+                      <a href={`https://sepolia.mantlescan.xyz/address/${a.token_address}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--fg-3)", whiteSpace:"nowrap" }}>
+                        contract ↗
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+              {myAssets.length > 0 && (
+                <div style={{ padding:"10px 16px", borderTop:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{myAssets.length} asset{myAssets.length !== 1 ? "s" : ""} tokenized · stored on Mantle Sepolia</span>
+                  <a href="/tokenize" className="mono-sm" style={{ color:"var(--accent)", textDecoration:"none" }}>Tokenize another →</a>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Rebalance history */}
           <div className="panel">

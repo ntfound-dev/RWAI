@@ -18,13 +18,17 @@ def _load() -> dict:
     if DB_PATH.exists():
         try:
             with open(DB_PATH, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                if "user_tokenizations" not in data:
+                    data["user_tokenizations"] = []
+                return data
         except Exception:
             pass
     return {
         "last_block": 0,
-        "assets": {},           # asset_id -> asset dict
+        "assets": {},           # asset_id -> asset dict (from chain indexer)
         "agent_actions": {},    # action_id -> action dict
+        "user_tokenizations": [],  # user-initiated tokenizations (off-chain metadata)
         "tvl_snapshots": [],
         "yield_snapshots": [],
     }
@@ -56,7 +60,8 @@ def set_last_indexed_block(block: int) -> None:
         _save(data)
 
 
-def upsert_asset(asset_id, token_address, owner, asset_type, block_number, tx_hash, ts):
+def upsert_asset(asset_id, token_address, owner, asset_type, block_number, tx_hash, ts,
+                 token_name=None, token_symbol=None, apy_bps=0, value_usd=0):
     with _lock:
         data = _load()
         key = str(asset_id)
@@ -71,8 +76,26 @@ def upsert_asset(asset_id, token_address, owner, asset_type, block_number, tx_ha
                 "block_number":    block_number,
                 "tx_hash":         tx_hash,
                 "ts":              ts,
+                "token_name":      token_name or "",
+                "token_symbol":    token_symbol or "",
+                "apy_bps":         int(apy_bps or 0),
+                "value_usd":       float(value_usd or 0),
             }
             _save(data)
+        else:
+            # Update meta fields if provided and not already set
+            changed = False
+            entry = data["assets"][key]
+            if token_name and not entry.get("token_name"):
+                entry["token_name"] = token_name; changed = True
+            if token_symbol and not entry.get("token_symbol"):
+                entry["token_symbol"] = token_symbol; changed = True
+            if apy_bps and not entry.get("apy_bps"):
+                entry["apy_bps"] = int(apy_bps); changed = True
+            if value_usd and not entry.get("value_usd"):
+                entry["value_usd"] = float(value_usd); changed = True
+            if changed:
+                _save(data)
 
 
 def update_compliance(asset_id, score):
@@ -173,8 +196,40 @@ def get_recent_actions(limit: int = 20) -> list:
     return actions[:limit]
 
 
-def get_assets(limit: int = 50) -> list:
+def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx_hash: str,
+                              token_name: str = "", token_symbol: str = "",
+                              apy_bps: int = 0, value_usd: float = 0,
+                              compliance_score: int = 0) -> None:
     with _lock:
         data = _load()
-    assets = sorted(data["assets"].values(), key=lambda a: a.get("asset_id", 0), reverse=True)
-    return assets[:limit]
+        entry = {
+            "asset_id":        None,
+            "token_address":   token_address,
+            "owner":           owner,
+            "asset_type":      asset_type,
+            "compliance_score": int(compliance_score or 0),
+            "active":          True,
+            "block_number":    0,
+            "tx_hash":         tx_hash,
+            "ts":              int(time.time()),
+            "token_name":      token_name,
+            "token_symbol":    token_symbol,
+            "apy_bps":         int(apy_bps or 0),
+            "value_usd":       float(value_usd or 0),
+            "_source":         "user",
+        }
+        data["user_tokenizations"].append(entry)
+        _save(data)
+
+
+def get_assets(limit: int = 50, owner: str = None) -> list:
+    with _lock:
+        data = _load()
+    chain_assets = list(data["assets"].values())
+    user_assets  = list(data.get("user_tokenizations", []))
+    if owner:
+        owner_lc = owner.lower()
+        chain_assets = [a for a in chain_assets if (a.get("owner") or "").lower() == owner_lc]
+        user_assets  = [a for a in user_assets  if (a.get("owner") or "").lower() == owner_lc]
+    all_assets = sorted(chain_assets + user_assets, key=lambda a: a.get("ts", 0), reverse=True)
+    return all_assets[:limit]

@@ -56,5 +56,5 @@ def recent_actions(limit: int = Query(default=20, le=100)):
 
 
 @router.get("/stats/assets")
-def asset_list(limit: int = Query(default=50, le=200)):
-    return {"assets": get_assets(limit)}
+def asset_list(limit: int = Query(default=50, le=200), owner: str = Query(default=None)):
+    return {"assets": get_assets(limit, owner=owner)}

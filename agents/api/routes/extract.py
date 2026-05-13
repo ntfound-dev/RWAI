@@ -35,8 +35,6 @@ async def extract_text(files: List[UploadFile] = File(...)):
                 text = _extract_pdf(data)
             elif name.endswith(".docx") or name.endswith(".doc"):
                 text = _extract_docx(data)
-            elif any(name.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
-                text = f"[Image: {f.filename}, {len(data)//1024} KB]"
             else:
                 decoded = data.decode("utf-8", errors="ignore")
                 clean = "".join(c for c in decoded if c.isprintable() or c in "\n\t")

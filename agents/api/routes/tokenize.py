@@ -1,9 +1,11 @@
 import json
+import time
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
 from ...mantle.executor import log_tokenization, log_compliance_review
+from ...mantle.db import record_user_tokenization
 
 router = APIRouter()
 
@@ -13,6 +15,7 @@ class TokenizeRequest(BaseModel):
     asset_type: Optional[str] = None
     asset_id: int = 0                     # existing assetId if known (0 = new)
     token_address: str = "0x" + "0" * 40  # address after deploy (or zero)
+    owner_address: Optional[str] = None   # wallet that owns the token
 
 
 class ComplianceRequest(BaseModel):
@@ -53,6 +56,20 @@ async def tokenize(req: TokenizeRequest):
         tx = log_tokenization(req.asset_id, req.token_address, reasoning)
         if tx:
             result["onChainTx"] = tx
+
+        # Record user tokenization with full nexus metadata so portfolio can display it
+        if req.owner_address:
+            record_user_tokenization(
+                owner=req.owner_address,
+                token_address=req.token_address,
+                asset_type=req.asset_type or result.get("assetType", "real_estate"),
+                tx_hash=tx or "",
+                token_name=result.get("suggestedTokenName") or result.get("tokenName", ""),
+                token_symbol=result.get("suggestedSymbol") or result.get("symbol", ""),
+                apy_bps=result.get("annualYieldBps", 0),
+                value_usd=result.get("estimatedValueUSD", 0),
+                compliance_score=0,
+            )
 
     return result
 
