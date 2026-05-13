@@ -359,7 +359,205 @@ html, body {
   }
 }
 
+/* ── Voice / Atlas Jarvis interface ─────────────────────────────── */
+.voice-shell {
+  min-height: 100vh;
+  background: #020406;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  font-family: var(--font-mono);
+}
+.voice-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  pointer-events: none;
+}
+.voice-identity {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(0,212,255,0.45);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+}
+.voice-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(0,212,255,0.3);
+}
+.voice-state-label {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  letter-spacing: 0.35em;
+  opacity: 0.8;
+  transition: color 0.4s;
+}
+.voice-centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+.voice-orb-wrap {
+  position: relative;
+  width: 220px;
+  height: 220px;
+}
+.voice-orb {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.5s, border-color 0.5s;
+}
+.voice-mark {
+  font-family: Georgia, serif;
+  font-size: 56px;
+  font-style: italic;
+  font-weight: 700;
+  user-select: none;
+  transition: color 0.4s, text-shadow 0.4s;
+}
+.voice-orb-idle      { animation: orbIdle      3.5s ease-in-out infinite; }
+.voice-orb-listening { animation: orbListening 0.7s ease-in-out infinite; }
+.voice-orb-thinking  { animation: orbThinking  2s   linear     infinite; }
+.voice-orb-speaking  { animation: orbSpeaking  0.35s ease-in-out infinite; }
+.voice-orb-executing { animation: orbExecuting 0.55s ease-in-out infinite; }
+@keyframes orbIdle      { 0%,100%{transform:scale(1)}50%{transform:scale(1.022)} }
+@keyframes orbListening { 0%,100%{transform:scale(1)}50%{transform:scale(1.08)}  }
+@keyframes orbThinking  { 0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)} }
+@keyframes orbSpeaking  { 0%,100%{transform:scale(1)}25%{transform:scale(1.05)}75%{transform:scale(1.07)} }
+@keyframes orbExecuting { 0%,100%{transform:scale(1)}50%{transform:scale(1.06)} }
+.voice-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 220px; height: 220px;
+  transform: translate(-50%,-50%) scale(1);
+  border-radius: 50%;
+  border: 1px solid;
+  opacity: 0;
+  pointer-events: none;
+}
+.voice-ring-1 { animation: ringOut 1.8s ease-out infinite; }
+.voice-ring-2 { animation: ringOut 1.8s ease-out 0.6s infinite; }
+@keyframes ringOut {
+  0%   { transform: translate(-50%,-50%) scale(1);   opacity: 0.55; }
+  100% { transform: translate(-50%,-50%) scale(2.4); opacity: 0;    }
+}
+.voice-text {
+  max-width: 520px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.55);
+  min-height: 60px;
+  padding: 0 20px;
+  transition: color 0.3s;
+}
+.voice-mic {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: box-shadow 0.25s, background 0.25s;
+}
+.voice-mic:active:not(:disabled) {
+  background: rgba(0,212,255,0.08);
+  box-shadow: 0 0 40px rgba(0,212,255,0.45);
+}
+.voice-mic:disabled { opacity: 0.4; cursor: not-allowed; }
+.voice-hint {
+  color: rgba(255,255,255,0.18);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  margin: 0;
+}
+.voice-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
+.voice-log {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 290px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 8px;
+  padding: 14px;
+  backdrop-filter: blur(6px);
+}
+.voice-log-title {
+  color: rgba(0,212,255,0.4);
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  margin-bottom: 12px;
+}
+.voice-log-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.voice-log-row:last-child { border-bottom: 0; }
+.voice-log-meta { display: flex; justify-content: space-between; align-items: center; }
+.voice-log-type { font-size: 8px; letter-spacing: 0.2em; font-weight: 700; }
+.voice-log-type-input    { color: #a78bfa; }
+.voice-log-type-response { color: #34d399; }
+.voice-log-type-execute  { color: #fbbf24; }
+.voice-log-type-error    { color: #f87171; }
+.voice-log-time { color: rgba(255,255,255,0.25); font-size: 9px; }
+.voice-log-text { color: rgba(255,255,255,0.55); font-size: 10px; line-height: 1.5; }
+.voice-log-tx   { color: #fbbf24; font-size: 9px; font-family: var(--font-mono); }
+.voice-wallet {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.18);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+}
+
 @media (max-width: 620px) {
+  .voice-log { display: none; }
+  .voice-identity { font-size: 8px; gap: 6px; }
+  .voice-orb-wrap, .voice-orb { width: 180px; height: 180px; }
+  .voice-ring { width: 180px; height: 180px; }
+  .voice-mark { font-size: 44px; }
   .bridge-title {
     font-size: 42px;
   }

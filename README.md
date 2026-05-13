@@ -1,59 +1,138 @@
-# RWAi — AI-Native Real World Asset Platform on Mantle
+# RWAi — Sovereign AI Agents for Real World Assets on Mantle
 
-> Four ERC-8004 sovereign AI agents tokenize real-world assets and manage investor portfolios on Mantle Network. Every agent decision is written permanently on-chain.
-
-**Track:** AI & RWA Track · DoraHacks Turing Test Hackathon  
-**Chain:** Mantle Sepolia Testnet (chainId 5003)  
-**Stack:** Next.js 14 · FastAPI · OpenClaw/CMDOP + Groq fallback · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004
+> **Track:** AI & RWA Track · Turing Test Hackathon  
+> **One-liner:** The first RWA platform where 4 ERC-8004 sovereign AI agents tokenize assets, manage portfolios, and answer to no one — every decision benchmarked on Mantle forever.
 
 ---
 
-## One-Line Pitch
+## The Problem
 
-RWAi is the first RWA platform where 4 ERC-8004 sovereign AI agents autonomously tokenize real-world assets and manage investor portfolios — with every AI decision permanently verifiable on Mantle.
+**1. Tokenizing a real-world asset costs $100,000 and takes months.**  
+Lawyers, Solidity developers, compliance consultants — before a single token exists. Only institutions can afford this. Retail asset owners are locked out entirely.
+
+**2. Mantle's native RWA ecosystem (USDY, mETH, fBTC, mUSD) has no intelligent layer.**  
+The assets are excellent. The yield is real. But there is no system that tells a retail investor *what* to buy, *how much*, and *when to rebalance* — based on their risk profile, on current data, on their actual wallet.
+
+**3. On-chain AI has a trust crisis.**  
+AI agents are executing decisions that move real money — but there is no verifiable identity, no reputation trail, no auditable record of who decided what and why. When an AI agent acts, it leaves no proof it ever existed.
 
 ---
 
-## The 4 AI Agents
+## The Solution
 
-| Agent | Role | On-Chain Action |
-|-------|------|----------------|
-| **Nexus** | Analyzes documents → recommends ERC-20 token params | `AgentExecutor.logTokenization()` |
-| **Shield** | Compliance scoring, KYC/AML, sanctions screening | `AgentExecutor.logComplianceReview()` |
-| **Yield** | Monitors APY and Pyth USD prices across Mantle RWAs | `YieldOracle.createMarketSnapshot()` / `YieldOracle.updatePrice()` |
-| **Atlas** | Onboards investors, builds strategies, executes rebalancing | `AgentExecutor.executeAllocation()` |
+**RWAi** puts four ERC-8004 sovereign AI agents to work on these three problems simultaneously.
 
-Each agent has an **ERC-8004 identity** on Mantle. Reputation score (0–100) gates autonomy level — higher score → more autonomous actions allowed.
+```
+Asset Owner                          Investor
+     │                                   │
+     ▼                                   ▼
+[Upload PDF/DOCX]              [Tell Atlas what you want]
+     │                          (text or VOICE command)
+     ▼                                   │
+[NEXUS analyzes doc]           [ATLAS builds strategy]
+[SHIELD validates compliance]  [YIELD prices the assets]
+     │                                   │
+     ▼                                   ▼
+[ERC-20 deployed on Mantle]    [Allocation executed on Mantle]
+     │                                   │
+     └──────────────┬────────────────────┘
+                    ▼
+        AgentExecutor.sol — immutable on-chain log
+        Every decision. Every agent. Every outcome.
+        Permanently benchmarked on Mantle.
+```
+
+**For asset owners:** Upload a PDF deed or income statement → Nexus extracts asset metadata, Yield prices it, Shield scores compliance → ERC-20 token deployed on Mantle in minutes. Cost: gas only.
+
+**For investors:** Talk to Atlas (text or voice) → Atlas coordinates Nexus + Shield + Yield → recommends a strategy across real Mantle RWAs → executes allocation → writes reasoning on-chain with its ERC-8004 identity as proof.
+
+**For everyone:** Every AI decision is logged immutably in `AgentExecutor.sol`. Every agent action is signed by its ERC-8004 identity NFT. Reputation score (0–100) gates autonomy level. This is the first verifiable AI performance benchmark on Mantle.
+
+---
+
+## Why This Wins the Turing Test
+
+The three defining criteria of this hackathon — built into RWAi's core:
+
+| Hackathon Criterion | How RWAi Delivers |
+|---|---|
+| **On-chain benchmarking of AI** | `AgentExecutor.sol` logs every agent decision on Mantle — queryable, permanent, the first RWA AI benchmark on-chain |
+| **ERC-8004 agent identity** | 4 agents registered (nexus=41, shield=42, yield=43, atlas=44), reputation gating live, reputation mirrors to ERC-8004 on-chain |
+| **Radical transparency** | Atlas voice interface — watch the agent hear your command, reason, execute, and write proof to Mantle in real time |
+
+---
+
+## The 4 ERC-8004 Agents
+
+| Agent | ERC-8004 ID | Role | Primary On-Chain Action |
+|-------|------------|------|------------------------|
+| **Nexus** | 41 | Tokenizes RWAs from documents | `AgentExecutor.logTokenization()` |
+| **Shield** | 42 | AI compliance review — KYC/AML, sanctions, risk scoring | `AgentExecutor.logComplianceReview()` |
+| **Yield** | 43 | Prices assets via Pyth, monitors APY across Mantle RWAs | `YieldOracle.updatePrice()` / `createMarketSnapshot()` |
+| **Atlas** | 44 | Portfolio strategy, voice commands, autonomous execution | `AgentExecutor.executeAllocation()` / `executeRebalance()` |
+
+**Reputation scores (live on Mantle Sepolia):** Nexus: 85 · Shield: 75 · Yield: 75 · Atlas: 75  
+Higher reputation → more autonomous actions permitted. Agents earn reputation through successful on-chain decisions.
+
+**Agent runtime:** OpenClaw/CMDOP primary → Groq (llama-3.3-70b) → Claude fallback. Model-agnostic, 4-level chain.
 
 ---
 
 ## Architecture
 
 ```
-Browser
+Browser (Next.js 14)
+  │  wagmi v2 + viem · Mantle Sepolia · WalletConnect
   │
   ▼
-Next.js 14 (app/)          ← wagmi v2 + viem, Mantle Sepolia
-  │
-  ▼
-FastAPI Backend (agents/)  ← OpenClaw/CMDOP → Groq (llama-3.3-70b) → Claude
-  │  4-level fallback chain; every decision logged on-chain
+FastAPI Backend (agents/)
+  │  OpenClaw/CMDOP → Groq → Claude (4-level fallback)
+  │  Every decision logged on-chain before response returned
   │
   ▼
 Mantle Sepolia (chainId 5003)
-  ├── AgentExecutor.sol          — immutable AI action log
-  ├── HybridVault.sol            — user deposits + capped autonomous agent allowance
-  ├── AgentReputationManager.sol — local score + ERC-8004 mirror
-  ├── YieldOracle.sol            — live APY + Pyth USD prices + market snapshots
-  ├── PortfolioVault.sol         — strategy layer (bps) + execution layer
-  ├── ComplianceLog.sol          — KYC/AML + sanctions list
+  ├── AgentExecutor.sol          — immutable AI action log (the benchmark)
+  ├── AgentReputationManager.sol — reputation score + ERC-8004 mirror
+  ├── YieldOracle.sol            — Pyth USD prices + APY market snapshots
+  ├── ComplianceLog.sol          — Shield's KYC/AML decisions
   ├── RWAiRegistry.sol           — tokenized asset registry
-  └── AssetToken.sol             — ERC-20 fractional RWA token
+  ├── AssetToken.sol             — ERC-20 fractional RWA token
+  ├── PortfolioVault.sol         — strategy (bps) + execution
+  └── HybridVault.sol            — user deposits + EIP-712 agent consent
 
-ERC-8004 (official Mantle Testnet — pre-deployed)
+ERC-8004 (Mantle Sepolia — official pre-deployed)
   Identity:   0x8004A818BFB912233c491871b3d84c89A494BD9e
   Reputation: 0x8004B663056A597Dffe9eCcC1965A193B7388713
 ```
+
+---
+
+## Contract Addresses (Mantle Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| AgentExecutor | `0x9a822B9A50D090CfcCa1e6474efCd653112d8501` |
+| AgentReputationManager | `0xfFE21EC80012D3Bf00F5eE20a400C94455F32D32` |
+| YieldOracle | `0x1288dF9F55673cBFc97BCe7aD5445D77B9029B92` |
+| ComplianceLog | `0xCc6296557c05ca02f3258DEd19f4104a9C19a80B` |
+| RWAiRegistry | `0xeE7a50936a25a375143b75b7Ca743B9513368680` |
+| PortfolioVault | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` |
+| HybridVault | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` |
+| AssetToken (template) | `0x80E0e5f6488FA2726c042a204344281974f72609` |
+| ERC-8004 Identity | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| ERC-8004 Reputation | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+
+**Mock RWA Tokens on Mantle Sepolia**
+
+| Token | Address |
+|-------|---------|
+| Mock USDY | `0xcE265E23aAc349cEf9Fa3CC058062A44080f2289` |
+| Mock mUSD | `0xDf079DB274fAEFfeD10A4a0E5C12f65e1570Cd35` |
+| Mock mETH | `0xD57f88B64611dBf74f87FC40f2F1010320483584` |
+| Mock fBTC | `0xbED7ad48984fBb3984F5aF83E176fb9f40dB37cc` |
+
+**Agent Wallet:** `0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7`  
+Explorer: https://sepolia.mantlescan.xyz
 
 ---
 
@@ -61,180 +140,89 @@ ERC-8004 (official Mantle Testnet — pre-deployed)
 
 ```
 rwai/
-├── contracts/              # Hardhat — 8 Solidity contracts
-│   ├── contracts/          # AgentExecutor, ReputationManager, YieldOracle,
-│   │                       # PortfolioVault, ComplianceLog, RWAiRegistry, AssetToken
-│   ├── scripts/
-│   │   ├── deploy.ts       # Full 8-contract deploy + wiring
-│   │   └── registerAgents.ts # ERC-8004 identity registration
-│   ├── test/RWAi.test.ts   # 46 tests — all passing
-│   ├── hardhat.config.ts
-│   └── README.md
-│
-├── agents/                 # FastAPI — 4 AI agent backend
-│   ├── api/
-│   │   ├── app.py          # FastAPI app + health + status
-│   │   ├── core.py         # OpenClaw → Groq → Claude fallback chain
-│   │   └── routes/         # chat, tokenize, compliance, yield, portfolio
-│   ├── mantle/
-│   │   ├── client.py       # Web3 + deployments.json reader
-│   │   ├── contracts.py    # Contract ABIs
-│   │   ├── executor.py     # On-chain write helpers
-│   │   ├── openclaw.py     # OpenClaw/CMDOP integration (primary AI layer)
-│   │   ├── pyth.py         # Hermes price update fetcher
-│   │   └── reputation.py   # Live reputation reader
-│   ├── skills/             # nexus.md, shield.md, yield.md, atlas.md
-│   ├── requirements.txt
-│   └── README.md
-│
-├── app/                    # Next.js 14 — frontend
-│   ├── app/                # /, /hub, /tokenize, /portfolio, /chat, /docs
-│   ├── components/         # UI + layout + agent components
-│   ├── lib/contracts.ts    # ABIs + addresses
-│   └── README.md
-│
-└── Makefile                # One-command setup & dev
+├── contracts/          # 8 Solidity contracts · Hardhat · 46 passing tests
+├── agents/             # FastAPI backend · 4 AI agents · OpenClaw runtime
+│   ├── api/routes/     # chat, tokenize, compliance, yield, portfolio, market
+│   ├── mantle/         # Web3 client, executor, reputation, Pyth, db
+│   └── skills/         # nexus.md, shield.md, yield.md, atlas.md
+└── app/                # Next.js 14 frontend
+    ├── app/            # /, /hub, /tokenize, /market, /portfolio, /chat, /voice, /docs
+    └── components/     # Agent monograms, TopBar, MeshBackground
 ```
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js ≥ 18
-- Python 3.11+
-- A wallet with **native MNT** on Mantle Sepolia for gas.
-  If your faucet only mints MNT on Ethereum Sepolia (L1), bridge that testnet MNT to Mantle Sepolia (L2) in Mantle Bridge Sepolia mode.
-
-### 1. Install dependencies
-
 ```bash
+# Install all dependencies
 make install
-```
 
-### 2. Configure environment
+# Configure environment
+cp contracts/.env.example contracts/.env   # add PRIVATE_KEY
+cp agents/.env.example agents/.env         # add GROQ_API_KEY + AGENT_PRIVATE_KEY
 
-```bash
-# Contracts — add PRIVATE_KEY
-cp contracts/.env.example contracts/.env
-
-# Agents — add ANTHROPIC_API_KEY + AGENT_PRIVATE_KEY
-cp agents/.env.example agents/.env
-
-# Frontend — add WalletConnect project ID + contract addresses
-# (edit app/.env.local)
-```
-
-### 3. Run tests
-
-```bash
-make test
-```
-
-### 4. Deploy contracts to Mantle Sepolia
-
-```bash
-make preflight
-make deploy
-make register
-make verify
-make sync-deployment
-```
-
-For the full testnet-production flow in one command:
-
-```bash
+# Deploy contracts + register agents
 make production-testnet
-```
 
-### 5. Start dev servers
-
-```bash
+# Start dev servers
 make dev
 # Backend  → http://localhost:8001
 # Frontend → http://localhost:3000
 ```
 
-See all available commands:
+---
 
-```bash
-make help
-```
+## API Reference (port 8001)
+
+| Method | Path | Agent | Description |
+|--------|------|-------|-------------|
+| POST | `/api/agents/chat` | any | Conversational interface — text or voice transcript |
+| POST | `/api/agents/tokenize` | Nexus | PDF/DOCX → token params + on-chain log |
+| POST | `/api/agents/compliance` | Shield | KYC/AML review → on-chain compliance record |
+| GET | `/api/agents/yield` | Yield | Live APY snapshot → writes to YieldOracle |
+| GET | `/api/agents/yield/prices` | Yield | Pyth price feed → writes USD prices on-chain |
+| POST | `/api/agents/portfolio/plan` | Atlas | Strategy → writes allocation on-chain |
+| POST | `/api/agents/portfolio/rebalance` | Atlas | Rebalance → writes rebalance on-chain |
+| GET | `/api/agents/market/listings` | — | All user-tokenized RWA listings |
+| POST | `/api/agents/market/buy` | Atlas | Log purchase on-chain with AI reasoning |
+| POST | `/api/agents/market/sell` | Atlas | Log sell on-chain (RWA → USDY) with AI reasoning |
+| GET | `/api/agents/status` | — | Live ERC-8004 reputation scores for all agents |
+
+Swagger UI: http://localhost:8001/docs
 
 ---
 
-## Contract Addresses
-
-> Fill after running `make deploy` or `cd contracts && npm run deploy:sepolia`
-
-| Contract | Address |
-|----------|---------|
-| ComplianceLog | `0xCc6296557c05ca02f3258DEd19f4104a9C19a80B` |
-| YieldOracle | `0x1288dF9F55673cBFc97BCe7aD5445D77B9029B92` |
-| RWAiRegistry | `0xeE7a50936a25a375143b75b7Ca743B9513368680` |
-| AgentReputationManager | `0xfFE21EC80012D3Bf00F5eE20a400C94455F32D32` |
-| AgentExecutor | `0x9a822B9A50D090CfcCa1e6474efCd653112d8501` |
-| PortfolioVault | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` |
-| HybridVault | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` |
-| AssetToken | `0x80E0e5f6488FA2726c042a204344281974f72609` |
-| ERC-8004 Identity *(pre-deployed)* | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| ERC-8004 Reputation *(pre-deployed)* | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
-
-**Mock RWA Tokens (Mantle Sepolia)**
-
-| Token | Address | Supply |
-|-------|---------|--------|
-| Mock USDY | `0xcE265E23aAc349cEf9Fa3CC058062A44080f2289` | 1,000,000 |
-| Mock mUSD | `0xDf079DB274fAEFfeD10A4a0E5C12f65e1570Cd35` | 1,000,000 |
-| Mock mETH | `0xD57f88B64611dBf74f87FC40f2F1010320483584` | 100 |
-| Mock fBTC | `0xbED7ad48984fBb3984F5aF83E176fb9f40dB37cc` | 10 |
-
-**Agent Wallet:** `0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7`  
-**Agent IDs (ERC-8004):** nexus=41, shield=42, yield=43, atlas=44
-
-Mantle Sepolia Explorer: https://sepolia.mantlescan.xyz
-
----
-
-## API Endpoints (Backend — port 8001)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Mantle connection + contract addresses |
-| GET | `/api/agents/status` | Live reputation scores for all 4 agents |
-| POST | `/api/agents/chat` | Chat with any agent |
-| POST | `/api/agents/tokenize` | Nexus analyzes document → token params |
-| POST | `/api/agents/compliance` | Shield compliance review |
-| GET | `/api/agents/yield` | Live APY snapshot → writes to Mantle |
-| GET | `/api/agents/yield/prices` | Pyth price updates → writes USD prices to Mantle |
-| GET | `/api/agents/yield/market-analysis` | Full market snapshot |
-| POST | `/api/agents/portfolio/plan` | Atlas builds strategy → writes allocation |
-| POST | `/api/agents/portfolio/rebalance` | Execute rebalance |
-| GET | `/api/agents/portfolio/{address}` | Read portfolio from chain |
-| GET | `/api/agents/vault/status/{address}` | Read HybridVault balance, nonce, allowance |
-| POST | `/api/agents/vault/consent` | Build EIP-712 AgentConsent for Atlas autonomy |
-| POST | `/api/agents/vault/relay-allowance` | Relay signed HybridVault allowance |
-| POST | `/api/agents/vault/execute` | Autonomous agent execution, gated by `AUTONOMOUS_EXECUTION_ENABLED=true` |
-
-Swagger docs: http://localhost:8001/docs
-
----
-
-## Hackathon Checklist
+## Hackathon Submission Checklist
 
 - [x] 8 contracts deployed on Mantle Sepolia (chainId 5003)
 - [x] 4 agents registered on ERC-8004 Identity Registry (nexus=41, shield=42, yield=43, atlas=44)
-- [x] 4 mock RWA tokens deployed + minted (USDY, mUSD, mETH, fBTC)
-- [x] 5 assets registered in RWAiRegistry on-chain
-- [x] On-chain action log working (logTokenization, logComplianceReview, executeAllocation)
-- [x] Agent reputation system live (nexus score: 85, others: 75)
-- [x] OpenClaw/CMDOP integration as primary AI execution layer
+- [x] Reputation system live and gating autonomy
+- [x] On-chain action logging: tokenization, compliance, allocation, rebalance, buy, sell
+- [x] OpenClaw/CMDOP as primary agent runtime
+- [x] Full tokenize flow: PDF → AI analysis → ERC-20 on Mantle
+- [x] RWA Market: list, buy, sell with Atlas AI reasoning on-chain
+- [x] Portfolio management with Atlas
+- [x] Atlas voice interface (Jarvis-style) — speak to your AI agent
+- [x] 46 contract tests passing
 - [ ] Live frontend on Vercel
-- [ ] Agent backend running (Railway)
-- [ ] Demo video (3–4 min) — tokenization + portfolio flow + on-chain proof
-- [ ] Public GitHub repo at submission
+- [ ] Agent backend deployed (Railway / Render)
+- [ ] Demo video (3–4 min) — voice command → Atlas executes → on-chain proof shown
 
 ---
 
-*RWAi · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004 · FastAPI · Next.js 14 · Mantle Network*
+## Scoring Alignment
+
+**General (60%)**
+- *AI × RWA depth*: AI is not a chatbot — it's the execution layer. Every tokenization, every allocation, every rebalance is an AI agent action with on-chain proof.
+- *Technical completeness*: 8 contracts, 4 agents, full tokenize + market + portfolio flows, voice interface — end-to-end.
+- *Mantle integration*: ERC-8004, AgentExecutor, YieldOracle with Pyth, HybridVault with EIP-712 consent, 4 mock RWA tokens.
+- *Compliance awareness*: Shield agent scores every asset. ComplianceLog.sol records every decision on-chain.
+
+**Track-specific (40%) — Path A + B**
+- *Infrastructure*: Complete tokenization flow — document in, ERC-20 out, compliance logged, price set.
+- *Application*: Atlas voice interface — retail investors speak their intent, agent executes, on-chain proof returned.
+
+---
+
+*RWAi · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004 · FastAPI · OpenClaw · Next.js 14 · Mantle Network*

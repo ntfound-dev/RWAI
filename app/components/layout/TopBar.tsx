@@ -12,6 +12,7 @@ const NAV = [
   { href: "/tokenize",  label: "Tokenize" },
   { href: "/market",    label: "Market" },
   { href: "/portfolio", label: "Portfolio" },
+  { href: "/voice",     label: "Atlas" },
   { href: "/docs",      label: "Docs" },
 ];
 
