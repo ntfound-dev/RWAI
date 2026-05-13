@@ -196,6 +196,23 @@ def execute_allocation(user: str, asset_symbols: list[str], amounts_wei: list[in
     return _send(w3, account, executor.functions.executeAllocation(agent_id, user, assets, amounts_wei, ai_reasoning))
 
 
+def log_market_purchase(buyer: str, token_address: str, amount_wei: int, ai_reasoning: str) -> Optional[str]:
+    """Atlas: log an RWA market purchase on AgentExecutor.executeAllocation."""
+    w3, account = _get_account()
+    executor = get_agent_executor()
+    if not w3 or not account or not executor:
+        return None
+    try:
+        addr = Web3.to_checksum_address(token_address)
+        agent_id = get_agent_ids().get("atlas", 0)
+        return _send(w3, account, executor.functions.executeAllocation(
+            agent_id, Web3.to_checksum_address(buyer), [addr], [int(amount_wei)], ai_reasoning[:500]
+        ))
+    except Exception as e:
+        print(f"[mantle.executor] log_market_purchase failed: {e}")
+        return None
+
+
 def execute_rebalance(
     user: str,
     from_symbols: list[str],

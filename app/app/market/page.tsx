@@ -1,0 +1,316 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { AgentMonogram } from "@/components/agents/AgentMonogram";
+import { useAccount } from "wagmi";
+import { agentApi } from "@/lib/agent-api";
+
+interface Listing {
+  asset_id: number | null;
+  token_address: string;
+  owner: string;
+  asset_type: string;
+  compliance_score: number;
+  tx_hash: string;
+  ts: number;
+  token_name: string;
+  token_symbol: string;
+  apy_bps: number;
+  value_usd: number;
+  price_usd: number;
+  supply: number;
+  _source: string;
+}
+
+const TYPE_COLOR: Record<string, string> = {
+  real_estate:    "var(--nexus)",
+  bond:           "var(--accent)",
+  commodity:      "var(--warn)",
+  liquid_staking: "var(--atlas)",
+  stablecoin:     "var(--fg-2)",
+  btc_wrapper:    "var(--warn)",
+};
+
+function ScoreBar({ score }: { score: number }) {
+  const color = score >= 70 ? "var(--accent)" : score >= 50 ? "var(--warn)" : "rgba(239,68,68,0.7)";
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+      <div style={{ flex:1, height:3, background:"var(--bg-2)", borderRadius:2, overflow:"hidden" }}>
+        <div style={{ width:`${score}%`, height:"100%", background:color, borderRadius:2 }}/>
+      </div>
+      <span className="mono-sm" style={{ color, minWidth:28 }}>{score}</span>
+    </div>
+  );
+}
+
+export default function MarketPage() {
+  const { address, isConnected } = useAccount();
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState<string | null>(null); // token_address being bought
+  const [buyAmount, setBuyAmount] = useState("1000");
+  const [buyTx, setBuyTx] = useState<Record<string, string>>({});
+  const [buyError, setBuyError] = useState<Record<string, string>>({});
+  const [buyStatus, setBuyStatus] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    agentApi<{ listings: Listing[] }>("/market/listings")
+      .then(d => setListings(d.listings ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const executeBuy = async (listing: Listing) => {
+    if (!address || !isConnected) return;
+    const key = listing.token_address;
+    setBuyStatus(s => ({ ...s, [key]: "Atlas is pricing your order…" }));
+    setBuyError(s => ({ ...s, [key]: "" }));
+    setBuyTx(s => ({ ...s, [key]: "" }));
+    try {
+      const usd = parseFloat(buyAmount) || 0;
+      const d = await agentApi<{ success: boolean; onChainTx: string; tokens: number; reasoning: string }>("/market/buy", {
+        method: "POST",
+        body: JSON.stringify({
+          buyer_address:   address,
+          token_address:   listing.token_address,
+          token_symbol:    listing.token_symbol,
+          token_name:      listing.token_name,
+          amount_usd:      usd,
+          price_per_token: listing.price_usd,
+          apy_bps:         listing.apy_bps,
+        }),
+      });
+      if (d.onChainTx) {
+        setBuyTx(s => ({ ...s, [key]: d.onChainTx }));
+        setBuyStatus(s => ({ ...s, [key]: `✅ ${d.tokens.toLocaleString(undefined, { maximumFractionDigits:2 })} ${listing.token_symbol} — logged by Atlas` }));
+      } else {
+        setBuyStatus(s => ({ ...s, [key]: "Order logged. Waiting for on-chain confirmation." }));
+      }
+    } catch (err) {
+      setBuyError(s => ({ ...s, [key]: err instanceof Error ? err.message : "Buy failed." }));
+      setBuyStatus(s => ({ ...s, [key]: "" }));
+    }
+  };
+
+  const totalListings = listings.length;
+  const totalValue = listings.reduce((s, l) => s + (l.value_usd || 0), 0);
+  const avgApy = listings.length
+    ? listings.reduce((s, l) => s + (l.apy_bps || 0), 0) / listings.length / 100
+    : 0;
+
+  return (
+    <div style={{ maxWidth:1480, margin:"0 auto", padding:"32px" }}>
+
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:32 }}>
+        <div>
+          <div className="mono" style={{ color:"var(--nexus)", marginBottom:8 }}>§ market · nexus listed</div>
+          <h1 className="display" style={{ fontSize:64 }}>RWA Market.</h1>
+          <p style={{ color:"var(--fg-1)", fontSize:14, marginTop:8 }}>
+            Buy fractions of tokenized real-world assets. Every trade logged on Mantle by Atlas.
+          </p>
+        </div>
+        <a href="/tokenize" className="btn btn-primary" style={{ textDecoration:"none" }}>
+          List your asset →
+        </a>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:32 }}>
+        {[
+          { label:"Listings",    value: totalListings.toString(),                         sub:"Tokenized RWAs" },
+          { label:"Total Value", value: `$${totalValue.toLocaleString()}`,                sub:"Combined asset value" },
+          { label:"Avg APY",     value: `${avgApy.toFixed(2)}%`,                         sub:"Yield across all listings" },
+        ].map(({ label, value, sub }, i) => (
+          <div key={i} style={{ padding:"16px 18px", borderRight: i < 2 ? "1px solid var(--line)" : "none" }}>
+            <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
+            <div style={{ fontFamily:"var(--font-mono)", fontSize:28, color:"var(--fg-0)" }}>{value}</div>
+            <div className="mono-sm" style={{ color:"var(--nexus)", marginTop:4 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Listings */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"60px 0", color:"var(--fg-3)", fontFamily:"var(--font-mono)", fontSize:12 }}>
+          Loading listings…
+        </div>
+      ) : listings.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"80px 0" }}>
+          <div style={{ fontSize:32, marginBottom:16 }}>📋</div>
+          <div className="display" style={{ fontSize:28, marginBottom:8 }}>No listings yet.</div>
+          <p style={{ color:"var(--fg-2)", fontSize:14, marginBottom:24 }}>
+            Tokenize your first real-world asset to list it here.
+          </p>
+          <a href="/tokenize" className="btn btn-primary" style={{ textDecoration:"none" }}>Tokenize an asset →</a>
+        </div>
+      ) : (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(380px,1fr))", gap:16 }}>
+          {listings.map(listing => {
+            const key = listing.token_address;
+            const isOwner = listing.owner?.toLowerCase() === address?.toLowerCase();
+            const color = TYPE_COLOR[listing.asset_type] ?? "var(--fg-2)";
+            const symbol = listing.token_symbol || "RWA";
+            const name = listing.token_name || listing.asset_type?.replace(/_/g," ") || "Real World Asset";
+            const apy = (listing.apy_bps / 100).toFixed(2);
+            const price = listing.price_usd;
+            const usd = parseFloat(buyAmount) || 0;
+            const tokens = price > 0 ? usd / price : 0;
+            const txForThis = buyTx[key];
+            const statusForThis = buyStatus[key];
+            const errorForThis = buyError[key];
+            const isBuying = buying === key;
+            const date = new Date(listing.ts * 1000).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+
+            return (
+              <div key={key} className="panel" style={{ display:"flex", flexDirection:"column" }}>
+                {/* Card header */}
+                <div style={{ padding:"16px", borderBottom:"1px solid var(--line)" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <div style={{ width:40, height:40, borderRadius:2, background:"var(--bg-2)", border:`1px solid ${color}33`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color, fontWeight:700 }}>{symbol.slice(0,5)}</span>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:14, color:"var(--fg-0)", marginBottom:2 }}>{symbol}</div>
+                        <div className="mono-sm" style={{ color:"var(--fg-3)" }}>{name}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <span className="tag" style={{ fontSize:9, color, borderColor:`${color}44` }}>
+                        {listing.asset_type.replace(/_/g," ")}
+                      </span>
+                      {isOwner && (
+                        <div className="mono-sm" style={{ color:"var(--nexus)", marginTop:4 }}>Your listing</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats grid */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                    {[
+                      { label:"Price/Token",    value: price > 0 ? `$${price.toFixed(2)}` : "—" },
+                      { label:"APY",            value: `${apy}%`,           accent:true },
+                      { label:"Total Value",    value: listing.value_usd ? `$${Number(listing.value_usd).toLocaleString()}` : "—" },
+                    ].map(({ label, value, accent }) => (
+                      <div key={label} style={{ background:"var(--bg-1)", padding:"8px", borderRadius:2 }}>
+                        <div className="mono-sm" style={{ marginBottom:4 }}>{label}</div>
+                        <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color: accent ? "var(--accent)" : "var(--fg-0)" }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Compliance + meta */}
+                <div style={{ padding:"10px 16px", borderBottom:"1px solid var(--line)", background:"var(--bg-1)" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                    <span className="mono-sm">Compliance</span>
+                    <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Listed {date}</span>
+                  </div>
+                  <ScoreBar score={listing.compliance_score} />
+                </div>
+
+                {/* Buy panel */}
+                <div style={{ padding:"14px 16px", marginTop:"auto" }}>
+                  {isOwner ? (
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span className="mono-sm" style={{ color:"var(--fg-3)" }}>You listed this asset</span>
+                      {listing.tx_hash && (
+                        <a href={`https://sepolia.mantlescan.xyz/tx/${listing.tx_hash}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
+                          ↗ {listing.tx_hash.slice(0,8)}…
+                        </a>
+                      )}
+                    </div>
+                  ) : !isBuying ? (
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      {txForThis ? (
+                        <span className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{statusForThis}</span>
+                      ) : (
+                        <span className="mono-sm" style={{ color:"var(--fg-3)" }}>
+                          {listing.supply > 0 ? `${Number(listing.supply).toLocaleString()} tokens available` : "Fractional ownership"}
+                        </span>
+                      )}
+                      <button
+                        className="btn btn-primary"
+                        style={{ fontSize:11 }}
+                        onClick={() => { setBuying(key); setBuyAmount("1000"); }}
+                        disabled={!isConnected}
+                      >
+                        {isConnected ? "Buy →" : "Connect wallet"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, marginBottom:8, alignItems:"end" }}>
+                        <label style={{ display:"grid", gap:4 }}>
+                          <span className="mono-sm">Amount (USD)</span>
+                          <input
+                            className="input-field"
+                            value={buyAmount}
+                            onChange={e => setBuyAmount(e.target.value.replace(/[^\d.]/g,""))}
+                            style={{ fontSize:12 }}
+                            autoFocus
+                          />
+                        </label>
+                        <button className="btn btn-ghost" style={{ fontSize:10 }} onClick={() => setBuying(null)}>✕</button>
+                      </div>
+                      {price > 0 && (
+                        <div className="mono-sm" style={{ color:"var(--fg-2)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>
+                          = {tokens.toLocaleString(undefined, { maximumFractionDigits:2 })} {symbol} tokens
+                        </div>
+                      )}
+                      {statusForThis && !txForThis && (
+                        <div className="mono-sm" style={{ color:"var(--nexus)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>
+                          {statusForThis}
+                        </div>
+                      )}
+                      {errorForThis && (
+                        <div className="mono-sm" style={{ color:"var(--warn)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>
+                          {errorForThis}
+                        </div>
+                      )}
+                      {txForThis ? (
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <span className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{statusForThis}</span>
+                          <a href={`https://sepolia.mantlescan.xyz/tx/${txForThis}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
+                            ↗ {txForThis.slice(0,8)}…{txForThis.slice(-6)}
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ display:"flex", gap:8 }}>
+                          <button
+                            className="btn btn-primary"
+                            style={{ flex:1, fontSize:11 }}
+                            onClick={() => executeBuy(listing)}
+                          >
+                            Confirm purchase →
+                          </button>
+                          <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setBuying(null)}>Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Agent monogram footer */}
+                <div style={{ padding:"8px 16px", borderTop:"1px solid var(--line)", background:"var(--bg-1)", display:"flex", alignItems:"center", gap:6 }}>
+                  <AgentMonogram agent="nexus"/>
+                  <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Nexus verified</span>
+                  <span className="mono-sm" style={{ color:"var(--fg-3)", marginLeft:"auto" }}>
+                    {listing.token_address.slice(0,10)}…{listing.token_address.slice(-6)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!isConnected && listings.length > 0 && (
+        <div style={{ marginTop:24, padding:"14px 18px", background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:2, fontSize:13, color:"var(--warn)" }}>
+          ⚠ Connect wallet to buy tokens
+        </div>
+      )}
+    </div>
+  );
+}

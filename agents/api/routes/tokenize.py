@@ -68,6 +68,8 @@ async def tokenize(req: TokenizeRequest):
                 token_symbol=result.get("suggestedSymbol") or result.get("symbol", ""),
                 apy_bps=result.get("annualYieldBps", 0),
                 value_usd=result.get("estimatedValueUSD", 0),
+                price_usd=result.get("pricePerTokenUSD", 0),
+                supply=result.get("suggestedSupply", 0),
                 compliance_score=0,
             )
 

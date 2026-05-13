@@ -199,7 +199,8 @@ def get_recent_actions(limit: int = 20) -> list:
 def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx_hash: str,
                               token_name: str = "", token_symbol: str = "",
                               apy_bps: int = 0, value_usd: float = 0,
-                              compliance_score: int = 0) -> None:
+                              compliance_score: int = 0,
+                              price_usd: float = 0, supply: int = 0) -> None:
     with _lock:
         data = _load()
         entry = {
@@ -216,10 +217,20 @@ def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx
             "token_symbol":    token_symbol,
             "apy_bps":         int(apy_bps or 0),
             "value_usd":       float(value_usd or 0),
+            "price_usd":       float(price_usd or 0),
+            "supply":          int(supply or 0),
             "_source":         "user",
         }
         data["user_tokenizations"].append(entry)
         _save(data)
+
+
+def get_listings(limit: int = 100) -> list:
+    """Return all user-tokenized assets as market listings."""
+    with _lock:
+        data = _load()
+    listings = sorted(data.get("user_tokenizations", []), key=lambda a: a.get("ts", 0), reverse=True)
+    return listings[:limit]
 
 
 def get_assets(limit: int = 50, owner: str = None) -> list:

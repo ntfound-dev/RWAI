@@ -17,6 +17,7 @@ from .routes.portfolio     import router as portfolio_router
 from .routes.vault         import router as vault_router
 from .routes.stats         import router as stats_router
 from .routes.extract       import router as extract_router
+from .routes.market        import router as market_router
 from ..mantle.client       import get_addresses, is_connected, get_block_number, get_agent_ids, _load_deployments
 from ..mantle.reputation   import get_agent_reputation_scores
 from ..mantle              import indexer
@@ -60,6 +61,7 @@ app.include_router(portfolio_router, prefix="/api/agents")
 app.include_router(vault_router,     prefix="/api/agents")
 app.include_router(stats_router,     prefix="/api/agents")
 app.include_router(extract_router,   prefix="/api/agents")
+app.include_router(market_router,    prefix="/api/agents")
 
 
 # ── Health & Status ──────────────────────────────────────────────
