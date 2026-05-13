@@ -635,7 +635,7 @@ export default function ChatPage() {
               <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
             ))}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
             <input
               style={{ background:"transparent", border:0, outline:"none", color:"var(--fg-0)", fontFamily:"var(--font-sans)", fontSize:13, padding:"10px 0", width:"100%" }}
               placeholder={voiceState === "listening" ? "Listening…" : "Ask Atlas to plan, delegate, or execute…"}
