@@ -43,6 +43,8 @@ def get_agent_wallet_address() -> Optional[str]:
 
 def _send(w3, account, fn, gas: int = 400_000, value: int = 0) -> Optional[str]:
     try:
+        estimated = fn.estimate_gas({"from": account.address, "value": value})
+        gas = max(gas, int(estimated * 1.3))
         tx = fn.build_transaction({
             "from":  account.address,
             "nonce": w3.eth.get_transaction_count(account.address, "pending"),
@@ -149,7 +151,7 @@ def log_tokenization(asset_id: int, token_address: str, ai_reasoning: str) -> Op
     if not w3 or not account or not executor:
         return None
     agent_id = get_agent_ids().get("nexus", 0)
-    return _send(w3, account, executor.functions.logTokenization(agent_id, asset_id, token_address, ai_reasoning))
+    return _send(w3, account, executor.functions.logTokenization(agent_id, asset_id, token_address, ai_reasoning[:500]))
 
 
 def log_compliance_review(asset_id: int, score: int, ai_reasoning: str) -> Optional[str]:
@@ -159,7 +161,7 @@ def log_compliance_review(asset_id: int, score: int, ai_reasoning: str) -> Optio
     if not w3 or not account or not executor:
         return None
     agent_id = get_agent_ids().get("shield", 0)
-    return _send(w3, account, executor.functions.logComplianceReview(agent_id, asset_id, score, ai_reasoning))
+    return _send(w3, account, executor.functions.logComplianceReview(agent_id, asset_id, score, ai_reasoning[:500]))
 
 
 def execute_allocation(user: str, asset_symbols: list[str], amounts_wei: list[int], ai_reasoning: str) -> Optional[str]:
