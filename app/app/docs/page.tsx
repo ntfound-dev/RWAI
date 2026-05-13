@@ -7,6 +7,7 @@ import { ADDRESSES } from "@/lib/contracts";
 const SECTIONS = [
   { id:"getting-started",  label:"Getting Started" },
   { id:"architecture",     label:"Architecture" },
+  { id:"tokenize",         label:"Tokenize" },
   { id:"nexus-doc",        label:"Nexus" },
   { id:"shield-doc",       label:"Shield" },
   { id:"yield-doc",        label:"Yield" },
@@ -38,6 +39,12 @@ const CONTENT: Record<string, SectionContent> = {
     title: ["How does RWAi", "actually work?"],
     body: "Think of it as having 4 AI assistants working around the clock:\n\n① You chat with Atlas — say \"invest $10,000 conservatively\".\n② Atlas asks Yield to check current interest rates on all assets.\n③ Atlas asks Shield to verify all assets are legal and safe.\n④ Atlas creates an allocation plan and writes the decision to the blockchain — permanent, transparent, verifiable by anyone.\n\nEvery AI decision is stored on-chain. Not a promise — proof.",
     code: { title: "system flow", body: `You (chat/UI)\n  ↓\nAtlas — AI portfolio manager\n  ├── asks Yield: "what's the current USDY rate?"\n  ├── asks Shield: "is this asset compliant?"  \n  └── writes decision → AgentExecutor.sol (Mantle)\n            ↓\n    stored forever on-chain\n    verifiable at sepolia.mantlescan.xyz` },
+  },
+  "tokenize": {
+    kicker: "FEATURE · TOKENIZE",
+    title: ["Turn any real asset", "into a token."],
+    body: "The Tokenize flow converts a real-world asset (property, bond, certificate) into an ERC-20 token on Mantle in 6 steps — fully AI-driven, compliance-checked, and permanently recorded on-chain.\n\n① Upload — drop your PDF or DOCX documents (deed, income statement, appraisal).\n② Analyze — Nexus reads the documents and suggests token parameters: name, symbol, supply, price per token, and annual yield.\n③ Compliance — Shield reviews the same documents for legal risks, ownership clarity, and sanctions. Assets scoring ≥ 70 / 100 are cleared.\n④ Review — you see both agent results side by side before committing.\n⑤ Deploy — one click writes the tokenization to AgentExecutor.sol on Mantle, generating a permanent on-chain record.\n⑥ Live — your token is registered. The asset appears in your Portfolio under 'My Tokenized Assets' filtered by your wallet.\n\nAccepted file types: PDF, DOCX. Images are not supported — Nexus needs structured text to produce accurate valuations.",
+    code: { title: "end-to-end flow", body: `STEP 1  Upload (PDF / DOCX)\n        └─ POST /api/extract-text → pypdf / python-docx\n\nSTEP 2  Analyze — Nexus agent\n        └─ POST /api/agents/tokenize\n           {\n             assetType        : "real_estate"\n             estimatedValueUSD: 4250000\n             suggestedSymbol  : "BWAY"\n             suggestedTokenName: "RWAi Broadway Tower"\n             annualYieldBps   : 519        ← 5.19% APY\n             pricePerTokenUSD : 2.00\n           }\n\nSTEP 3  Compliance — Shield agent\n        └─ POST /api/agents/compliance\n           { score: 82, cleared: true, jurisdiction: "US-NY" }\n           → logged: AgentExecutor.logComplianceReview()\n\nSTEP 4  Review UI  — user confirms or cancels\n\nSTEP 5  Deploy\n        └─ POST /api/agents/tokenize  (with token_address + owner)\n           → AgentExecutor.logTokenization()   on Mantle\n           → record_user_tokenization()        in local db\n           → TX: 0xc10e2e63...  (mantlescan.xyz)\n\nSTEP 6  Portfolio\n        └─ GET /api/agents/stats/assets?owner=0xYourWallet\n           → "My Tokenized Assets" section` },
   },
   "nexus-doc": {
     kicker: "AGENT · NEXUS",
