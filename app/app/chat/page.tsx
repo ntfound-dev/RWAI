@@ -454,10 +454,12 @@ export default function ChatPage() {
   const [input, setInput]   = useState("");
   const [thinking, setThinking] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const recRef    = useRef<any>(null);
-  const synthRef  = useRef<SpeechSynthesis | null>(null);
-  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const scrollRef   = useRef<HTMLDivElement>(null);
+  const recRef      = useRef<any>(null);
+  const synthRef    = useRef<SpeechSynthesis | null>(null);
+  const voicesRef   = useRef<SpeechSynthesisVoice[]>([]);
+  const pendingRef  = useRef("");   // holds transcript across closure boundary
+  const sendRef     = useRef<(t: string) => void>(() => {});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -483,27 +485,38 @@ export default function ChatPage() {
     synthRef.current.speak(utt);
   };
 
-  const startVoice = () => {
+  const toggleVoice = () => {
+    // If already listening — stop
+    if (voiceState === "listening") { recRef.current?.stop(); return; }
     if (typeof window === "undefined") return;
     synthRef.current?.cancel();
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { alert("Voice requires Chrome or Edge."); return; }
     const rec = new SR();
     recRef.current = rec;
+    pendingRef.current = "";
     rec.continuous = false; rec.interimResults = true; rec.lang = "en-US";
     rec.onstart  = () => setVoiceState("listening");
     rec.onresult = (e: any) => {
       const t = Array.from(e.results).map((r: any) => r[0].transcript).join("");
+      pendingRef.current = t;
       setInput(t);
     };
     rec.onend = () => {
       setVoiceState("idle");
-      setInput(prev => { if (prev.trim()) { setTimeout(() => send(prev.trim()), 50); } return ""; });
+      const heard = pendingRef.current.trim();
+      pendingRef.current = "";
+      if (heard) {
+        setInput("");
+        sendRef.current(heard);   // use ref — always latest send()
+      }
     };
-    rec.onerror = () => setVoiceState("idle");
+    rec.onerror = (e: any) => {
+      setVoiceState("idle");
+      if (e.error === "not-allowed") alert("Microphone permission denied. Click the 🔒 in the address bar to allow.");
+    };
     rec.start();
   };
-  const stopVoice = () => recRef.current?.stop();
 
   const messages = [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
 
@@ -529,6 +542,7 @@ export default function ChatPage() {
   const send = async (text?: string) => {
     const q = (text ?? input).trim();
     if (!q || thinking) return;
+    sendRef.current = send;   // keep ref fresh
     const userMessage: Msg = { role:"user", kind:"text", body:q };
     const nextMessages = [...messages, userMessage];
     setInput("");
@@ -548,7 +562,7 @@ export default function ChatPage() {
       });
       const reply = data.reply ?? "Atlas unavailable.";
       setExtraMessages(m => [...m, { role:"atlas", kind:"text", body: reply }]);
-      if (voiceState !== "idle" || recRef.current) speakReply(reply);
+      if (voiceState !== "idle" || pendingRef.current !== undefined) speakReply(reply);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Atlas backend unavailable.";
       setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:`Production backend error: ${message}` }]);
@@ -629,24 +643,31 @@ export default function ChatPage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && send()}
             />
-            {/* Mini orb — voice state indicator */}
-            <div style={{
-              width:10, height:10, borderRadius:"50%", flexShrink:0,
-              background: VOICE_COLOR[voiceState],
-              boxShadow: voiceState !== "idle" ? `0 0 10px ${VOICE_COLOR[voiceState]}` : "none",
-              transition:"background 0.3s, box-shadow 0.3s",
-              animation: voiceState === "listening" ? "voiceOrbPulse 0.7s ease-in-out infinite" : voiceState === "speaking" ? "voiceOrbPulse 0.4s ease-in-out infinite" : "none",
-            }}/>
-            {/* Mic button */}
+            {/* Mic toggle button */}
             <button
               className="btn btn-sm"
-              onMouseDown={startVoice} onMouseUp={stopVoice}
-              onTouchStart={startVoice} onTouchEnd={stopVoice}
-              disabled={thinking}
-              title="Hold to speak"
-              style={{ color: voiceState === "listening" ? "var(--accent)" : "var(--fg-2)", borderColor: voiceState === "listening" ? "var(--accent)" : "var(--line)", padding:"0 10px", boxShadow: voiceState === "listening" ? "0 0 12px var(--accent)" : "none", transition:"all 0.2s" }}
+              onClick={toggleVoice}
+              disabled={thinking || voiceState === "speaking"}
+              title={voiceState === "listening" ? "Stop listening" : "Click to speak"}
+              style={{
+                color: voiceState === "listening" ? "var(--accent)" : "var(--fg-2)",
+                borderColor: voiceState === "listening" ? "var(--accent)" : "var(--line)",
+                padding:"0 12px",
+                boxShadow: voiceState === "listening" ? "0 0 14px var(--accent)" : "none",
+                background: voiceState === "listening" ? "rgba(0,212,255,0.08)" : "transparent",
+                transition:"all 0.2s",
+                position:"relative",
+              }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              {voiceState === "listening" && (
+                <span style={{
+                  position:"absolute", inset:-3, borderRadius:4,
+                  border:"1px solid var(--accent)", opacity:0.5,
+                  animation:"voiceOrbPulse 0.8s ease-in-out infinite",
+                  pointerEvents:"none",
+                }}/>
+              )}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={voiceState === "listening" ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <rect x="9" y="2" width="6" height="11" rx="3"/>
                 <path d="M5 10a7 7 0 0 0 14 0"/>
                 <line x1="12" y1="19" x2="12" y2="22"/>
