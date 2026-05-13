@@ -52,3 +52,4 @@ Thumbs.db
 contracts/.env
 contracts/.env.local
 contracts/.env.production
+DEMO.md
