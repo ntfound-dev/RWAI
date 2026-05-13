@@ -63,7 +63,14 @@ export async function POST(req: NextRequest) {
     try {
       if (name.endsWith(".pdf")) {
         const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        // Disable worker and font warnings for Node.js server environment
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+        const doc = await pdfjsLib.getDocument({
+          data: new Uint8Array(buf),
+          useWorkerFetch: false,
+          useSystemFonts: true,
+          verbosity: 0,
+        } as Parameters<typeof pdfjsLib.getDocument>[0]).promise;
         const pages: string[] = [];
         for (let i = 1; i <= doc.numPages; i++) {
           const page = await doc.getPage(i);
@@ -82,7 +89,8 @@ export async function POST(req: NextRequest) {
         const raw = buf.toString("utf-8").replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "").trim();
         text = raw.length > 80 ? raw : `[File: ${file.name}, ${Math.round(file.size / 1024)} KB]`;
       }
-    } catch {
+    } catch (err) {
+      console.error(`[extract-text] failed for ${file.name}:`, err);
       text = `[Could not extract text from ${file.name}]`;
     }
 

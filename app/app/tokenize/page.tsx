@@ -198,7 +198,10 @@ export default function TokenizePage() {
                 ))}
               </div>
             )}
-            <button className="btn btn-primary" onClick={runAnalysis} disabled={files.length === 0 && true}>
+            <button
+              className="btn btn-primary"
+              onClick={files.length === 0 ? () => fileRef.current?.click() : runAnalysis}
+            >
               {files.length === 0 ? "Upload files to continue" : `Analyze ${files.length} document${files.length > 1 ? "s" : ""} →`}
             </button>
             {/* Demo button */}
@@ -330,15 +333,25 @@ export default function TokenizePage() {
           <div className="panel">
             <div className="panel-header">
               <span className="mono" style={{ color:"var(--accent)" }}>✅ Token live on Mantle</span>
-              {deployedTx && (
-                <a href={`https://sepolia.mantlescan.xyz/tx/${deployedTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
-                  ↗ View on Explorer
-                </a>
-              )}
             </div>
             <div style={{ padding:24 }}>
+              {/* Transaction row — clickable link to explorer */}
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10, fontSize:13 }}>
+                <span style={{ color:"var(--fg-2)" }}>Transaction</span>
+                {deployedTx ? (
+                  <a
+                    href={`https://sepolia.mantlescan.xyz/tx/${deployedTx}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color:"var(--accent)", fontFamily:"var(--font-mono)", textDecoration:"none" }}
+                  >
+                    {deployedTx.slice(0,10)}…{deployedTx.slice(-8)} ↗
+                  </a>
+                ) : (
+                  <span style={{ color:"var(--fg-0)", fontFamily:"var(--font-mono)" }}>Pending backend tx</span>
+                )}
+              </div>
               {[
-                ["Transaction", deployedTx ? `${deployedTx.slice(0,10)}…${deployedTx.slice(-8)}` : "Pending backend tx"],
                 ["Token", nexusResult?.suggestedSymbol ?? "—"],
                 ["Supply", `${nexusResult?.suggestedSupply.toLocaleString()} tokens`],
                 ["Price", `$${nexusResult?.pricePerTokenUSD.toFixed(2)}`],

@@ -52,7 +52,8 @@ def _send(w3, account, fn, gas: int = 400_000, value: int = 0) -> Optional[str]:
         signed  = account.sign_transaction(tx)
         raw = getattr(signed, "rawTransaction", None) or getattr(signed, "raw_transaction", None)
         tx_hash = w3.eth.send_raw_transaction(raw)
-        return tx_hash.hex()
+        h = tx_hash.hex()
+        return h if h.startswith("0x") else "0x" + h
     except Exception as e:
         print(f"[mantle.executor] tx failed: {e}")
         return None
