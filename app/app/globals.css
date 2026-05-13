@@ -517,6 +517,28 @@ html, body {
 .atlas-mic:disabled { opacity: 0.3; cursor: not-allowed; }
 .atlas-mic-active { background: rgba(0,212,255,0.07) !important; }
 .atlas-hint { color: rgba(255,255,255,0.15); font-size: 8px; letter-spacing: 0.25em; margin: 0; }
+.atlas-text-input-row {
+  display: flex; align-items: center;
+  width: 420px; max-width: 90vw;
+  border: 1px solid; border-radius: 4px;
+  background: rgba(2,5,8,0.6); backdrop-filter: blur(4px);
+  overflow: hidden;
+}
+.atlas-text-input {
+  flex: 1; background: transparent; border: 0; outline: none;
+  padding: 10px 14px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.05em;
+}
+.atlas-text-input::placeholder { color: rgba(255,255,255,0.2); }
+.atlas-text-input:disabled { opacity: 0.4; }
+.atlas-text-send {
+  background: transparent; border: 0; border-left: 1px solid;
+  padding: 0 14px; height: 40px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 14px;
+  transition: background 0.2s;
+}
+.atlas-text-send:hover:not(:disabled) { background: rgba(0,212,255,0.06); }
+.atlas-text-send:disabled { opacity: 0.25; cursor: not-allowed; }
 /* On-chain log */
 .atlas-log {
   position: absolute; right: 24px; top: 50%; transform: translateY(-50%);

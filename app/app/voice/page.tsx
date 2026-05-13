@@ -249,6 +249,36 @@ export default function VoicePage() {
         </button>
 
         <p className="atlas-hint">HOLD TO SPEAK · RELEASE TO SEND</p>
+
+        {/* Text input fallback */}
+        <div className="atlas-text-input-row">
+          <input
+            className="atlas-text-input"
+            placeholder="Or type a command…"
+            value={interim || ""}
+            onChange={e => { interimRef.current = e.target.value; setInterim(e.target.value); }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && interimRef.current.trim()) {
+                const t = interimRef.current.trim();
+                setInterim(""); interimRef.current = "";
+                sendToAtlas(t);
+              }
+            }}
+            disabled={busy || orbState === "listening"}
+            style={{ borderColor: `${s.color}25`, color: "rgba(255,255,255,0.7)" }}
+          />
+          <button
+            className="atlas-text-send"
+            style={{ borderColor: `${s.color}25`, color: s.color }}
+            disabled={busy || orbState === "listening" || !interim.trim()}
+            onClick={() => {
+              const t = interimRef.current.trim();
+              if (!t) return;
+              setInterim(""); interimRef.current = "";
+              sendToAtlas(t);
+            }}
+          >↵</button>
+        </div>
       </div>
 
       {/* On-chain log — right panel */}
