@@ -78,6 +78,52 @@ Higher reputation → more autonomous actions permitted. Agents earn reputation 
 
 ---
 
+## Autonomous Agent Control — HybridVault + EIP-712 Capped Consent
+
+This is the feature that separates RWAi from every other "AI + RWA" project: **Atlas does not just recommend — it executes.**
+
+Most AI portfolio tools give advice. Atlas acts. But acting with someone's money requires trust. RWAi solves this with **capped consent** — a single EIP-712 signature that gives Atlas a bounded, revocable allowance to operate autonomously.
+
+```
+User signs once (EIP-712)
+  └─ "Atlas may move up to $500 from my HybridVault"
+
+Atlas detects opportunity → executes rebalance autonomously
+  └─ No per-transaction approvals needed within the cap
+
+Every autonomous action is logged on AgentExecutor.sol
+  └─ ERC-8004 identity of Atlas is the signer — permanent proof
+
+Allowance exhausted → Atlas requests new consent
+  └─ User is always in control of the ceiling
+```
+
+**Why this matters for the scoring criteria:**
+
+- *AI × RWA depth* — AI is the execution layer, not a chatbot. Atlas signs and submits transactions.
+- *Mantle integration* — HybridVault.sol lives on Mantle. Every autonomous action is an on-chain event.
+- *Path B Application* — this is what "AI-driven RWA application" means: an agent that lowers the barrier by acting on the user's behalf, within explicit consent bounds.
+
+**How consent works (EIP-712):**
+
+```typescript
+// User signs this structure — no private key exposure, no full custody
+{
+  domain: { name: "RWAi HybridVault", chainId: 5003 },
+  types:  { AgentConsent: [
+    { name: "agent",      type: "address" },  // Atlas wallet
+    { name: "allowance",  type: "uint256" },  // cap in wei
+    { name: "deadline",   type: "uint256" },  // expiry
+    { name: "nonce",      type: "uint256" },  // replay protection
+  ]},
+  message: { agent, allowance, deadline, nonce }
+}
+```
+
+The signature is submitted to `HybridVault.relayAllowance()`. From that point, Atlas can call `HybridVault.agentExecute()` for actions up to the cap — each deducting from the allowance, each logged permanently on `AgentExecutor.sol`.
+
+---
+
 ## Architecture
 
 ```
