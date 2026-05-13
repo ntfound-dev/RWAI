@@ -1,11 +1,12 @@
 """
 GET  /api/agents/market/listings  — all tokenized RWA listings
 POST /api/agents/market/buy       — Atlas logs purchase on-chain
+POST /api/agents/market/sell      — Atlas logs sell on-chain (RWA → USDY)
 """
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from ...mantle.db import get_listings
-from ...mantle.executor import log_market_purchase
+from ...mantle.executor import log_market_purchase, log_market_sell
 from ..core import agent_complete, ChatMessage
 
 router = APIRouter()
@@ -51,5 +52,43 @@ async def buy(req: BuyRequest):
         "success": bool(tx),
         "onChainTx": tx or "",
         "tokens": tokens,
+        "reasoning": reasoning,
+    }
+
+
+class SellRequest(BaseModel):
+    seller_address: str
+    token_address: str
+    token_symbol: str
+    token_name: str
+    amount_tokens: float     # number of tokens to sell
+    price_per_token: float   # price per token in USD
+    apy_bps: int = 0
+
+
+@router.post("/market/sell")
+async def sell(req: SellRequest):
+    usd_value = req.amount_tokens * req.price_per_token
+    amount_wei = int(req.amount_tokens * 1e18)
+
+    prompt = (
+        f"You are Atlas. A seller at {req.seller_address[:10]}... is selling "
+        f"{req.amount_tokens:,.2f} {req.token_symbol} tokens (${usd_value:,.2f} USD) "
+        f"on the RWAi Market. Asset: {req.token_name}, price ${req.price_per_token:.4f}/token. "
+        f"Write a 1-2 sentence on-chain reasoning for this rebalance (RWA → USDY)."
+    )
+    reasoning = f"Atlas market sell: {req.amount_tokens:,.2f} {req.token_symbol} at ${req.price_per_token:.4f}/token (${usd_value:,.2f} total). Rebalancing RWA position to USDY."
+    try:
+        reply, _, _ = await agent_complete("atlas", [ChatMessage(role="user", body=prompt)])
+        if reply and len(reply.strip()) > 10:
+            reasoning = reply.strip()
+    except Exception:
+        pass
+
+    tx = log_market_sell(req.seller_address, req.token_address, amount_wei, reasoning)
+    return {
+        "success": bool(tx),
+        "onChainTx": tx or "",
+        "usd_value": usd_value,
         "reasoning": reasoning,
     }

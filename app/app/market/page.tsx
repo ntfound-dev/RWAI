@@ -47,11 +47,16 @@ export default function MarketPage() {
   const { address, isConnected } = useAccount();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [buying, setBuying] = useState<string | null>(null); // token_address being bought
+  const [buying, setBuying] = useState<string | null>(null);
+  const [selling, setSelling] = useState<string | null>(null);
   const [buyAmount, setBuyAmount] = useState("1000");
+  const [sellAmount, setSellAmount] = useState("500");
   const [buyTx, setBuyTx] = useState<Record<string, string>>({});
+  const [sellTx, setSellTx] = useState<Record<string, string>>({});
   const [buyError, setBuyError] = useState<Record<string, string>>({});
+  const [sellError, setSellError] = useState<Record<string, string>>({});
   const [buyStatus, setBuyStatus] = useState<Record<string, string>>({});
+  const [sellStatus, setSellStatus] = useState<Record<string, string>>({});
 
   useEffect(() => {
     agentApi<{ listings: Listing[] }>("/market/listings")
@@ -89,6 +94,38 @@ export default function MarketPage() {
     } catch (err) {
       setBuyError(s => ({ ...s, [key]: err instanceof Error ? err.message : "Buy failed." }));
       setBuyStatus(s => ({ ...s, [key]: "" }));
+    }
+  };
+
+  const executeSell = async (listing: Listing) => {
+    if (!address || !isConnected) return;
+    const key = listing.token_address;
+    setSellStatus(s => ({ ...s, [key]: "Atlas is processing your sell order…" }));
+    setSellError(s => ({ ...s, [key]: "" }));
+    setSellTx(s => ({ ...s, [key]: "" }));
+    try {
+      const tokens = parseFloat(sellAmount) || 0;
+      const d = await agentApi<{ success: boolean; onChainTx: string; usd_value: number; reasoning: string }>("/market/sell", {
+        method: "POST",
+        body: JSON.stringify({
+          seller_address:  address,
+          token_address:   listing.token_address,
+          token_symbol:    listing.token_symbol,
+          token_name:      listing.token_name,
+          amount_tokens:   tokens,
+          price_per_token: listing.price_usd,
+          apy_bps:         listing.apy_bps,
+        }),
+      });
+      if (d.onChainTx) {
+        setSellTx(s => ({ ...s, [key]: d.onChainTx }));
+        setSellStatus(s => ({ ...s, [key]: `✅ Sold ${tokens.toLocaleString()} ${listing.token_symbol} → $${d.usd_value.toLocaleString(undefined,{maximumFractionDigits:2})} — Atlas logged on-chain` }));
+      } else {
+        setSellStatus(s => ({ ...s, [key]: "Sell logged. Waiting for on-chain confirmation." }));
+      }
+    } catch (err) {
+      setSellError(s => ({ ...s, [key]: err instanceof Error ? err.message : "Sell failed." }));
+      setSellStatus(s => ({ ...s, [key]: "" }));
     }
   };
 
@@ -213,14 +250,66 @@ export default function MarketPage() {
                 {/* Buy panel */}
                 <div style={{ padding:"14px 16px", marginTop:"auto" }}>
                   {isOwner ? (
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span className="mono-sm" style={{ color:"var(--fg-3)" }}>You listed this asset</span>
-                      {listing.tx_hash && (
-                        <a href={`https://sepolia.mantlescan.xyz/tx/${listing.tx_hash}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
-                          ↗ {listing.tx_hash.slice(0,8)}…
-                        </a>
-                      )}
-                    </div>
+                    selling === key ? (
+                      <div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, marginBottom:8, alignItems:"end" }}>
+                          <label style={{ display:"grid", gap:4 }}>
+                            <span className="mono-sm">Tokens to sell</span>
+                            <input
+                              className="input-field"
+                              value={sellAmount}
+                              onChange={e => setSellAmount(e.target.value.replace(/[^\d.]/g,""))}
+                              style={{ fontSize:12 }}
+                              autoFocus
+                            />
+                          </label>
+                          <button className="btn btn-ghost" style={{ fontSize:10 }} onClick={() => setSelling(null)}>✕</button>
+                        </div>
+                        {listing.price_usd > 0 && (
+                          <div className="mono-sm" style={{ color:"var(--fg-2)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>
+                            = ${((parseFloat(sellAmount)||0) * listing.price_usd).toLocaleString(undefined,{maximumFractionDigits:2})} USD
+                          </div>
+                        )}
+                        {sellStatus[key] && !sellTx[key] && (
+                          <div className="mono-sm" style={{ color:"var(--warn)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>{sellStatus[key]}</div>
+                        )}
+                        {sellError[key] && (
+                          <div className="mono-sm" style={{ color:"var(--warn)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>{sellError[key]}</div>
+                        )}
+                        {sellTx[key] ? (
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                            <span className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{sellStatus[key]}</span>
+                            <a href={`https://sepolia.mantlescan.xyz/tx/${sellTx[key]}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
+                              ↗ {sellTx[key].slice(0,8)}…{sellTx[key].slice(-6)}
+                            </a>
+                          </div>
+                        ) : (
+                          <div style={{ display:"flex", gap:8 }}>
+                            <button className="btn btn-primary" style={{ flex:1, fontSize:11, background:"var(--warn)", borderColor:"var(--warn)" }} onClick={() => executeSell(listing)}>
+                              Confirm sell →
+                            </button>
+                            <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setSelling(null)}>Cancel</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div>
+                          <div className="mono-sm" style={{ color:"var(--nexus)", marginBottom:2 }}>Your listing</div>
+                          {sellTx[key] && (
+                            <div className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{sellStatus[key]}</div>
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize:11, borderColor:"var(--warn)", color:"var(--warn)" }}
+                          onClick={() => { setSelling(key); setSellAmount("500"); }}
+                          disabled={!isConnected}
+                        >
+                          Sell →
+                        </button>
+                      </div>
+                    )
                   ) : !isBuying ? (
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       {txForThis ? (

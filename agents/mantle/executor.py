@@ -213,6 +213,25 @@ def log_market_purchase(buyer: str, token_address: str, amount_wei: int, ai_reas
         return None
 
 
+def log_market_sell(seller: str, from_token: str, amount_wei: int, ai_reasoning: str) -> Optional[str]:
+    """Atlas: log an RWA market sell on AgentExecutor.executeRebalance (RWA → USDY)."""
+    w3, account = _get_account()
+    executor = get_agent_executor()
+    if not w3 or not account or not executor:
+        return None
+    try:
+        usdy = Web3.to_checksum_address(ASSET_ADDRESSES["USDY"])
+        from_addr = Web3.to_checksum_address(from_token)
+        agent_id = get_agent_ids().get("atlas", 0)
+        return _send(w3, account, executor.functions.executeRebalance(
+            agent_id, Web3.to_checksum_address(seller),
+            [from_addr], [usdy], [int(amount_wei)], ai_reasoning[:500]
+        ))
+    except Exception as e:
+        print(f"[mantle.executor] log_market_sell failed: {e}")
+        return None
+
+
 def execute_rebalance(
     user: str,
     from_symbols: list[str],
