@@ -45,7 +45,7 @@ def _send(w3, account, fn, gas: int = 400_000, value: int = 0) -> Optional[str]:
     try:
         tx = fn.build_transaction({
             "from":  account.address,
-            "nonce": w3.eth.get_transaction_count(account.address),
+            "nonce": w3.eth.get_transaction_count(account.address, "pending"),
             "gas":   gas,
             "value": value,
         })
