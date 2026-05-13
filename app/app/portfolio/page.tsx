@@ -660,6 +660,16 @@ export default function PortfolioPage() {
               <input className="input-field" style={{ fontSize:12 }} value={atlasInput} onChange={e => setAtlasInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && sendAtlas()} placeholder="Ask Atlas about your portfolio…"/>
               <button className="btn btn-primary btn-sm" onClick={sendAtlas}>→</button>
+              <a href="/voice" title="Talk to Atlas (voice)">
+                <button className="btn btn-sm" style={{ color:"var(--warn)", borderColor:"rgba(245,158,11,0.3)", padding:"0 10px" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <rect x="9" y="2" width="6" height="12" rx="3"/>
+                    <path d="M5 10a7 7 0 0 0 14 0"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
+                </button>
+              </a>
             </div>
           </div>
         )}

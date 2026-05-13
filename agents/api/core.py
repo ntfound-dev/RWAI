@@ -1,6 +1,6 @@
 """
-Shared AI helpers.
-Priority: Ollama (local) → Claude (Anthropic SDK) → OpenAI-compatible (ChainGPT / any)
+Agent AI fallback chain.
+Priority: OpenClaw → Groq (free, cloud) → Claude → Ollama (local opt-in)
 """
 import os
 import logging
@@ -10,15 +10,15 @@ import httpx
 
 log = logging.getLogger("rwai.core")
 
-CLAUDE_API_KEY       = os.getenv("ANTHROPIC_API_KEY", "")
-OLLAMA_URL           = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL         = os.getenv("OLLAMA_MODEL", "qwen3:8b")
-CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.80"))
+CLAUDE_API_KEY      = os.getenv("ANTHROPIC_API_KEY", "")
+GROQ_API_KEY        = os.getenv("OPENAI_COMPAT_API_KEY", "")
+GROQ_URL            = os.getenv("OPENAI_COMPAT_BASE_URL", "https://api.groq.com/openai")
+GROQ_MODEL          = os.getenv("OPENAI_COMPAT_MODEL", "llama-3.3-70b-versatile")
 
-# OpenAI-compatible fallback (ChainGPT, OpenAI, Together, etc.)
-OPENAI_COMPAT_KEY    = os.getenv("OPENAI_COMPAT_API_KEY", "")
-OPENAI_COMPAT_URL    = os.getenv("OPENAI_COMPAT_BASE_URL", "https://api.chaingpt.org")
-OPENAI_COMPAT_MODEL  = os.getenv("OPENAI_COMPAT_MODEL", "chaingpt-4o")
+# Ollama is opt-in local only — not used in cloud deployments
+OLLAMA_ENABLED      = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
+OLLAMA_URL          = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL        = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
 SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
@@ -32,28 +32,35 @@ class ChatMessage(BaseModel):
     role: str
     body: str
 
+
 class ChatResponse(BaseModel):
     reply: str
     model_used: str
     fallback: bool = False
 
 
-async def call_ollama(system: str, user: str) -> tuple[str, float]:
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            res = await client.post(f"{OLLAMA_URL}/api/generate", json={
-                "model":  OLLAMA_MODEL,
-                "system": system,
-                "prompt": user,
-                "stream": False,
-            })
-            data = res.json()
-            text = data.get("response", "")
-            confidence = 0.85 if len(text) > 80 else 0.65
-            return text, confidence
-    except Exception as e:
-        log.debug("Ollama unavailable: %s", e)
-        return "", 0.0
+async def call_groq(system: str, user: str) -> str:
+    if not GROQ_API_KEY or GROQ_API_KEY.startswith("your_"):
+        raise ValueError("OPENAI_COMPAT_API_KEY (Groq) not configured")
+    async with httpx.AsyncClient(timeout=30) as client:
+        res = await client.post(
+            f"{GROQ_URL}/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type":  "application/json",
+            },
+            json={
+                "model":      GROQ_MODEL,
+                "max_tokens": 1024,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": user},
+                ],
+            },
+        )
+        if res.status_code != 200:
+            raise ValueError(f"Groq {res.status_code}: {res.text[:200]}")
+        return res.json()["choices"][0]["message"]["content"]
 
 
 async def call_claude(system: str, user: str) -> str:
@@ -75,14 +82,14 @@ async def call_claude(system: str, user: str) -> str:
                 "https://api.anthropic.com/v1/messages",
                 headers={
                     "x-api-key":         CLAUDE_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type":      "application/json",
+                    "anthropic-version":  "2023-06-01",
+                    "Content-Type":       "application/json",
                 },
                 json={
-                    "model":    "claude-opus-4-7",
+                    "model":      "claude-opus-4-7",
                     "max_tokens": 1024,
-                    "system":   system,
-                    "messages": [{"role": "user", "content": user}],
+                    "system":     system,
+                    "messages":   [{"role": "user", "content": user}],
                 },
             )
             if res.status_code != 200:
@@ -90,33 +97,25 @@ async def call_claude(system: str, user: str) -> str:
             return res.json()["content"][0]["text"]
 
 
-async def call_openai_compat(system: str, user: str) -> str:
-    """OpenAI-compatible endpoint: ChainGPT, Together, OpenAI, etc."""
-    if not OPENAI_COMPAT_KEY or OPENAI_COMPAT_KEY.startswith("your_"):
-        raise ValueError("OPENAI_COMPAT_API_KEY not configured")
-    async with httpx.AsyncClient(timeout=30) as client:
-        res = await client.post(
-            f"{OPENAI_COMPAT_URL}/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_COMPAT_KEY}",
-                "Content-Type":  "application/json",
-            },
-            json={
-                "model":      OPENAI_COMPAT_MODEL,
-                "max_tokens": 1024,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user",   "content": user},
-                ],
-            },
-        )
-        if res.status_code != 200:
-            raise ValueError(f"{OPENAI_COMPAT_URL} returned {res.status_code}: {res.text[:200]}")
-        return res.json()["choices"][0]["message"]["content"]
+async def call_ollama(system: str, user: str) -> str:
+    async with httpx.AsyncClient(timeout=25) as client:
+        res = await client.post(f"{OLLAMA_URL}/api/generate", json={
+            "model":  OLLAMA_MODEL,
+            "system": system,
+            "prompt": user,
+            "stream": False,
+        })
+        text = res.json().get("response", "").strip()
+        if not text:
+            raise ValueError("Empty Ollama response")
+        return text
 
 
 async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tuple[str, str, bool]:
-    """OpenClaw → Ollama → Claude → Groq fallback chain."""
+    """
+    Fallback chain: OpenClaw → Groq → Claude → Ollama (local opt-in)
+    Returns: (reply, model_used, is_fallback)
+    """
     skill   = load_skill(agent_id)
     history = "\n".join(
         f"{'User' if m.role == 'user' else agent_id.capitalize()}: {m.body}"
@@ -128,37 +127,37 @@ async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tupl
         f"Be concise (3-5 sentences max)."
     )
 
-    # 1. Try OpenClaw (CMDOP) — primary when API key configured
+    # 1. OpenClaw (primary when API key configured)
     try:
         from ..mantle.openclaw import run_skill, is_available
         if is_available():
             r = await run_skill(agent_id, prompt)
-            if r:
-                return r, "openclaw", False
+            if r and len(r.strip()) > 10:
+                return r.strip(), "openclaw", False
     except Exception as e:
         log.debug("OpenClaw unavailable: %s", e)
 
-    # 2. Try Ollama (local, free)
-    reply, confidence = await call_ollama(skill, prompt)
-    if confidence >= CONFIDENCE_THRESHOLD and reply:
-        return reply, OLLAMA_MODEL, False
+    # 2. Groq — free, cloud, fast (primary cloud fallback)
+    try:
+        r = await call_groq(skill, prompt)
+        if r and len(r.strip()) > 10:
+            return r.strip(), GROQ_MODEL, False
+    except Exception as e:
+        log.info("Groq unavailable: %s", e)
 
-    # 3. Try Claude
+    # 3. Claude — reliable but paid
     try:
         r = await call_claude(skill, prompt)
-        return r, "claude-opus-4-7", True
+        return r.strip(), "claude-opus-4-7", True
     except Exception as e:
         log.info("Claude unavailable: %s", e)
 
-    # 4. Try Groq / OpenAI-compatible
-    try:
-        r = await call_openai_compat(skill, prompt)
-        return r, OPENAI_COMPAT_MODEL, True
-    except Exception as e:
-        log.info("OpenAI-compat unavailable: %s", e)
-
-    # 5. Best-effort Ollama reply
-    if reply:
-        return reply, OLLAMA_MODEL, True
+    # 4. Ollama — local only, opt-in via OLLAMA_ENABLED=true
+    if OLLAMA_ENABLED:
+        try:
+            r = await call_ollama(skill, prompt)
+            return r, OLLAMA_MODEL, True
+        except Exception as e:
+            log.info("Ollama unavailable: %s", e)
 
     return "Agent temporarily unavailable.", "none", True
