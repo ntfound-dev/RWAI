@@ -15,6 +15,23 @@ except Exception:
 
 AGENT_PRIVATE_KEY = os.getenv("AGENT_PRIVATE_KEY", "")
 
+import threading
+_nonce_lock = threading.Lock()
+_nonce_cache: dict = {}  # address -> current nonce
+
+def _next_nonce(w3, address: str) -> int:
+    with _nonce_lock:
+        chain_nonce = w3.eth.get_transaction_count(address, "pending")
+        cached = _nonce_cache.get(address, 0)
+        nonce = max(chain_nonce, cached)
+        _nonce_cache[address] = nonce + 1
+        return nonce
+
+def _release_nonce(address: str):
+    """Call on tx failure to re-sync nonce from chain next time."""
+    with _nonce_lock:
+        _nonce_cache.pop(address, None)
+
 # Mantle Sepolia testnet asset addresses
 ASSET_ADDRESSES = {
     "USDY": "0xcE265E23aAc349cEf9Fa3CC058062A44080f2289",
@@ -45,9 +62,10 @@ def _send(w3, account, fn, gas: int = 400_000, value: int = 0) -> Optional[str]:
     try:
         estimated = fn.estimate_gas({"from": account.address, "value": value})
         gas = max(gas, int(estimated * 1.3))
+        nonce = _next_nonce(w3, account.address)
         tx = fn.build_transaction({
             "from":  account.address,
-            "nonce": w3.eth.get_transaction_count(account.address, "pending"),
+            "nonce": nonce,
             "gas":   gas,
             "value": value,
         })
@@ -58,6 +76,7 @@ def _send(w3, account, fn, gas: int = 400_000, value: int = 0) -> Optional[str]:
         return h if h.startswith("0x") else "0x" + h
     except Exception as e:
         print(f"[mantle.executor] tx failed: {e}")
+        _release_nonce(account.address)
         return None
 
 
