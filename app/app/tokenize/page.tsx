@@ -367,6 +367,23 @@ export default function TokenizePage() {
                 <div className="mono-sm" style={{ marginBottom:8, color:"var(--fg-2)" }}>NEXUS ERC-8004 REPUTATION UPDATED</div>
                 <div style={{ fontFamily:"var(--font-mono)", fontSize:24, color:"var(--accent)" }}>4.92 → 4.93</div>
               </div>
+              <div style={{ marginTop:24, paddingTop:16, borderTop:"1px solid var(--line)" }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setStep("upload");
+                    setFiles([]);
+                    setNexusResult(null);
+                    setShieldResult(null);
+                    setDeployedTx("");
+                    setDocumentText("");
+                    setError("");
+                    setAgentLog([]);
+                  }}
+                >
+                  Tokenize another asset →
+                </button>
+              </div>
             </div>
           </div>
         )}
