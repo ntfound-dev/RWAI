@@ -680,6 +680,17 @@ export default function PortfolioPage() {
           ⚠ Connect wallet to load your live portfolio from Mantle
         </div>
       )}
+
+      {/* Bridge utility */}
+      <div style={{ marginTop:16, padding:"12px 16px", background:"var(--bg-1)", border:"1px solid var(--line)", borderRadius:2, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+        <div>
+          <span className="mono-sm" style={{ color:"var(--fg-2)" }}>Need MNT or USDY on Mantle?</span>
+          <span className="mono-sm" style={{ color:"var(--fg-3)", marginLeft:8 }}>Bridge assets from L1 or swap on Mantle.</span>
+        </div>
+        <a href="/bridge">
+          <button className="btn btn-sm btn-ghost" style={{ whiteSpace:"nowrap" }}>Bridge →</button>
+        </a>
+      </div>
     </div>
   );
 }
