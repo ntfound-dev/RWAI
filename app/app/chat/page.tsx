@@ -448,7 +448,26 @@ export default function ChatPage() {
   const [extraMessages, setExtraMessages] = useState<Msg[]>([]);
   const [input, setInput]   = useState("");
   const [thinking, setThinking] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recRef    = useRef<any>(null);
+
+  const startVoice = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { alert("Voice requires Chrome or Edge."); return; }
+    const rec = new SR();
+    recRef.current = rec;
+    rec.continuous = false; rec.interimResults = false; rec.lang = "en-US";
+    rec.onstart  = () => setVoiceActive(true);
+    rec.onresult = (e: any) => {
+      const t = e.results[0][0].transcript;
+      setInput(t);
+    };
+    rec.onend = () => setVoiceActive(false);
+    rec.onerror = () => setVoiceActive(false);
+    rec.start();
+  };
+  const stopVoice = () => { recRef.current?.stop(); setVoiceActive(false); };
 
   const messages = [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
 
@@ -564,14 +583,28 @@ export default function ChatPage() {
               <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
             ))}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
             <input
               style={{ background:"transparent", border:0, outline:"none", color:"var(--fg-0)", fontFamily:"var(--font-sans)", fontSize:13, padding:"10px 0", width:"100%" }}
-              placeholder="Ask Atlas to plan, delegate, or execute…"
+              placeholder={voiceActive ? "Listening…" : "Ask Atlas to plan, delegate, or execute…"}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && send()}
             />
+            <button
+              className="btn btn-sm"
+              onMouseDown={startVoice} onMouseUp={stopVoice}
+              onTouchStart={startVoice} onTouchEnd={stopVoice}
+              title="Hold to speak"
+              style={{ color: voiceActive ? "var(--accent)" : "var(--fg-2)", borderColor: voiceActive ? "var(--accent)" : "var(--line)", padding:"0 10px", boxShadow: voiceActive ? "0 0 12px var(--accent)" : "none" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="9" y="2" width="6" height="11" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8"  y1="22" x2="16" y2="22"/>
+              </svg>
+            </button>
             <button className="btn btn-primary btn-sm" onClick={() => send()}>Send ↵</button>
           </div>
         </div>

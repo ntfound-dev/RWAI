@@ -51,8 +51,11 @@ def stats():
 
 
 @router.get("/stats/actions")
-def recent_actions(limit: int = Query(default=20, le=100)):
-    return {"actions": get_recent_actions(limit)}
+def recent_actions(limit: int = Query(default=20, le=100), agent: str = Query(default=None)):
+    actions = get_recent_actions(limit * 4 if agent else limit)
+    if agent:
+        actions = [a for a in actions if a.get("agent_name", "").lower() == agent.lower()][:limit]
+    return {"actions": actions}
 
 
 @router.get("/stats/assets")

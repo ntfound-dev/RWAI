@@ -75,7 +75,7 @@ export default function VoicePage() {
     try {
       const data = await agentApi<any>("/chat", {
         method: "POST",
-        body: JSON.stringify({ agent: "atlas", messages: next, wallet: address ?? "" }),
+        body: JSON.stringify({ agent_id: "atlas", messages: next }),
       });
       const reply: string = data.reply || data.message || "Understood.";
       const model: string = data.model_used || data.modelUsed || "";
