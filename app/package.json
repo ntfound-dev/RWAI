@@ -9,13 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@mantleio/viem": "^0.0.1-alpha.1",
     "@tanstack/react-query": "^5.45.0",
     "@wagmi/connectors": "^5.1.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.2.0",
     "lucide-react": "^0.400.0",
+    "mammoth": "^1.12.0",
     "next": "14.2.4",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.7.284",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.3.0",

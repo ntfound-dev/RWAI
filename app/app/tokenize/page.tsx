@@ -185,7 +185,7 @@ export default function TokenizePage() {
               <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
               <div className="display" style={{ fontSize:24, marginBottom:8 }}>Drop documents here</div>
               <p className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>PDF, DOCX, images · deed, income statement, appraisal</p>
-              <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.jpg,.png" style={{ display:"none" }} onChange={e => handleFiles(e.target.files)}/>
+              <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.webp" style={{ display:"none" }} onChange={e => handleFiles(e.target.files)}/>
             </div>
             {files.length > 0 && (
               <div style={{ marginBottom:20 }}>
@@ -383,17 +383,29 @@ export default function TokenizePage() {
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 async function filesToDocumentText(files: File[]) {
+  const form = new FormData();
+  for (const f of files) form.append("files", f);
+
+  try {
+    const res = await fetch("/api/extract-text", { method: "POST", body: form });
+    if (res.ok) {
+      const { results } = await res.json() as { results: Array<{ name: string; text: string }> };
+      return results
+        .map(r => `Document: ${r.name}\n${r.text.slice(0, 12_000)}`)
+        .join("\n\n");
+    }
+  } catch {
+    // fall through to client-side fallback
+  }
+
+  // Fallback: plain text files only
   const chunks = await Promise.all(files.map(async file => {
     try {
       const text = await file.text();
       const readable = text.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "").trim();
-      if (readable.length > 80) {
-        return `Document: ${file.name}\n${readable.slice(0, 12_000)}`;
-      }
-    } catch {
-      // Fall through to metadata payload.
-    }
-    return `Document uploaded: ${file.name} (${Math.round(file.size / 1024)} KB). Extract server-side if binary.`;
+      if (readable.length > 80) return `Document: ${file.name}\n${readable.slice(0, 12_000)}`;
+    } catch { /* ignore */ }
+    return `Document uploaded: ${file.name} (${Math.round(file.size / 1024)} KB).`;
   }));
   return chunks.join("\n\n");
 }
