@@ -113,7 +113,12 @@ export default function PortfolioPage() {
 
   const refreshMyAssets = (addr: string) => {
     agentApi<{ assets: TokenizedAsset[] }>(`/stats/assets?owner=${addr}&limit=20`)
-      .then(d => { if (d.assets) setMyAssets(d.assets); })
+      .then(d => {
+        if (d.assets) {
+          // Only show user-initiated tokenizations, not chain-indexed protocol tokens
+          setMyAssets(d.assets.filter(a => a._source === "user"));
+        }
+      })
       .catch(() => {});
   };
 
