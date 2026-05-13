@@ -11,14 +11,19 @@ export const metadata: Metadata = {
 // surface as Next.js dev-mode overlays inside our app.
 const _suppressExtensionErrors = `
 (function(){
+  var BAD = ['chrome-extension://', 'not been authorized yet', 'WalletConnect'];
+  function isBad(s){ return s && BAD.some(function(b){ return String(s).indexOf(b) !== -1; }); }
   var _onError = window.onerror;
-  window.onerror = function(msg, src) {
-    if (src && src.startsWith('chrome-extension://')) return true;
+  window.onerror = function(msg, src, line, col, err){
+    if(isBad(src) || isBad(msg) || isBad(err && err.message)) return true;
     return _onError ? _onError.apply(this, arguments) : false;
   };
-  window.addEventListener('unhandledrejection', function(e) {
+  window.addEventListener('error', function(e){
+    if(isBad(e.filename) || isBad(e.message)) e.stopImmediatePropagation();
+  }, true);
+  window.addEventListener('unhandledrejection', function(e){
     var s = e.reason && (e.reason.stack || e.reason.message || String(e.reason));
-    if (s && s.includes('chrome-extension://')) e.preventDefault();
+    if(isBad(s)) e.preventDefault();
   });
 })();
 `;
