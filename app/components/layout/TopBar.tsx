@@ -7,10 +7,10 @@ import { useAccount, useConnect, useDisconnect } from "wagmi";
 const NAV = [
   { href: "/",          label: "Home" },
   { href: "/hub",       label: "Agents" },
+  { href: "/chat",      label: "Atlas" },
   { href: "/tokenize",  label: "Tokenize" },
   { href: "/market",    label: "Market" },
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/voice",     label: "Atlas" },
   { href: "/docs",      label: "Docs" },
 ];
 

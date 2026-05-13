@@ -590,6 +590,8 @@ html, body {
   white-space: nowrap;
 }
 
+@keyframes voiceOrbPulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.5)} }
+
 /* ── Legacy voice classes (kept for any residual refs) ─────────── */
 .voice-shell {
   min-height: 100vh;

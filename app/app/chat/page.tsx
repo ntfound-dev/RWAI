@@ -442,13 +442,68 @@ const SUGGESTIONS = [
   "Explain CVaR",
 ];
 
+type VoiceState = "idle" | "listening" | "speaking";
+const VOICE_COLOR: Record<VoiceState, string> = {
+  idle: "var(--fg-3)", listening: "var(--accent)", speaking: "var(--yield)",
+};
+
 export default function ChatPage() {
   const [visibleCount, setVisibleCount] = useState(0);
   const [animKey, setAnimKey]           = useState(0);
   const [extraMessages, setExtraMessages] = useState<Msg[]>([]);
   const [input, setInput]   = useState("");
   const [thinking, setThinking] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recRef    = useRef<any>(null);
+  const synthRef  = useRef<SpeechSynthesis | null>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    synthRef.current = window.speechSynthesis;
+    const load = () => { voicesRef.current = synthRef.current?.getVoices() ?? []; };
+    load();
+    synthRef.current?.addEventListener("voiceschanged", load);
+    return () => synthRef.current?.removeEventListener("voiceschanged", load);
+  }, []);
+
+  const speakReply = (text: string) => {
+    if (!synthRef.current) return;
+    synthRef.current.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    const pick = voicesRef.current.find(v =>
+      v.name.includes("Daniel") || v.name.includes("Google UK English Male") ||
+      v.name.includes("Alex") || (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
+    );
+    if (pick) utt.voice = pick;
+    utt.rate = 0.88; utt.pitch = 0.78;
+    utt.onstart = () => setVoiceState("speaking");
+    utt.onend   = () => setVoiceState("idle");
+    synthRef.current.speak(utt);
+  };
+
+  const startVoice = () => {
+    if (typeof window === "undefined") return;
+    synthRef.current?.cancel();
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { alert("Voice requires Chrome or Edge."); return; }
+    const rec = new SR();
+    recRef.current = rec;
+    rec.continuous = false; rec.interimResults = true; rec.lang = "en-US";
+    rec.onstart  = () => setVoiceState("listening");
+    rec.onresult = (e: any) => {
+      const t = Array.from(e.results).map((r: any) => r[0].transcript).join("");
+      setInput(t);
+    };
+    rec.onend = () => {
+      setVoiceState("idle");
+      setInput(prev => { if (prev.trim()) { setTimeout(() => send(prev.trim()), 50); } return ""; });
+    };
+    rec.onerror = () => setVoiceState("idle");
+    rec.start();
+  };
+  const stopVoice = () => recRef.current?.stop();
 
   const messages = [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
 
@@ -489,9 +544,11 @@ export default function ChatPage() {
         }));
       const data = await agentApi<AgentChatResponse>("/chat", {
         method: "POST",
-        body: JSON.stringify({ agentId:"atlas", messages: chatMessages }),
+        body: JSON.stringify({ agent_id:"atlas", messages: chatMessages }),
       });
-      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:data.reply ?? "Atlas unavailable." }]);
+      const reply = data.reply ?? "Atlas unavailable.";
+      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body: reply }]);
+      if (voiceState !== "idle" || recRef.current) speakReply(reply);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Atlas backend unavailable.";
       setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:`Production backend error: ${message}` }]);
@@ -564,24 +621,38 @@ export default function ChatPage() {
               <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
             ))}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
             <input
               style={{ background:"transparent", border:0, outline:"none", color:"var(--fg-0)", fontFamily:"var(--font-sans)", fontSize:13, padding:"10px 0", width:"100%" }}
-              placeholder="Ask Atlas to plan, delegate, or execute…"
+              placeholder={voiceState === "listening" ? "Listening…" : "Ask Atlas to plan, delegate, or execute…"}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && send()}
             />
-            <a href="/voice" title="Switch to Atlas voice interface">
-              <button className="btn btn-sm" style={{ color:"var(--warn)", borderColor:"rgba(245,158,11,0.3)", padding:"0 10px" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <rect x="9" y="2" width="6" height="11" rx="3"/>
-                  <path d="M5 10a7 7 0 0 0 14 0"/>
-                  <line x1="12" y1="19" x2="12" y2="22"/>
-                  <line x1="8"  y1="22" x2="16" y2="22"/>
-                </svg>
-              </button>
-            </a>
+            {/* Mini orb — voice state indicator */}
+            <div style={{
+              width:10, height:10, borderRadius:"50%", flexShrink:0,
+              background: VOICE_COLOR[voiceState],
+              boxShadow: voiceState !== "idle" ? `0 0 10px ${VOICE_COLOR[voiceState]}` : "none",
+              transition:"background 0.3s, box-shadow 0.3s",
+              animation: voiceState === "listening" ? "voiceOrbPulse 0.7s ease-in-out infinite" : voiceState === "speaking" ? "voiceOrbPulse 0.4s ease-in-out infinite" : "none",
+            }}/>
+            {/* Mic button */}
+            <button
+              className="btn btn-sm"
+              onMouseDown={startVoice} onMouseUp={stopVoice}
+              onTouchStart={startVoice} onTouchEnd={stopVoice}
+              disabled={thinking}
+              title="Hold to speak"
+              style={{ color: voiceState === "listening" ? "var(--accent)" : "var(--fg-2)", borderColor: voiceState === "listening" ? "var(--accent)" : "var(--line)", padding:"0 10px", boxShadow: voiceState === "listening" ? "0 0 12px var(--accent)" : "none", transition:"all 0.2s" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="9" y="2" width="6" height="11" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8"  y1="22" x2="16" y2="22"/>
+              </svg>
+            </button>
             <button className="btn btn-primary btn-sm" onClick={() => send()}>Send ↵</button>
           </div>
         </div>
