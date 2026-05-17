@@ -2,11 +2,13 @@
 RWAi Agent API — FastAPI backend
 """
 import os
+import time
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from .core import agent_complete, ChatMessage, ChatResponse  # re-export for compat
 from contextlib import asynccontextmanager
@@ -104,3 +106,40 @@ async def agents_status():
         "yield":  _fmt("yield"),
         "atlas":  _fmt("atlas"),
     }
+
+
+# ── WebSocket — live agent heartbeat ─────────────────────────────
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            block   = get_block_number()
+            scores  = get_agent_reputation_scores()
+            ids     = get_agent_ids()
+
+            def _ws_fmt(name: str) -> dict:
+                s     = scores.get(name, {})
+                local = s.get("localScore", 75)
+                return {
+                    "online":     True,
+                    "reputation": round(local / 20, 2),
+                    "erc8004_id": ids.get(name, 0),
+                }
+
+            await websocket.send_json({
+                "type":   "heartbeat",
+                "block":  block,
+                "agents": {
+                    "nexus":  _ws_fmt("nexus"),
+                    "shield": _ws_fmt("shield"),
+                    "yield":  _ws_fmt("yield"),
+                    "atlas":  _ws_fmt("atlas"),
+                },
+                "ts": time.time(),
+            })
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass

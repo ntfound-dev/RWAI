@@ -5,6 +5,7 @@ import { AgentMonogram, AGENTS } from "@/components/agents/AgentMonogram";
 import { MeshBackground } from "@/components/ui/MeshBackground";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { JarvisPanel } from "@/components/ui/JarvisPanel";
+import { useAgentSocket } from "@/hooks/useAgentSocket";
 
 // ── Transcript data ───────────────────────────────────────────────
 type MsgKind = "text" | "reasoning" | "tool" | "plan-options";
@@ -492,6 +493,7 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { connected: wsConnected, heartbeat } = useAgentSocket();
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
   const messages = activeSession
@@ -767,11 +769,11 @@ export default function ChatPage() {
       {/* ── BOTTOM stats strip ── */}
       <div style={{ zIndex:1, borderTop:"1px solid var(--line)", display:"grid", gridTemplateColumns:"repeat(6,1fr)", background:"var(--bg-1)" }}>
         {[
-          { label:"PRIMARY OBJECTIVES · MISSION STATUS", val:"",        accent:false },
+          { label:"MISSION STATUS", val: wsConnected ? "● WSS LIVE" : "○ CONNECTING", accent: wsConnected },
           { label:"PORTFOLIO VALUE",    val:"$10,000",   accent:false },
           { label:"YIELD-WEIGHTED APY", val:"4.88%",     accent:true  },
-          { label:"AGENTS ONLINE",      val:"4 / 4",     accent:false },
-          { label:"IN PROGRESS",        val:"52",        accent:false },
+          { label:"AGENTS ONLINE",      val: heartbeat ? `${Object.values(heartbeat.agents).filter(a => a.online).length} / 4` : "4 / 4", accent:false },
+          { label:"MANTLE BLOCK",       val: heartbeat?.block ? heartbeat.block.toLocaleString() : "—", accent:false },
           { label:"OBJECTIVE STATUS",   val:"ENGAGED",   accent:true  },
         ].map((s, i) => (
           <div key={i} style={{ padding:"8px 14px", borderRight: i < 5 ? "1px solid var(--line)" : "none" }}>
