@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { AgentMonogram } from "@/components/agents/AgentMonogram";
 import { useAccount } from "wagmi";
 import { agentApi } from "@/lib/agent-api";
+import { useYieldOracle } from "@/hooks/useYieldOracle";
+import { ADDRESSES } from "@/lib/contracts";
 
 interface Listing {
   asset_id: number | null;
@@ -43,8 +45,15 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+const GAS_BADGE = (
+  <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
+    ⛽ ~$0.001 gas · Mantle L2
+  </span>
+);
+
 export default function MarketPage() {
   const { address, isConnected } = useAccount();
+  const { snapshotCount, apyMap, hasData, isLoading: oracleLoading } = useYieldOracle();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
@@ -167,6 +176,34 @@ export default function MarketPage() {
         ))}
       </div>
 
+      {/* Live YieldOracle banner */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:"var(--bg-1)", border:"1px solid var(--line)", borderRadius:2, marginBottom:24, flexWrap:"wrap" }}>
+        <span className="live-dot"/>
+        <span className="mono-sm" style={{ color:"var(--accent)" }}>LIVE · YieldOracle.sol on Mantle</span>
+        <span className="mono-sm" style={{ color:"var(--fg-3)" }}>·</span>
+        {oracleLoading ? (
+          <span className="mono-sm" style={{ color:"var(--fg-3)" }}>reading chain…</span>
+        ) : hasData ? (
+          <span className="mono-sm" style={{ color:"var(--fg-1)", textTransform:"none", letterSpacing:0 }}>
+            {Number(snapshotCount).toLocaleString()} on-chain snapshot{Number(snapshotCount) !== 1 ? "s" : ""} · APY sourced from Yield agent
+          </span>
+        ) : (
+          <span className="mono-sm" style={{ color:"var(--fg-3)" }}>no snapshots yet — Yield agent will post shortly</span>
+        )}
+        <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
+          <span className="tag" style={{ fontSize:9 }}>Pyth oracle feed</span>
+          <a
+            href={`https://sepolia.mantlescan.xyz/address/${ADDRESSES.YieldOracle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono-sm"
+            style={{ color:"var(--accent)" }}
+          >
+            YieldOracle ↗
+          </a>
+        </div>
+      </div>
+
       {/* Listings */}
       {loading ? (
         <div style={{ textAlign:"center", padding:"60px 0", color:"var(--fg-3)", fontFamily:"var(--font-mono)", fontSize:12 }}>
@@ -189,7 +226,9 @@ export default function MarketPage() {
             const color = TYPE_COLOR[listing.asset_type] ?? "var(--fg-2)";
             const symbol = listing.token_symbol || "RWA";
             const name = listing.token_name || listing.asset_type?.replace(/_/g," ") || "Real World Asset";
-            const apy = (listing.apy_bps / 100).toFixed(2);
+            const liveApy = apyMap[symbol];
+            const apy = (liveApy ?? (listing.apy_bps / 100)).toFixed(2);
+            const apyIsLive = liveApy != null;
             const price = listing.price_usd;
             const usd = parseFloat(buyAmount) || 0;
             const tokens = price > 0 ? usd / price : 0;
@@ -226,12 +265,15 @@ export default function MarketPage() {
                   {/* Stats grid */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                     {[
-                      { label:"Price/Token",    value: price > 0 ? `$${price.toFixed(2)}` : "—" },
-                      { label:"APY",            value: `${apy}%`,           accent:true },
-                      { label:"Total Value",    value: listing.value_usd ? `$${Number(listing.value_usd).toLocaleString()}` : "—" },
-                    ].map(({ label, value, accent }) => (
+                      { label:"Price/Token", value: price > 0 ? `$${price.toFixed(2)}` : "—", accent:false, live:false },
+                      { label:"APY",         value: `${apy}%`,  accent:true,  live:apyIsLive },
+                      { label:"Total Value", value: listing.value_usd ? `$${Number(listing.value_usd).toLocaleString()}` : "—", accent:false, live:false },
+                    ].map(({ label, value, accent, live }) => (
                       <div key={label} style={{ background:"var(--bg-1)", padding:"8px", borderRadius:2 }}>
-                        <div className="mono-sm" style={{ marginBottom:4 }}>{label}</div>
+                        <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:4 }}>
+                          <span className="mono-sm">{label}</span>
+                          {live && <span className="live-dot" style={{ width:5, height:5 }}/>}
+                        </div>
                         <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color: accent ? "var(--accent)" : "var(--fg-0)" }}>{value}</div>
                       </div>
                     ))}
@@ -366,15 +408,18 @@ export default function MarketPage() {
                           </a>
                         </div>
                       ) : (
-                        <div style={{ display:"flex", gap:8 }}>
-                          <button
-                            className="btn btn-primary"
-                            style={{ flex:1, fontSize:11 }}
-                            onClick={() => executeBuy(listing)}
-                          >
-                            Confirm purchase →
-                          </button>
-                          <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setBuying(null)}>Cancel</button>
+                        <div>
+                          <div style={{ display:"flex", gap:8, marginBottom:6 }}>
+                            <button
+                              className="btn btn-primary"
+                              style={{ flex:1, fontSize:11 }}
+                              onClick={() => executeBuy(listing)}
+                            >
+                              Confirm purchase →
+                            </button>
+                            <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setBuying(null)}>Cancel</button>
+                          </div>
+                          {GAS_BADGE}
                         </div>
                       )}
                     </div>

@@ -43,12 +43,18 @@ interface ChainStats { assetCount: number; agentRuns: number; agentRuns24h: numb
 export default function LandingPage() {
   const [tracePos, setTracePos] = useState(0);
   const [chainStats, setChainStats] = useState<ChainStats | null>(null);
+  const [recentTx, setRecentTx]   = useState<string>("");
   const { data: agentStatus } = useAgentStatus();
 
   useEffect(() => {
     fetch("/api/agents/stats", { cache: "no-store" })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j) setChainStats(j); })
+      .then(j => {
+        if (j) {
+          setChainStats(j);
+          if (j.recentTx) setRecentTx(j.recentTx);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -123,6 +129,22 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+
+            {/* Ecosystem stack badges */}
+            <div style={{ display:"flex", gap:8, marginTop:16, flexWrap:"wrap" }}>
+              {[
+                { label:"Mantle L2",     sub:"~$0.001 gas",       color:"var(--accent)" },
+                { label:"Pyth oracles",  sub:"real-time price feeds", color:"var(--yield)" },
+                { label:"ERC-8004",      sub:"agent identity",    color:"var(--nexus)" },
+                { label:"EIP-712",       sub:"typed consent",     color:"var(--atlas)" },
+                { label:"AgentExecutor", sub:"on-chain AI log",   color:"var(--shield)" },
+              ].map(b => (
+                <div key={b.label} style={{ padding:"6px 10px", border:"1px solid var(--line)", borderRadius:2, background:"var(--bg-1)" }}>
+                  <div style={{ fontFamily:"var(--font-mono)", fontSize:10, color:b.color, fontWeight:600 }}>{b.label}</div>
+                  <div className="mono-sm" style={{ color:"var(--fg-3)", marginTop:1 }}>{b.sub}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Live agent trace */}
@@ -161,8 +183,14 @@ export default function LandingPage() {
                 );
               })}
             </div>
-            <div style={{ borderTop:"1px solid var(--line)", padding:"10px 14px", display:"flex", justifyContent:"space-between" }}>
-              <span className="mono-sm">tx 0x9af2…3c12</span>
+            <div style={{ borderTop:"1px solid var(--line)", padding:"10px 14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              {recentTx ? (
+                <a href={`https://sepolia.mantlescan.xyz/tx/${recentTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--fg-2)" }}>
+                  tx {recentTx.slice(0,8)}…{recentTx.slice(-6)}
+                </a>
+              ) : (
+                <span className="mono-sm" style={{ color:"var(--fg-3)" }}>tx 0x9af2…3c12</span>
+              )}
               <a href="https://sepolia.mantlescan.xyz" target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", cursor:"pointer" }}>↗ Mantle Explorer</a>
             </div>
           </div>

@@ -301,9 +301,14 @@ export default function TokenizePage() {
                 ⚠ Connect wallet to deploy token on Mantle Testnet
               </div>
             )}
-            <button className="btn btn-primary" onClick={deployToken} disabled={!shieldResult.cleared || loading}>
-              {shieldResult.cleared ? "Deploy ERC-20 on Mantle →" : "Compliance score too low"}
-            </button>
+            <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              <button className="btn btn-primary" onClick={deployToken} disabled={!shieldResult.cleared || loading}>
+                {shieldResult.cleared ? "Deploy ERC-20 on Mantle →" : "Compliance score too low"}
+              </button>
+              <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
+                ⛽ Gas ≈ $0.001 · Mantle L2
+              </span>
+            </div>
             {error && (
               <div style={{ marginTop:16, padding:"12px 16px", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:2, fontSize:13, color:"var(--warn)" }}>
                 {error}
@@ -333,41 +338,68 @@ export default function TokenizePage() {
         {step === "live" && (
           <div className="panel">
             <div className="panel-header">
-              <span className="mono" style={{ color:"var(--accent)" }}>✅ Token live on Mantle</span>
+              <span className="mono" style={{ color:"var(--accent)" }}>✅ Token live on Mantle Sepolia</span>
+              <span className="live-dot"/>
             </div>
             <div style={{ padding:24 }}>
-              {/* Transaction row — clickable link to explorer */}
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10, fontSize:13 }}>
-                <span style={{ color:"var(--fg-2)" }}>Transaction</span>
-                {deployedTx ? (
-                  <a
-                    href={`https://sepolia.mantlescan.xyz/tx/${deployedTx}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color:"var(--accent)", fontFamily:"var(--font-mono)", textDecoration:"none" }}
-                  >
-                    {deployedTx.slice(0,10)}…{deployedTx.slice(-8)} ↗
-                  </a>
-                ) : (
-                  <span style={{ color:"var(--fg-0)", fontFamily:"var(--font-mono)" }}>Pending backend tx</span>
-                )}
-              </div>
+
+              {/* Prominent TX block */}
+              {deployedTx ? (
+                <a
+                  href={`https://sepolia.mantlescan.xyz/tx/${deployedTx}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration:"none", display:"block", marginBottom:20 }}
+                >
+                  <div style={{ padding:"14px 18px", background:"rgba(0,229,160,0.06)", border:"1px solid rgba(0,229,160,0.3)", borderRadius:2, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div>
+                      <div className="mono-sm" style={{ color:"var(--accent)", marginBottom:4 }}>AgentExecutor.sol · on-chain log</div>
+                      <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--fg-0)" }}>
+                        {deployedTx.slice(0,18)}…{deployedTx.slice(-10)}
+                      </div>
+                    </div>
+                    <span style={{ fontFamily:"var(--font-mono)", fontSize:18, color:"var(--accent)" }}>↗</span>
+                  </div>
+                </a>
+              ) : (
+                <div style={{ padding:"14px 18px", background:"var(--bg-1)", border:"1px solid var(--line)", borderRadius:2, marginBottom:20 }}>
+                  <div className="mono-sm" style={{ color:"var(--fg-3)" }}>On-chain TX pending — backend is signing…</div>
+                </div>
+              )}
+
+              {/* Token stats */}
               {[
-                ["Token", nexusResult?.suggestedSymbol ?? "—"],
-                ["Supply", `${nexusResult?.suggestedSupply.toLocaleString()} tokens`],
-                ["Price", `$${nexusResult?.pricePerTokenUSD.toFixed(2)}`],
-                ["Yield", `${((nexusResult?.annualYieldBps ?? 0)/100).toFixed(2)}% APY`],
-                ["Status", "Active · Compliance verified"],
+                ["Token",       nexusResult?.suggestedSymbol ?? "—"],
+                ["Supply",      `${nexusResult?.suggestedSupply.toLocaleString()} tokens`],
+                ["Price/token", `$${nexusResult?.pricePerTokenUSD.toFixed(2)}`],
+                ["Yield",       `${((nexusResult?.annualYieldBps ?? 0)/100).toFixed(2)}% APY`],
+                ["Compliance",  `${shieldResult?.score ?? "—"}/100 · ${shieldResult?.jurisdiction ?? "—"}`],
+                ["Gas paid",    "~$0.001 on Mantle L2"],
               ].map(([k,v]) => (
                 <div key={k} style={{ display:"flex", justifyContent:"space-between", marginBottom:10, fontSize:13 }}>
                   <span style={{ color:"var(--fg-2)" }}>{k}</span>
-                  <span style={{ color:"var(--fg-0)", fontFamily:"var(--font-mono)" }}>{v}</span>
+                  <span style={{ color: k === "Gas paid" ? "var(--accent)" : "var(--fg-0)", fontFamily:"var(--font-mono)" }}>{v}</span>
                 </div>
               ))}
+
+              {/* Contract links */}
+              <div style={{ marginTop:16, paddingTop:16, borderTop:"1px solid var(--line)", display:"flex", gap:12, flexWrap:"wrap" }}>
+                <a href={`https://sepolia.mantlescan.xyz/address/${ADDRESSES.AgentExecutor}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--fg-2)" }}>
+                  AgentExecutor.sol ↗
+                </a>
+                <a href={`https://sepolia.mantlescan.xyz/address/${ADDRESSES.RWAiRegistry}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--fg-2)" }}>
+                  RWAiRegistry.sol ↗
+                </a>
+                <a href={`https://sepolia.mantlescan.xyz/address/${ADDRESSES.ComplianceLog}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--fg-2)" }}>
+                  ComplianceLog.sol ↗
+                </a>
+              </div>
+
               <div style={{ marginTop:16, paddingTop:16, borderTop:"1px solid var(--line)" }}>
                 <div className="mono-sm" style={{ marginBottom:8, color:"var(--fg-2)" }}>NEXUS ERC-8004 REPUTATION UPDATED</div>
                 <div style={{ fontFamily:"var(--font-mono)", fontSize:24, color:"var(--accent)" }}>4.92 → 4.93</div>
               </div>
+
               <div style={{ marginTop:24, paddingTop:16, borderTop:"1px solid var(--line)" }}>
                 <button
                   className="btn btn-primary"

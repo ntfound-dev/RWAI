@@ -8,6 +8,7 @@ import { parseEther, type Address, encodeFunctionData } from "viem";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { MANTLE_ASSETS } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
+import { useYieldOracle } from "@/hooks/useYieldOracle";
 
 const ASSET_META: Record<string, { name: string; color: string; apy: number }> = {
   USDY: { name:"Ondo US Dollar Yield", color:"var(--accent)",  apy:4.20 },
@@ -73,8 +74,15 @@ interface TokenizedAsset {
 
 const TOTAL_VALUE = 10000;
 
+const GAS_BADGE = (
+  <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
+    ⛽ ~$0.001 gas · Mantle L2
+  </span>
+);
+
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
+  const { apyMap, hasData, snapshotCount } = useYieldOracle();
   const [showAtlas, setShowAtlas] = useState(false);
   const [atlasInput, setAtlasInput] = useState("");
   const [autonomyAmount, setAutonomyAmount] = useState("100");
@@ -132,10 +140,13 @@ export default function PortfolioPage() {
     const plan = PLANS.find(p => p.id === planId);
     if (!plan || !isConnected || !address) return;
 
-    // Optimistic UI update
+    // Optimistic UI update — use live oracle APY when available, fall back to static
     setSelectedPlan(planId);
     setAllocations(plan.allocations.map(a => ({
-      ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
+      ...a,
+      ...ASSET_META[a.symbol],
+      apy: apyMap[a.symbol] ?? ASSET_META[a.symbol].apy,
+      value: TOTAL_VALUE * a.pct / 100,
     })));
 
     setPlanBusy(true);
@@ -360,7 +371,15 @@ export default function PortfolioPage() {
             <AgentMonogram agent="atlas" active/>
             <span className="mono">Select a plan · Atlas executes on Mantle</span>
           </div>
-          {planBusy && <span className="mono-sm" style={{ color:"var(--atlas)" }}>Writing to chain…</span>}
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {hasData && (
+              <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.25)" }}>
+                <span className="live-dot" style={{ width:5, height:5, display:"inline-block", marginRight:4 }}/>
+                APY · YieldOracle.sol · {Number(snapshotCount)} snapshots
+              </span>
+            )}
+            {planBusy && <span className="mono-sm" style={{ color:"var(--atlas)" }}>Writing to chain…</span>}
+          </div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0 }}>
           {PLANS.map((plan, i) => {
@@ -430,9 +449,12 @@ export default function PortfolioPage() {
               <span className="mono-sm">Amount (mock USDY)</span>
               <input className="input-field" value={depositAmount} onChange={e => setDepositAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
             </label>
-            <button className="btn btn-ghost" onClick={depositToVault} disabled={!isConnected || depositBusy} style={{ fontSize:11 }}>
-              {depositBusy ? "Depositing..." : "Deposit →"}
-            </button>
+            <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
+              <button className="btn btn-ghost" onClick={depositToVault} disabled={!isConnected || depositBusy} style={{ fontSize:11 }}>
+                {depositBusy ? "Depositing..." : "Deposit →"}
+              </button>
+              {GAS_BADGE}
+            </div>
           </div>
           {(depositStatus || depositTx) && (
             <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -474,9 +496,12 @@ export default function PortfolioPage() {
               <span className="mono-sm">Expiry days</span>
               <input className="input-field" value={autonomyDays} onChange={e => setAutonomyDays(e.target.value.replace(/[^\d]/g, ""))}/>
             </label>
-            <button className="btn btn-primary" onClick={enableAtlasAutonomy} disabled={!isConnected || autonomyBusy}>
-              {autonomyBusy ? "Signing..." : "Enable Atlas"}
-            </button>
+            <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
+              <button className="btn btn-primary" onClick={enableAtlasAutonomy} disabled={!isConnected || autonomyBusy}>
+                {autonomyBusy ? "Signing..." : "Enable Atlas"}
+              </button>
+              {GAS_BADGE}
+            </div>
           </div>
           <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
             <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{autonomyStatus}</span>
