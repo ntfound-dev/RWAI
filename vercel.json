@@ -2,5 +2,20 @@
   "framework": "nextjs",
   "installCommand": "npm install && cd app && npm install",
   "buildCommand": "cd app && npm run build",
-  "outputDirectory": "app/.next"
+  "outputDirectory": "app/.next",
+  "env": {
+    "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID": "@walletconnect_project_id",
+    "NEXT_PUBLIC_AGENT_API_URL": "@agent_api_url",
+    "AGENT_API_URL": "@agent_api_url",
+    "ANTHROPIC_API_KEY": "@anthropic_api_key",
+    "NEXT_PUBLIC_MANTLE_TESTNET_RPC": "@mantle_testnet_rpc",
+    "NEXT_PUBLIC_SEPOLIA_RPC": "@sepolia_rpc",
+    "NEXT_PUBLIC_MANTLE_MAINNET_RPC": "@mantle_mainnet_rpc",
+    "NEXT_PUBLIC_RWAI_REGISTRY": "@rwai_registry",
+    "NEXT_PUBLIC_COMPLIANCE_LOG": "@compliance_log",
+    "NEXT_PUBLIC_YIELD_ORACLE": "@yield_oracle",
+    "NEXT_PUBLIC_AGENT_EXECUTOR": "@agent_executor",
+    "NEXT_PUBLIC_PORTFOLIO_VAULT": "@portfolio_vault",
+    "NEXT_PUBLIC_HYBRID_VAULT": "@hybrid_vault"
+  }
 }

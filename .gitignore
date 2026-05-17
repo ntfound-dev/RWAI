@@ -35,6 +35,7 @@ app/node_modules/
 app/.next/
 app/.env.local
 app/.env*.local
+*.tsbuildinfo
 
 # Hardhat
 contracts/node_modules/
@@ -53,3 +54,4 @@ contracts/.env
 contracts/.env.local
 contracts/.env.production
 DEMO.md
+.vercel
