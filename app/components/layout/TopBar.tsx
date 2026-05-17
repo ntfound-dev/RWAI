@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useChatMode, type ChatMode } from "@/lib/chat-mode-context";
 
 const NAV = [
   { href: "/",          label: "Home" },
@@ -15,11 +16,10 @@ const NAV = [
 ];
 
 export function TopBar() {
-  const pathname = usePathname();
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
-  const injectedConnector = connectors.find(connector => connector.id === "injected") ?? connectors[0];
+  const pathname  = usePathname();
+  const { mode, setMode, openBridge, jarvisOpen, toggleJarvis } = useChatMode();
+  const onChat = pathname === "/chat";
+  const onHome = pathname === "/";
 
   return (
     <header className="topbar">
@@ -32,27 +32,97 @@ export function TopBar() {
         </div>
       </div>
 
-      <nav className="topbar-nav">
+      <nav className="topbar-nav" translate="no">
         {NAV.map(({ href, label }) => (
           <Link key={href} href={href}>
-            <button className={pathname === href ? "active" : ""}>{label}</button>
+            <button className={pathname === href ? "active" : ""} suppressHydrationWarning>{label}</button>
           </Link>
         ))}
       </nav>
 
-      <div className="topbar-right" style={{ display:"flex", alignItems:"center", gap:12 }}>
-        <span className="mono-sm" style={{ color:"var(--fg-2)" }}>MANTLE · TESTNET</span>
-        {isConnected ? (
-          <button className="btn btn-sm" onClick={() => disconnect()}>
-            <span style={{ width:6, height:6, borderRadius:"50%", background:"var(--accent)", boxShadow:"0 0 6px var(--accent)", display:"inline-block" }}/>
-            {address?.slice(0,6)}…{address?.slice(-4)}
-          </button>
-        ) : (
-          <button className="btn btn-sm btn-primary" disabled={!injectedConnector} onClick={() => injectedConnector && connect({ connector: injectedConnector })}>
-            Connect
+      <div className="topbar-right" style={{ display:"flex", alignItems:"center", gap:8 }}>
+        {/* SPLIT / BRIDGE / JARVIS mode toggle — only on /chat */}
+        {onChat && (
+          <div style={{ display:"flex", border:"1px solid var(--line-strong)", borderRadius:2, overflow:"hidden" }}>
+            {(["split","bridge","jarvis"] as ChatMode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => m === "bridge" ? openBridge() : setMode(m)}
+                style={{
+                  background: mode === m ? "rgba(0,229,160,0.12)" : "transparent",
+                  border: "none",
+                  borderRight: m !== "jarvis" ? "1px solid var(--line-strong)" : "none",
+                  color: mode === m ? "var(--accent)" : "var(--fg-3)",
+                  fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.12em",
+                  padding:"5px 10px", cursor:"pointer", textTransform:"uppercase",
+                  transition:"all 0.15s",
+                }}
+              >{m}</button>
+            ))}
+          </div>
+        )}
+
+        {/* JARVIS pill — hidden on home page */}
+        {!onHome && (
+          <button
+            onClick={toggleJarvis}
+            style={{
+              display:"flex", alignItems:"center", gap:5,
+              background: jarvisOpen ? "rgba(0,212,255,0.1)" : "rgba(168,85,247,0.06)",
+              border: `1px solid ${jarvisOpen ? "rgba(0,212,255,0.5)" : "rgba(168,85,247,0.3)"}`,
+              color: jarvisOpen ? "#00d4ff" : "#a855f7",
+              fontFamily:"var(--font-mono)", fontSize:9,
+              padding:"4px 10px", cursor:"pointer", letterSpacing:"0.12em",
+              transition:"all 0.2s",
+              boxShadow: jarvisOpen ? "0 0 12px rgba(0,212,255,0.2)" : "none",
+            }}
+            title={jarvisOpen ? "Close JARVIS" : "Open JARVIS"}
+          >
+            <span style={{
+              width:5, height:5, borderRadius:"50%",
+              background: jarvisOpen ? "#00d4ff" : "#a855f7",
+              boxShadow: `0 0 6px ${jarvisOpen ? "#00d4ff" : "#a855f7"}`,
+              display:"inline-block",
+              animation:"topbarJarvisPulse 2s ease-in-out infinite",
+            }} />
+            JARVIS
           </button>
         )}
+
+        <span className="mono-sm" style={{ color:"var(--fg-2)" }}>MANTLE · TESTNET</span>
+
+        <ConnectButton.Custom>
+          {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+            if (!mounted) return null;
+            if (!account) return (
+              <button className="btn btn-sm btn-primary" onClick={openConnectModal}>Connect</button>
+            );
+            if (chain?.unsupported) return (
+              <button className="btn btn-sm" style={{ color:"var(--error,#f87171)", borderColor:"rgba(248,113,113,0.4)" }} onClick={openChainModal}>
+                Wrong Network
+              </button>
+            );
+            return (
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                <button className="btn btn-sm" onClick={openChainModal} style={{ padding:"0 8px", fontSize:10 }}>
+                  {chain?.hasIcon && chain.iconUrl && (
+                    <img src={chain.iconUrl} alt={chain.name ?? ""} style={{ width:12, height:12, borderRadius:"50%", marginRight:4, display:"inline-block", verticalAlign:"middle" }} />
+                  )}
+                  {chain?.name ?? "Unknown"}
+                </button>
+                <button className="btn btn-sm" onClick={openAccountModal}>
+                  <span style={{ width:6, height:6, borderRadius:"50%", background:"var(--accent)", boxShadow:"0 0 6px var(--accent)", display:"inline-block", marginRight:5 }} />
+                  {account.displayName}
+                </button>
+              </div>
+            );
+          }}
+        </ConnectButton.Custom>
       </div>
+
+      <style>{`
+        @keyframes topbarJarvisPulse { 0%,100%{opacity:1;box-shadow:0 0 6px #a855f7;}50%{opacity:0.5;box-shadow:0 0 2px #a855f7;} }
+      `}</style>
     </header>
   );
 }

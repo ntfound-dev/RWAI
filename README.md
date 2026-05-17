@@ -212,6 +212,113 @@ rwai/
 
 ---
 
+## Revenue Model
+
+RWAi captures value at three protocol layers — every fee is on-chain, auditable, and enforced by smart contracts.
+
+| Stream | Rate | Mechanism |
+|--------|------|-----------|
+| **Tokenization fee** | 0.5% of stated asset value | Charged at `AgentExecutor.logTokenization()` — paid in MNT or USDY when Nexus deploys an ERC-20 RWA token |
+| **Protocol fee on AUM** | 0.3% / year | Streamed continuously from `HybridVault` deposits; Atlas-managed positions pay into the protocol treasury |
+| **Market transaction fee** | 0.15% of trade value | Collected on every buy/sell routed through the RWA Market; split 80% treasury / 20% Shield compliance fund |
+| **Agent API (enterprise)** | $299–$999 / month | Institutions call Atlas, Nexus, Shield, Yield directly via REST — higher consent caps, SLA, dedicated indexer |
+
+**Unit economics at scale (illustrative):**
+- $50M AUM → $150,000 / year from vault fee alone
+- 100 tokenizations × avg $500K asset → $250,000 single quarter
+- Market volume $5M / month → $90,000 / year in transaction fees
+
+All fees flow to `ProtocolTreasury` — governed by $RWAI stakers, not the founding team.
+
+---
+
+## Tokenomics
+
+**$RWAI** is the protocol governance and fee-capture token. It is not required to use the product — retail users interact purely with MNT and RWA tokens. $RWAI exists to align long-term stakeholders.
+
+### Utility
+
+| Function | How |
+|----------|-----|
+| **Governance** | Vote on fee parameters, new asset type whitelists, agent reputation thresholds |
+| **Fee sharing** | Stake $RWAI → earn 70% of protocol fees pro-rata (30% to treasury) |
+| **Agent licensing** | New third-party ERC-8004 agents must bond $RWAI; slashed on malicious actions |
+| **Discount** | Tokenization fee reduced to 0.2% if paid in $RWAI (vs 0.5% in MNT) |
+| **Reputation boost** | Agents backed by staked $RWAI start with higher base reputation (up to +10 points) |
+
+### Supply & Distribution
+
+**Total supply: 100,000,000 $RWAI** — fixed, no inflation.
+
+| Allocation | % | Tokens | Vesting |
+|------------|---|--------|---------|
+| Ecosystem & grants | 25% | 25M | 4 years linear |
+| Protocol treasury | 20% | 20M | DAO-controlled |
+| Team & contributors | 18% | 18M | 1-year cliff, 3-year linear |
+| Community & airdrops | 15% | 15M | 6-month cliff, then linear |
+| Investors (seed) | 12% | 12M | 6-month cliff, 2-year linear |
+| Liquidity provision | 10% | 10M | Unlocked at TGE for DEX pools |
+
+**Launch:** $RWAI launches on Mantle after mainnet deployment. Initial liquidity seeded on FusionX (Mantle-native DEX). No presale, no VC dump — team tokens cliff at 12 months.
+
+---
+
+## Go-to-Market Strategy
+
+### Target Segments
+
+**Primary (Year 1):** Crypto-native retail investors on Mantle who already hold USDY, mETH, mUSD, fBTC — they have the assets but no intelligent allocation layer. Zero acquisition cost barrier: Atlas speaks to them in plain English (or voice).
+
+**Secondary (Year 1–2):** SME asset owners (real estate, invoice, commodity) who cannot afford $100K traditional tokenization. RWAi reduces this to gas fees + 0.5% protocol fee.
+
+**Tertiary (Year 2+):** Institutional desks who need verifiable AI decision audit trails — `AgentExecutor.sol` is the only on-chain AI benchmark that exists today.
+
+### Phases
+
+```
+Phase 1 — Seed (Now, Testnet)
+  └── Hackathon submission → developer mindshare
+  └── Open source → forks become distribution
+  └── ERC-8004 standard → Mantle ecosystem becomes dependency
+
+Phase 2 — Mainnet Alpha (Q3 2026)
+  └── Deploy to Mantle mainnet (Mantle assets: real USDY, mETH)
+  └── Partner with Mantle Foundation for co-marketing
+  └── Onboard first 10 asset tokenizations (target: real estate, invoices)
+  └── JARVIS voice interface as viral acquisition hook
+
+Phase 3 — Growth (Q4 2026)
+  └── Integrate real KYC provider (Fractal ID or Sumsub) into Shield agent
+  └── $RWAI token launch on FusionX
+  └── Enterprise API tier — target family offices and asset managers
+  └── Agent marketplace: third parties deploy ERC-8004 agents, bond $RWAI
+
+Phase 4 — Scale (2027+)
+  └── Cross-chain (OP Stack, Arbitrum) — AgentExecutor bridges via LayerZero
+  └── RWA index products managed autonomously by Atlas
+  └── Regulatory sandbox applications (MAS Singapore, ADGM Abu Dhabi)
+```
+
+### Distribution Channels
+
+- **Mantle ecosystem programs** — grants, co-marketing, Mantle DeFi integrations
+- **Voice-first virality** — JARVIS demo clips on X/Twitter; "speak to your portfolio" is inherently shareable
+- **Developer adoption** — ERC-8004 agent SDK; any team building AI × DeFi becomes a distribution partner
+- **Asset owner outreach** — direct to SMEs via real estate tokenization communities (RWA.xyz, Centrifuge community)
+
+### Competitive Moat
+
+| Competitor | Gap | RWAi advantage |
+|------------|-----|----------------|
+| Ondo Finance | No AI, no voice, no agent autonomy | Atlas executes, not just recommends |
+| Centrifuge | No AI layer, Substrate chain | Mantle-native, Atlas voice interface |
+| OpenTrade | Institutional only, no retail | Retail-first, $10K minimum via HybridVault |
+| Generic AI chatbots | No on-chain proof | `AgentExecutor.sol` = immutable AI audit trail |
+
+**The irreplaceable asset:** `AgentExecutor.sol` accumulates every AI decision ever made on RWAi. By the time competitors build equivalent infrastructure, RWAi will have months of verifiable on-chain AI performance data — a benchmark no one can fake retroactively.
+
+---
+
 ## Open Source
 
 This project is fully open source under the **MIT License**.

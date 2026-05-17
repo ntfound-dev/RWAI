@@ -1,156 +1,997 @@
 "use client";
 
-import { useState } from "react";
-import { AgentMonogram } from "@/components/agents/AgentMonogram";
+import { useState, useCallback } from "react";
 import { ADDRESSES } from "@/lib/contracts";
 
-const SECTIONS = [
-  { id:"getting-started",  label:"Getting Started" },
-  { id:"architecture",     label:"Architecture" },
-  { id:"tokenize",         label:"Tokenize" },
-  { id:"market",           label:"Market" },
-  { id:"nexus-doc",        label:"Nexus" },
-  { id:"shield-doc",       label:"Shield" },
-  { id:"yield-doc",        label:"Yield" },
-  { id:"atlas-doc",        label:"Atlas" },
-  { id:"portfolio-doc",    label:"Portfolio" },
-  { id:"erc8004",          label:"ERC-8004" },
-  { id:"contracts",        label:"Contracts" },
-  { id:"orchestration",    label:"Orchestration" },
+// ── Sidebar structure ───────────────────────────────────────────
+const SIDEBAR = [
+  {
+    group: "OVERVIEW",
+    items: [
+      { id: "getting-started", label: "Getting Started" },
+      { id: "architecture",    label: "Architecture" },
+    ],
+  },
+  {
+    group: "FEATURES",
+    items: [
+      { id: "tokenize",     label: "Tokenize" },
+      { id: "market",       label: "Market" },
+      { id: "portfolio-doc",label: "Portfolio" },
+    ],
+  },
+  {
+    group: "AGENTS",
+    items: [
+      { id: "atlas-doc",  label: "Atlas" },
+      { id: "nexus-doc",  label: "Nexus" },
+      { id: "shield-doc", label: "Shield" },
+      { id: "yield-doc",  label: "Yield" },
+      { id: "orchestration", label: "Orchestration" },
+    ],
+  },
+  {
+    group: "PROTOCOL",
+    items: [
+      { id: "erc8004",   label: "ERC-8004 Identity" },
+      { id: "contracts", label: "Contract Addresses" },
+      { id: "consent",   label: "EIP-712 Consent" },
+    ],
+  },
+  {
+    group: "TOKENOMICS",
+    items: [
+      { id: "tokenomics", label: "$RWAI Token" },
+      { id: "revenue",    label: "Revenue Model" },
+      { id: "gtm",        label: "Go-to-Market" },
+    ],
+  },
 ];
 
-type SectionId = typeof SECTIONS[number]["id"];
+const FLAT = SIDEBAR.flatMap(g => g.items);
 
-interface SectionContent {
-  kicker: string;
-  title: string[];
-  body: string;
-  code?: { title: string; body: string };
+// ── Copy button ─────────────────────────────────────────────────
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }, [text]);
+  return (
+    <button onClick={copy} style={{
+      position:"absolute", top:10, right:10,
+      background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)",
+      color: copied ? "var(--accent)" : "var(--fg-3)",
+      fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.1em",
+      padding:"3px 8px", cursor:"pointer", borderRadius:2, transition:"all 0.2s",
+    }}>
+      {copied ? "COPIED" : "COPY"}
+    </button>
+  );
 }
 
-const CONTENT: Record<string, SectionContent> = {
-  "getting-started": {
-    kicker: "GETTING STARTED",
-    title: ["Where do I", "begin?"],
-    body: "RWAi is simple: connect your wallet, chat with Atlas, and let AI manage your portfolio. You don't need to understand blockchain or DeFi — just tell Atlas how much you want to invest and how much risk you're comfortable with. Atlas handles the rest.\n\nIf you're a developer who wants to build on top of RWAi, all the code is open-source. Deploy your own contracts to Mantle Sepolia in under 30 minutes.",
-    code: { title: "developer quickstart", body: `# Clone & install\ngit clone https://github.com/ntfound-dev/RWAI\ncd rwai/contracts && npm install\ncd ../app && npm install\n\n# Fill in env\ncp contracts/.env.example contracts/.env\ncp agents/.env.example agents/.env\n\n# Deploy contracts to Mantle Sepolia\ncd contracts && npm run deploy:testnet\n\n# Run everything\nmake run\n# Backend  → http://localhost:8001\n# Frontend → http://localhost:3000` },
+// ── Code block ──────────────────────────────────────────────────
+function Code({ title, body, lang = "bash" }: { title?: string; body: string; lang?: string }) {
+  return (
+    <div style={{
+      background:"#040d16", border:"1px solid var(--line)",
+      borderRadius:4, marginBottom:24, overflow:"hidden",
+    }}>
+      {title && (
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"8px 14px", borderBottom:"1px solid var(--line)",
+          background:"rgba(255,255,255,0.02)",
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ display:"flex", gap:5 }}>
+              {["#f87171","#fbbf24","#34d399"].map(c=>(
+                <span key={c} style={{ width:8, height:8, borderRadius:"50%", background:c, opacity:0.7 }}/>
+              ))}
+            </div>
+            <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--fg-3)", letterSpacing:"0.06em" }}>
+              {title}
+            </span>
+          </div>
+          <span style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--fg-3)", opacity:0.5 }}>{lang}</span>
+        </div>
+      )}
+      <div style={{ position:"relative" }}>
+        <CopyBtn text={body} />
+        <pre style={{
+          padding:"16px 44px 16px 16px",
+          fontFamily:"var(--font-mono)", fontSize:11.5,
+          color:"var(--fg-1)", lineHeight:1.85,
+          overflowX:"auto", whiteSpace:"pre", margin:0,
+        }}>
+          {body}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// ── Callout ─────────────────────────────────────────────────────
+function Callout({ type, children }: { type: "info"|"warn"|"tip"; children: React.ReactNode }) {
+  const colors = {
+    info: { border:"rgba(0,212,255,0.3)", bg:"rgba(0,212,255,0.05)", icon:"ℹ", c:"#00d4ff" },
+    warn: { border:"rgba(251,191,36,0.3)", bg:"rgba(251,191,36,0.05)", icon:"⚠", c:"#fbbf24" },
+    tip:  { border:"rgba(0,229,160,0.3)", bg:"rgba(0,229,160,0.05)", icon:"✦", c:"var(--accent)" },
+  }[type];
+  return (
+    <div style={{
+      border:`1px solid ${colors.border}`, background:colors.bg,
+      borderRadius:4, padding:"12px 16px", marginBottom:20,
+      display:"flex", gap:10, alignItems:"flex-start",
+    }}>
+      <span style={{ color:colors.c, fontSize:13, flexShrink:0, marginTop:1 }}>{colors.icon}</span>
+      <span style={{ fontSize:12.5, color:"var(--fg-1)", lineHeight:1.65 }}>{children}</span>
+    </div>
+  );
+}
+
+// ── Table ────────────────────────────────────────────────────────
+function Table({ headers, rows }: { headers: string[]; rows: (string|React.ReactNode)[][] }) {
+  return (
+    <div style={{ overflowX:"auto", marginBottom:24 }}>
+      <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:"var(--font-mono)", fontSize:11.5 }}>
+        <thead>
+          <tr style={{ borderBottom:"1px solid var(--line)" }}>
+            {headers.map(h=>(
+              <th key={h} style={{ textAlign:"left", padding:"8px 12px", color:"var(--fg-3)", fontWeight:400, letterSpacing:"0.08em", fontSize:10 }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row,i)=>(
+            <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)", background: i%2===0?"transparent":"rgba(255,255,255,0.01)" }}>
+              {row.map((cell,j)=>(
+                <td key={j} style={{ padding:"9px 12px", color:"var(--fg-1)", verticalAlign:"top", lineHeight:1.55 }}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Inline code ─────────────────────────────────────────────────
+function IC({ children }: { children: string }) {
+  return (
+    <code style={{
+      fontFamily:"var(--font-mono)", fontSize:11, padding:"1px 5px",
+      background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)",
+      borderRadius:2, color:"var(--accent)",
+    }}>{children}</code>
+  );
+}
+
+// ── H2 / H3 ────────────────────────────────────────────────────
+function H2({ children }: { children: React.ReactNode }) {
+  return <h2 style={{ fontSize:20, fontWeight:600, marginBottom:10, marginTop:36, color:"var(--fg-0)" }}>{children}</h2>;
+}
+function H3({ children }: { children: React.ReactNode }) {
+  return <h3 style={{ fontSize:14, fontWeight:500, marginBottom:8, marginTop:24, color:"var(--fg-1)", letterSpacing:"0.04em" }}>{children}</h3>;
+}
+function P({ children }: { children: React.ReactNode }) {
+  return <p style={{ fontSize:13.5, color:"var(--fg-1)", lineHeight:1.75, marginBottom:16 }}>{children}</p>;
+}
+
+// ── Business Impact strip ───────────────────────────────────────
+function BizStrip({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <div style={{
+      display:"grid", gridTemplateColumns:`repeat(${items.length}, 1fr)`,
+      gap:1, background:"var(--line)", border:"1px solid var(--line)",
+      borderRadius:4, overflow:"hidden", marginBottom:24,
+    }}>
+      {items.map(({ label, value }) => (
+        <div key={label} style={{ background:"var(--bg-1)", padding:"12px 16px" }}>
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--fg-3)", letterSpacing:"0.1em", marginBottom:4 }}>{label}</div>
+          <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--accent)", fontWeight:600 }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Divider label ───────────────────────────────────────────────
+function Divider({ label }: { label: string }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:12, margin:"32px 0 20px" }}>
+      <div style={{ flex:1, height:1, background:"var(--line)" }}/>
+      <span style={{ fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.14em", color:"var(--fg-3)" }}>{label}</span>
+      <div style={{ flex:1, height:1, background:"var(--line)" }}/>
+    </div>
+  );
+}
+
+// ── Section content components ──────────────────────────────────
+function GettingStarted() {
+  return (
+    <>
+      <BizStrip items={[
+        { label:"TIME TO FIRST TRADE", value:"< 5 min" },
+        { label:"GAS COST (MANTLE)",   value:"~$0.001" },
+        { label:"MIN INVESTMENT",      value:"$10 USD" },
+        { label:"AI AGENTS AVAILABLE", value:"4 / 4" },
+      ]} />
+      <P>RWAi is simple: connect your wallet, chat with Atlas, and let AI manage your portfolio. You don't need to understand blockchain — just tell Atlas how much you want to invest and your risk tolerance. Atlas handles the rest.</P>
+      <Callout type="tip">New to Web3? You only need a MetaMask or any EVM wallet connected to <strong>Mantle Sepolia</strong> (chainId 5003). No ETH required — gas on Mantle is near-zero.</Callout>
+      <H2>Developer Quickstart</H2>
+      <Code title="terminal" lang="bash" body={`git clone https://github.com/ntfound-dev/RWAI
+cd rwai/contracts && npm install
+cd ../app && npm install
+
+# Configure environment
+cp contracts/.env.example contracts/.env    # add PRIVATE_KEY
+cp agents/.env.example agents/.env          # add GROQ_API_KEY
+
+# Deploy contracts to Mantle Sepolia
+cd contracts && npm run deploy:testnet
+
+# Start everything
+make dev
+# Backend  → http://localhost:8001
+# Frontend → http://localhost:3000`} />
+      <H2>Environment Variables</H2>
+      <Table
+        headers={["Variable", "Where", "Required"]}
+        rows={[
+          [<IC>PRIVATE_KEY</IC>, "contracts/.env", "✓ Deploy contracts"],
+          [<IC>GROQ_API_KEY</IC>, "agents/.env", "✓ AI agents"],
+          [<IC>ANTHROPIC_API_KEY</IC>, "agents/.env", "Fallback (optional)"],
+          [<IC>AGENT_PRIVATE_KEY</IC>, "agents/.env", "✓ On-chain execution"],
+          [<IC>NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</IC>, "app/.env.local", "✓ WalletConnect"],
+        ]}
+      />
+    </>
+  );
+}
+
+function Architecture() {
+  return (
+    <>
+      <BizStrip items={[
+        { label:"CONTRACTS DEPLOYED",  value:"8 on Mantle" },
+        { label:"AI PROVIDERS",        value:"4-level chain" },
+        { label:"DECISION LATENCY",    value:"< 3 seconds" },
+        { label:"AUDIT TRAIL",         value:"Permanent on-chain" },
+      ]} />
+      <P>RWAi is a three-layer system: a Next.js frontend, a FastAPI AI backend, and 8 Solidity contracts on Mantle Sepolia. Every AI decision is logged on-chain before the response is returned to the user.</P>
+      <Code title="system diagram" lang="text" body={`Browser (Next.js 14)
+  wagmi v2 + viem · RainbowKit · Mantle Sepolia · WalletConnect
+  ↓
+FastAPI Backend  (agents/)
+  OpenClaw/CMDOP → Groq llama-3.3-70b → Claude (4-level fallback)
+  Every decision logged on-chain BEFORE response returned
+  ↓
+Mantle Sepolia (chainId 5003)
+  ├── AgentExecutor.sol          — immutable AI action log
+  ├── AgentReputationManager.sol — ERC-8004 reputation scores
+  ├── YieldOracle.sol            — Pyth price feeds + APY snapshots
+  ├── ComplianceLog.sol          — Shield KYC/AML decisions
+  ├── RWAiRegistry.sol           — tokenized asset registry
+  ├── AssetToken.sol             — ERC-20 fractional RWA token
+  ├── PortfolioVault.sol         — allocation strategy + execution
+  └── HybridVault.sol            — user deposits + EIP-712 consent`} />
+      <H2>AI Runtime Chain</H2>
+      <Table
+        headers={["Priority", "Provider", "Model", "Condition"]}
+        rows={[
+          ["1", "OpenClaw/CMDOP", "Custom", "Primary — always attempted first"],
+          ["2", "Groq", "llama-3.3-70b-versatile", "Fallback if OpenClaw unavailable"],
+          ["3", "Anthropic", "Claude Sonnet", "Fallback if Groq fails"],
+          ["4", "Ollama", "qwen3:8b", "Local opt-in only — disabled in cloud"],
+        ]}
+      />
+      <Callout type="info">The AI runtime is model-agnostic. Swapping the primary provider requires only changing <IC>OPENAI_COMPAT_BASE_URL</IC> and <IC>OPENAI_COMPAT_MODEL</IC> in the agent environment.</Callout>
+    </>
+  );
+}
+
+function Tokenize() {
+  return (
+    <>
+      <BizStrip items={[
+        { label:"TRADITIONAL COST",   value:"$100,000+" },
+        { label:"RWAI COST",          value:"Gas + 0.5%" },
+        { label:"TRADITIONAL TIME",   value:"3–6 months" },
+        { label:"RWAI TIME",          value:"< 10 minutes" },
+      ]} />
+      <P>The Tokenize flow converts any real-world asset — property deeds, bonds, certificates — into an ERC-20 token on Mantle in 6 AI-driven steps.</P>
+      <Callout type="tip">Traditional asset tokenization requires lawyers, Solidity developers, and compliance consultants — costing $100,000+ before a single token exists. RWAi replaces all three with AI agents. Cost: gas fees + 0.5% protocol fee.</Callout>
+      <Callout type="warn">Accepted file types: <strong>PDF, DOCX</strong>. Images (.jpg, .png) are not supported — Nexus requires structured text to produce accurate valuations.</Callout>
+      <H2>Step-by-Step Flow</H2>
+      <Table
+        headers={["Step", "Action", "Agent", "On-chain"]}
+        rows={[
+          ["①", "Upload PDF / DOCX", "—", "No"],
+          ["②", "Asset analysis — name, supply, APY, price/token", "Nexus", "No"],
+          ["③", "Compliance review — score ≥ 70 to proceed", "Shield", "ComplianceLog.sol"],
+          ["④", "User reviews both results side-by-side", "—", "No"],
+          ["⑤", "Deploy — ERC-20 created, tokenization logged", "Nexus", "AgentExecutor.sol + RWAiRegistry.sol"],
+          ["⑥", "Asset live in Market + Portfolio", "—", "No"],
+        ]}
+      />
+      <H2>Nexus Output Schema</H2>
+      <Code title="POST /api/agents/tokenize → response" lang="json" body={`{
+  "assetType":         "real_estate",
+  "estimatedValueUSD": 4250000,
+  "suggestedTokenName":"RWAi Broadway Tower",
+  "suggestedSymbol":   "BWAY",
+  "suggestedSupply":   2000000,
+  "pricePerTokenUSD":  2.125,
+  "annualYieldBps":    519,      // 5.19% APY
+  "missingDocuments":  [],
+  "concerns":          [],
+  "summary":           "Class-A NYC office. Clean title. Strong yield."
+}`} />
+    </>
+  );
+}
+
+function Market() {
+  return (
+    <>
+      <BizStrip items={[
+        { label:"MARKET FEE",         value:"0.15% / trade" },
+        { label:"MIN TRADE SIZE",     value:"$1 USD" },
+        { label:"SETTLEMENT",         value:"Instant on Mantle" },
+        { label:"AUDIT TRAIL",        value:"Every trade on-chain" },
+      ]} />
+      <P>The RWA Market lists every asset tokenized through Nexus. Anyone can buy fractions — or the original owner can sell their position. Every trade is logged on-chain by Atlas.</P>
+      <Callout type="tip">Traditional RWA markets require accredited investor status ($1M+ net worth) and $50,000+ minimum tickets. RWAi opens the same assets to anyone with $1 and a wallet — fractional ownership with no minimums.</Callout>
+      <H2>Buy Flow</H2>
+      <Code title="POST /api/agents/market/buy" lang="json" body={`// Request
+{
+  "buyer_address":   "0xYourWallet",
+  "token_address":   "0xcE265E23...",
+  "token_symbol":    "BWAY",
+  "amount_usd":      1000,
+  "price_per_token": 2.125
+}
+
+// Atlas reasoning (stored on-chain)
+"Allocating 470 BWAY tokens at $2.125/token ($998.75 total).
+ 5.19% APY — compliant real estate asset, score 82/100."
+
+// On-chain action
+AgentExecutor.executeAllocation(atlasId=44, buyer, [tokenAddress], [470e18], reasoning)`} />
+      <H2>Sell Flow</H2>
+      <Code title="POST /api/agents/market/sell" lang="json" body={`// Request
+{
+  "seller_address":  "0xYourWallet",
+  "token_address":   "0xcE265E23...",
+  "amount_tokens":   250,
+  "price_per_token": 2.125
+}
+
+// On-chain: RWA token → USDY rebalance
+AgentExecutor.executeRebalance(
+  atlasId=44, seller,
+  [tokenAddress],   // from: RWA token
+  [USDY_address],   // to: USDY stablecoin
+  [250e18], reasoning
+)`} />
+      <Callout type="info">All buy/sell transactions are attributed to Atlas (ERC-8004 ID: 44) with AI-generated reasoning stored permanently on Mantlescan.</Callout>
+    </>
+  );
+}
+
+function Portfolio() {
+  return (
+    <>
+      <BizStrip items={[
+        { label:"AVG BLENDED APY",    value:"4.57%" },
+        { label:"AUM FEE",            value:"0.3% / year" },
+        { label:"REBALANCE COST",     value:"Gas only" },
+        { label:"AUTONOMOUS CONSENT", value:"EIP-712 capped" },
+      ]} />
+      <P>The Portfolio page shows your RWA allocation in real-time: asset breakdown, blended APY, monthly income estimate, and full Atlas action history with on-chain TX links.</P>
+      <Callout type="tip">Traditional robo-advisors charge 0.25–0.75% AUM fee with no on-chain proof of decisions. RWAi charges 0.3%/yr with every rebalance permanently logged on Mantle — Atlas literally signs its decisions with its ERC-8004 identity.</Callout>
+      <H2>HybridVault — Autonomous Mode</H2>
+      <P>Enable autonomous mode to let Atlas rebalance without per-transaction confirmations. You sign once (EIP-712) and set a cap — Atlas operates within it.</P>
+      <Code title="EIP-712 consent structure" lang="typescript" body={`{
+  domain: { name: "RWAi HybridVault", chainId: 5003 },
+  types: {
+    AgentConsent: [
+      { name: "agent",     type: "address" },  // Atlas wallet
+      { name: "allowance", type: "uint256" },  // cap in wei
+      { name: "deadline",  type: "uint256" },  // expiry timestamp
+      { name: "nonce",     type: "uint256" },  // replay protection
+    ]
   },
-  "architecture": {
-    kicker: "HOW IT WORKS",
-    title: ["How does RWAi", "actually work?"],
-    body: "Think of it as having 4 AI assistants working around the clock:\n\n① You chat with Atlas — say \"invest $10,000 conservatively\".\n② Atlas asks Yield to check current interest rates on all assets.\n③ Atlas asks Shield to verify all assets are legal and safe.\n④ Atlas creates an allocation plan and writes the decision to the blockchain — permanent, transparent, verifiable by anyone.\n\nEvery AI decision is stored on-chain. Not a promise — proof.",
-    code: { title: "system flow", body: `You (chat/UI)\n  ↓\nAtlas — AI portfolio manager\n  ├── asks Yield: "what's the current USDY rate?"\n  ├── asks Shield: "is this asset compliant?"  \n  └── writes decision → AgentExecutor.sol (Mantle)\n            ↓\n    stored forever on-chain\n    verifiable at sepolia.mantlescan.xyz` },
+  message: { agent, allowance, deadline, nonce }
+}`} />
+      <Table
+        headers={["Field", "Description"]}
+        rows={[
+          [<IC>Portfolio Value</IC>, "Total current value of all RWA positions"],
+          [<IC>Blended APY</IC>, "Weighted average yield across all assets"],
+          [<IC>Monthly Income</IC>, "Estimated income: value × APY / 12"],
+          [<IC>Risk Score</IC>, "1 (very safe) – 10 (very aggressive)"],
+          [<IC>Agent History</IC>, "All Atlas actions with on-chain TX links"],
+        ]}
+      />
+    </>
+  );
+}
+
+function AgentDoc({ id }: { id: string }) {
+  const data: Record<string, { color: string; num: string; role: string; body: JSX.Element }> = {
+    "atlas-doc": {
+      color: "#00d4ff", num: "44", role: "Portfolio strategy, voice commands, autonomous execution",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"WHO BENEFITS",    value:"Retail investors" },
+            { label:"VALUE PROP",      value:"Robo-advisor + execution" },
+            { label:"DIFFERENTIATOR", value:"Voice-first + on-chain proof" },
+            { label:"REVENUE STREAM",  value:"AUM 0.3% / market 0.15%" },
+          ]} />
+          <P>Atlas is the primary AI you chat with — by text or voice. It knows your portfolio, understands your goals, and coordinates Nexus, Shield, and Yield to execute your strategy.</P>
+          <Callout type="tip">Most AI portfolio tools stop at recommendations. Atlas executes — it submits on-chain transactions autonomously within your EIP-712 consent cap. Every action is signed by Atlas's ERC-8004 identity (#44) and stored permanently on Mantle.</Callout>
+          <Divider label="TECHNICAL REFERENCE" />
+          <H3>On-chain actions</H3>
+          <Table headers={["Method", "Contract", "Trigger"]} rows={[
+            [<IC>executeAllocation()</IC>, "AgentExecutor.sol", "New portfolio plan"],
+            [<IC>executeRebalance()</IC>, "AgentExecutor.sol", "Rebalance or sell"],
+            [<IC>agentExecute()</IC>, "HybridVault.sol", "Autonomous action within consent cap"],
+          ]} />
+          <Code title="example conversation" lang="text" body={`You   : "I have $10,000 — invest conservatively"
+
+Atlas : "Here's my recommended allocation:
+         50% USDY  — 4.20% APY  (stable)
+         25% mETH  — 6.12% APY  (growth)
+         15% mUSD  — 3.90% APY  (stable)
+         10% fBTC  — 3.50% APY  (diversification)
+
+         Blended APY : 4.57%
+         Monthly est.: $38.08
+
+         Writing plan to AgentExecutor.sol...
+         TX: 0x77a66d7a..."`} />
+        </>
+      ),
+    },
+    "nexus-doc": {
+      color: "var(--nexus)", num: "41", role: "Tokenizes RWAs from uploaded documents",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"WHO BENEFITS",   value:"Asset owners / SMEs" },
+            { label:"COST REDUCTION", value:"99% vs traditional" },
+            { label:"TIME TO TOKEN",  value:"< 10 minutes" },
+            { label:"REVENUE STREAM", value:"Tokenization 0.5% fee" },
+          ]} />
+          <P>Nexus reads PDF and DOCX documents — deeds, appraisals, certificates — and extracts the metadata needed to deploy an ERC-20 token on Mantle. It works in seconds versus the months traditional tokenization takes.</P>
+          <Callout type="tip">A $500k real estate tokenization traditionally costs $100k+ in legal and dev fees. Through Nexus: gas (~$0.01 on Mantle) + 0.5% protocol fee ($2,500). The asset owner retains 99.5% of value from day one — and can accept fractional buyers globally.</Callout>
+          <Divider label="TECHNICAL REFERENCE" />
+          <H3>On-chain actions</H3>
+          <Table headers={["Method", "Contract"]} rows={[
+            [<IC>logTokenization()</IC>, "AgentExecutor.sol"],
+            [<IC>registerAsset()</IC>, "RWAiRegistry.sol"],
+          ]} />
+          <Code title="example Nexus output" lang="json" body={`{
+  "suggestedTokenName": "RWAi Bali Land",
+  "suggestedSymbol":    "BALI500",
+  "estimatedValueUSD":  315000,
+  "suggestedSupply":    1000000,
+  "pricePerTokenUSD":   0.315,
+  "annualYieldBps":     200,
+  "concerns":           []
+}`} />
+        </>
+      ),
+    },
+    "shield-doc": {
+      color: "var(--warn)", num: "42", role: "AI compliance — KYC/AML, sanctions, risk scoring",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"WHO BENEFITS",   value:"Asset owners + investors" },
+            { label:"REVIEW COST",    value:"Gas only (no lawyers)" },
+            { label:"REVIEW TIME",    value:"< 30 seconds" },
+            { label:"STORED ON-CHAIN",value:"ComplianceLog.sol" },
+          ]} />
+          <P>Shield reviews every asset before it can go live. It checks document completeness, jurisdictional legal risks, and wallet sanctions status. Every review is stored permanently in <IC>ComplianceLog.sol</IC>.</P>
+          <Callout type="tip">Traditional compliance consultants charge $5,000–$20,000 per asset review and take weeks. Shield delivers an AI compliance score in seconds — stored on-chain so investors can verify it themselves without trusting a third party.</Callout>
+          <Divider label="TECHNICAL REFERENCE" />
+          <H3>Scoring</H3>
+          <Table headers={["Score", "Status", "Meaning"]} rows={[
+            ["≥ 70", "✓ Cleared", "Asset may proceed to deployment"],
+            ["50–69", "⚠ Conditional", "Proceed with warnings flagged to user"],
+            ["< 50", "✗ Blocked", "Asset cannot be tokenized"],
+          ]} />
+          <Code title="ComplianceLog event" lang="solidity" body={`event ComplianceReviewed(
+  uint256 indexed agentId,    // 42 (Shield)
+  address indexed wallet,
+  uint8   score,              // 0–100
+  bool    cleared,
+  string  jurisdiction,
+  bytes32 evidenceHash        // IPFS hash of review
+);`} />
+        </>
+      ),
+    },
+    "yield-doc": {
+      color: "var(--accent)", num: "43", role: "Prices assets via Pyth, monitors APY on Mantle",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"WHO BENEFITS",   value:"All investors" },
+            { label:"DATA SOURCE",    value:"Pyth (tamper-proof)" },
+            { label:"UPDATE FREQ",   value:"Every few hours" },
+            { label:"STORED ON-CHAIN",value:"YieldOracle.sol" },
+          ]} />
+          <P>Yield monitors interest rates across all Mantle RWA assets every few hours. It writes live prices and APY snapshots to <IC>YieldOracle.sol</IC> — publicly verifiable, not a number that can be manually changed.</P>
+          <Callout type="tip">Traditional yield data is provided by platforms who could manipulate it. Yield writes APY snapshots directly to <IC>YieldOracle.sol</IC> via Pyth — a decentralized price oracle. Any investor can query the contract themselves and verify the rates are real.</Callout>
+          <Divider label="TECHNICAL REFERENCE" />
+          <H3>Supported price feeds (Pyth)</H3>
+          <Table headers={["Asset", "Feed ID (truncated)", "Current APY"]} rows={[
+            ["USDY", "0xe393449f...", "4.20%"],
+            ["mUSD", "0xe393449f...", "3.90%"],
+            ["mETH", "0xfbc9c3a7...", "6.12%"],
+            ["fBTC", "0xe62df6c8...", "3.50%"],
+          ]} />
+          <Code title="GET /api/agents/yield" lang="json" body={`{
+  "assets": [
+    { "symbol": "USDY", "priceUSD": 1.000, "apyBps": 420 },
+    { "symbol": "mETH", "priceUSD": 2847,  "apyBps": 612 },
+    { "symbol": "fBTC", "priceUSD": 95200, "apyBps": 350 },
+    { "symbol": "mUSD", "priceUSD": 1.000, "apyBps": 390 }
+  ],
+  "blendedApy": 457,
+  "snapshotBlock": 38612004
+}`} />
+        </>
+      ),
+    },
+    "orchestration": {
+      color: "#a855f7", num: "—", role: "Multi-agent coordination flow",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"UX BENEFIT",     value:"One chat, 4 agents" },
+            { label:"LATENCY",        value:"< 3 seconds total" },
+            { label:"USER ACTION",    value:"Zero — Atlas decides" },
+            { label:"EXTENSIBILITY",  value:"Bond $RWAI + add agent" },
+          ]} />
+          <P>Atlas orchestrates Nexus, Shield, and Yield automatically. You never need to invoke individual agents — Atlas decides which agents to consult and in what order based on your request.</P>
+          <Callout type="tip">From an investor's perspective: you say one sentence, and four AI specialists collaborate in parallel to deliver a result that is immediately written to the blockchain. No forms, no waiting, no manual steps.</Callout>
+          <Divider label="TECHNICAL REFERENCE" />
+          <Code title="orchestration flow — build portfolio" lang="text" body={`User: "Build a conservative $10k portfolio"
+  ↓
+Atlas
+  ├─① calls Yield internally   → get live APY for all assets
+  ├─② calls Shield internally  → verify assets are compliant
+  ├─③ calculates allocation     → 50/25/15/10 split
+  └─④ writes to chain
+        PortfolioVault.executeAllocation()
+        AgentExecutor.sol logs reasoning + ERC-8004 signature
+        TX: 0x77a66d7a...  (permanent, verifiable)`} />
+          <Callout type="tip">The orchestration pattern is extensible — third-party ERC-8004 agents can be bonded into the system via $RWAI staking and will be callable by Atlas as additional specialists.</Callout>
+        </>
+      ),
+    },
+  };
+
+  const d = data[id];
+  if (!d) return null;
+
+  return (
+    <>
+      <div style={{
+        display:"inline-flex", alignItems:"center", gap:10, marginBottom:20,
+        background:"rgba(255,255,255,0.03)", border:"1px solid var(--line)",
+        borderRadius:4, padding:"8px 14px",
+      }}>
+        <div style={{ width:8, height:8, borderRadius:"50%", background:d.color, boxShadow:`0 0 8px ${d.color}` }}/>
+        <span style={{ fontFamily:"var(--font-mono)", fontSize:11, color:"var(--fg-2)" }}>ERC-8004 ID</span>
+        <span style={{ fontFamily:"var(--font-mono)", fontSize:13, color:d.color }}>{d.num}</span>
+        <span style={{ color:"var(--line)", padding:"0 4px" }}>·</span>
+        <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--fg-3)" }}>{d.role}</span>
+      </div>
+      {d.body}
+    </>
+  );
+}
+
+function ERC8004() {
+  return (
+    <>
+      <P>ERC-8004 is Mantle's official standard for on-chain AI agent identity. Every RWAi agent has a unique identity NFT that stores its reputation score and action history — permanently verifiable on Mantlescan.</P>
+      <Callout type="info">ERC-8004 contracts are pre-deployed by Mantle on Sepolia. RWAi registers agents to these contracts — not a custom implementation.</Callout>
+      <H2>Live Agent Reputation</H2>
+      <Table
+        headers={["Agent", "ERC-8004 ID", "Score", "Autonomy Level", "Max Action"]}
+        rows={[
+          ["Nexus",  "41", "85 / 100", "Level 3 — Medium",     "Tokenization + registry"],
+          ["Shield", "42", "75 / 100", "Level 3 — Medium",     "Compliance log"],
+          ["Yield",  "43", "75 / 100", "Level 3 — Medium",     "Oracle update"],
+          ["Atlas",  "44", "75 / 100", "Level 3 — Medium",     "Full portfolio execution"],
+        ]}
+      />
+      <H2>Autonomy Levels</H2>
+      <Table
+        headers={["Level", "Score Range", "Capability"]}
+        rows={[
+          ["Level 1 — Restricted", "< 50",   "Read-only. Cannot submit on-chain actions."],
+          ["Level 2 — Limited",    "50 – 69", "Can submit low-value actions (< $1,000 / tx)."],
+          ["Level 3 — Medium",     "70 – 89", "Normal operation. Default for new agents."],
+          ["Level 4 — Full",       "≥ 90",    "Unrestricted. Earns through sustained performance."],
+        ]}
+      />
+      <Code title="ERC-8004 registry addresses (Mantle Sepolia)" lang="text" body={`Identity Registry   0x8004A818BFB912233c491871b3d84c89A494BD9e
+Reputation Registry 0x8004B663056A597Dffe9eCcC1965A193B7388713`} />
+    </>
+  );
+}
+
+function Contracts() {
+  return (
+    <>
+      <P>All RWAi logic runs on 8 Solidity contracts (0.8.24, OpenZeppelin v5) deployed on Mantle Sepolia. Source code is MIT licensed and fully open-source.</P>
+      <Callout type="tip">Verify any contract directly on <a href="https://sepolia.mantlescan.xyz" target="_blank" rel="noreferrer" style={{ color:"var(--accent)" }}>sepolia.mantlescan.xyz</a> — no permission required.</Callout>
+      <H2>Core Contracts</H2>
+      <Table
+        headers={["Contract", "Address", "Purpose"]}
+        rows={[
+          [<IC>AgentExecutor</IC>,          ADDRESSES.AgentExecutor,          "Immutable AI action log — every decision"],
+          [<IC>AgentReputationManager</IC>, ADDRESSES.AgentReputationManager, "ERC-8004 reputation scores + gating"],
+          [<IC>YieldOracle</IC>,            ADDRESSES.YieldOracle,            "Pyth price feeds + APY market snapshots"],
+          [<IC>ComplianceLog</IC>,          ADDRESSES.ComplianceLog,          "Shield KYC/AML decisions"],
+          [<IC>RWAiRegistry</IC>,           ADDRESSES.RWAiRegistry,           "All tokenized RWA asset records"],
+          [<IC>PortfolioVault</IC>,         ADDRESSES.PortfolioVault,         "Strategy allocation + execution"],
+          [<IC>HybridVault</IC>,            ADDRESSES.HybridVault,            "User deposits + EIP-712 agent consent"],
+          [<IC>AssetToken (template)</IC>,  ADDRESSES.AssetToken,             "ERC-20 RWA token template"],
+        ]}
+      />
+      <H2>Mock RWA Assets (Testnet)</H2>
+      <Table
+        headers={["Token", "Address"]}
+        rows={[
+          ["USDY", "0xcE265E23aAc349cEf9Fa3CC058062A44080f2289"],
+          ["mUSD", "0xDf079DB274fAEFfeD10A4a0E5C12f65e1570Cd35"],
+          ["mETH", "0xD57f88B64611dBf74f87FC40f2F1010320483584"],
+          ["fBTC", "0xbED7ad48984fBb3984F5aF83E176fb9f40dB37cc"],
+        ]}
+      />
+    </>
+  );
+}
+
+function Consent() {
+  return (
+    <>
+      <P>HybridVault uses EIP-712 typed-data signatures to grant Atlas a bounded, revocable allowance to act autonomously on your behalf — without exposing your private key or requiring approval for each transaction.</P>
+      <H2>How It Works</H2>
+      <Code title="1. User signs once" lang="typescript" body={`const consent = {
+  domain: { name: "RWAi HybridVault", chainId: 5003 },
+  types: {
+    AgentConsent: [
+      { name: "agent",     type: "address" },  // Atlas: 0x834De...
+      { name: "allowance", type: "uint256" },  // e.g. 500 USDY
+      { name: "deadline",  type: "uint256" },  // e.g. now + 30 days
+      { name: "nonce",     type: "uint256" },  // replay protection
+    ]
   },
-  "tokenize": {
-    kicker: "FEATURE · TOKENIZE",
-    title: ["Turn any real asset", "into a token."],
-    body: "The Tokenize flow converts a real-world asset (property, bond, certificate) into an ERC-20 token on Mantle in 6 steps — fully AI-driven, compliance-checked, and permanently recorded on-chain.\n\n① Upload — drop your PDF or DOCX documents (deed, income statement, appraisal).\n② Analyze — Nexus reads the documents and suggests token parameters: name, symbol, supply, price per token, and annual yield.\n③ Compliance — Shield reviews the same documents for legal risks, ownership clarity, and sanctions. Assets scoring ≥ 70 / 100 are cleared.\n④ Review — you see both agent results side by side before committing.\n⑤ Deploy — one click writes the tokenization to AgentExecutor.sol on Mantle, generating a permanent on-chain record.\n⑥ Live — your token is registered. The asset appears in your Portfolio under 'My Tokenized Assets' filtered by your wallet.\n\nAccepted file types: PDF, DOCX. Images are not supported — Nexus needs structured text to produce accurate valuations.",
-    code: { title: "end-to-end flow", body: `STEP 1  Upload (PDF / DOCX)\n        └─ POST /api/extract-text → pypdf / python-docx\n\nSTEP 2  Analyze — Nexus agent\n        └─ POST /api/agents/tokenize\n           {\n             assetType        : "real_estate"\n             estimatedValueUSD: 4250000\n             suggestedSymbol  : "BWAY"\n             suggestedTokenName: "RWAi Broadway Tower"\n             annualYieldBps   : 519        ← 5.19% APY\n             pricePerTokenUSD : 2.00\n           }\n\nSTEP 3  Compliance — Shield agent\n        └─ POST /api/agents/compliance\n           { score: 82, cleared: true, jurisdiction: "US-NY" }\n           → logged: AgentExecutor.logComplianceReview()\n\nSTEP 4  Review UI  — user confirms or cancels\n\nSTEP 5  Deploy\n        └─ POST /api/agents/tokenize  (with token_address + owner)\n           → AgentExecutor.logTokenization()   on Mantle\n           → record_user_tokenization()        in local db\n           → TX: 0xc10e2e63...  (mantlescan.xyz)\n\nSTEP 6  Portfolio\n        └─ GET /api/agents/stats/assets?owner=0xYourWallet\n           → "My Tokenized Assets" section` },
-  },
-  "market": {
-    kicker: "FEATURE · MARKET",
-    title: ["Buy and sell", "tokenized assets."],
-    body: "The RWA Market lists every asset tokenized through Nexus. Anyone can buy fractions — or the original owner can sell their position. Every trade is executed and logged on-chain by Atlas, creating a permanent, auditable record.\n\nBuy flow:\n① Browse listings — symbol, price per token, APY, compliance score.\n② Click Buy → enter USD amount → see exactly how many tokens you receive.\n③ Confirm → Atlas generates reasoning and calls AgentExecutor.executeAllocation() on Mantle.\n④ You receive a transaction hash — the trade is permanent.\n\nSell flow:\n① On your own listing, click Sell (orange button).\n② Enter how many tokens you want to sell → see USD value preview.\n③ Confirm → Atlas logs AgentExecutor.executeRebalance(RWA token → USDY) on-chain.\n④ Transaction hash confirms the rebalance is recorded.\n\nEvery buy and sell creates an on-chain action attributed to Atlas with AI-generated reasoning — auditable by anyone on Mantlescan.",
-    code: { title: "buy & sell on-chain flow", body: `BUY\n  POST /api/agents/market/buy\n  {\n    buyer_address   : "0xYourWallet"\n    token_address   : "0xcE265E..."\n    token_symbol    : "BWAY"\n    amount_usd      : 1000        ← $1,000 to spend\n    price_per_token : 2.00        ← $2.00/token\n  }\n\n  Atlas reasoning →\n  "Allocating 500 BWAY tokens at $2.00/token ($1,000 total).\n   5.19% APY — strong yield for a compliant real estate asset."\n\n  On-chain →\n  AgentExecutor.executeAllocation(\n    atlasId, buyer, [tokenAddress], [500e18], reasoning\n  )\n  TX: 0xabc123...  mantlescan.xyz\n\nSELL\n  POST /api/agents/market/sell\n  {\n    seller_address  : "0xYourWallet"\n    token_address   : "0xcE265E..."\n    amount_tokens   : 250         ← 250 tokens to sell\n    price_per_token : 2.00\n  }\n\n  On-chain →\n  AgentExecutor.executeRebalance(\n    atlasId, seller,\n    [tokenAddress],  ← from: RWA token\n    [USDY_address],  ← to: USDY\n    [250e18], reasoning\n  )\n  TX: 0xdef456...  mantlescan.xyz` },
-  },
-  "nexus-doc": {
-    kicker: "AGENT · NEXUS",
-    title: ["Got a real asset?", "Nexus tokenizes it."],
-    body: "Nexus is the AI that turns real-world assets — land, property, stocks, bonds — into digital tokens on Mantle.\n\nHow it works: upload your asset documents (certificates, deeds, appraisal reports). Nexus reads them, calculates fair value, suggests a token name and supply, then asks Shield to verify legal compliance before deployment.\n\nThe result: your asset becomes an ERC-20 token that can be traded, fractionally owned, or used as collateral — all recorded on-chain.",
-    code: { title: "example Nexus analysis output", body: `Input document: "Land certificate 500m² Bali, HM title, 2024"\n\nNexus output:\n  Token name    : RWAi Bali Land\n  Symbol        : BALI500\n  Est. value    : $315,000\n  Supply        : 1,000,000 tokens\n  Price/token   : $0.315\n  Annual yield  : 2.00%\n  Shield status : Cleared ✓\n  TX on-chain   : 0x185071df...` },
-  },
-  "shield-doc": {
-    kicker: "AGENT · SHIELD",
-    title: ["Is it legally", "safe?"],
-    body: "Shield is the AI compliance agent that ensures every tokenized asset meets legal standards before it goes live.\n\nShield checks: are the ownership documents complete? Are there legal risks in that jurisdiction? Is the associated wallet on any international sanctions list?\n\nShield's review is stored permanently in ComplianceLog.sol — so investors can verify that an asset has passed due diligence themselves, without taking anyone's word for it.",
-    code: { title: "example Shield compliance score", body: `Asset: Bali Land 500m²\n\nCompliance score : 82 / 100  ✓ Cleared\nJurisdiction     : Indonesia\nNotes            : Documents complete.\n                   Moderate local market risk.\nStored in        : ComplianceLog.sol\nTX               : 0x2af248...` },
-  },
-  "yield-doc": {
-    kicker: "AGENT · YIELD",
-    title: ["Best rates,", "monitored 24/7."],
-    body: "Yield is the AI that monitors interest rates (APY) across all RWA assets on Mantle — USDY, mETH, fBTC, mUSD — every few hours.\n\nIf an asset's rate rises significantly, Yield automatically signals Atlas to consider rebalancing the portfolio. All yield data is written to YieldOracle.sol so it can be publicly verified — not a number that can be manipulated.\n\nYou can also ask directly: \"what's the current mETH rate?\" — Yield will respond with real-time data.",
-    code: { title: "live yield snapshot", body: `Yield Agent — market snapshot\n\n  USDY   4.20% APY  ██████░░░░  stable\n  mETH   6.12% APY  █████████░  up +0.8%\n  fBTC   3.50% APY  █████░░░░░  stable\n  mUSD   3.90% APY  ██████░░░░  stable\n\nBlended (conservative 50/25/15/10):\n  → 4.57% APY\n  → $38.08 / month per $10,000` },
-  },
-  "atlas-doc": {
-    kicker: "AGENT · ATLAS",
-    title: ["Your AI", "portfolio manager."],
-    body: "Atlas is the primary AI you chat with. It knows your portfolio, understands your investment goals, and coordinates Nexus, Shield, and Yield to execute your strategy.\n\nTell Atlas: how much capital you want to invest, whether you're conservative or aggressive, and your investment horizon. Atlas will build a plan, explain its reasoning in plain language, then write that decision to the blockchain — transparent and auditable any time.\n\nYou can also enable autonomous mode: Atlas can rebalance automatically within the limits you set, without requiring confirmation each time.",
-    code: { title: "example conversation with Atlas", body: `You   : "I have $10,000. I want a conservative\n         investment — I can't afford big losses."\n\nAtlas : "Got it. I recommend:\n         50% USDY  — stable, 4.2% APY\n         25% mETH  — growth, 6.1% APY\n         15% mUSD  — stable, 3.9% APY\n         10% fBTC  — diversification\n         \n         Blended APY: ~4.57%\n         Est. income: $38/month\n         \n         Reasoning written on-chain →\n         TX: 0x77a66d..."` },
-  },
-  "portfolio-doc": {
-    kicker: "FEATURE · PORTFOLIO",
-    title: ["Your portfolio,", "managed by Atlas."],
-    body: "The Portfolio page shows your RWA asset allocation in real-time: what percentage is in USDY, mETH, mUSD, and fBTC, your combined yield, and estimated monthly income.\n\nEvery allocation change Atlas makes is stored on-chain — you can click the TX link and verify it yourself on Mantlescan any time. Nothing can be hidden.\n\nTo enable Atlas in autonomous mode:\n① Deposit USDY into HybridVault as Atlas's working capital.\n② Click 'Enable Atlas' — sign the permission with your wallet. This caps how much Atlas can manage and for how long.\n③ Atlas can start auto-rebalancing within the limits you approved — no further confirmation needed until permission expires.",
-    code: { title: "how to read the portfolio page", body: `Portfolio Value   → total value of your investments\nBlended APY       → weighted average yield across all assets\nMonthly Income    → estimated income per month\nRisk Score        → 1 (very safe) – 10 (very aggressive)\n\nAllocation chart  → proportion of each asset (color bars)\nAgent history     → all Atlas actions + on-chain TX links\n\nHybridVault panel:\n  Deposit →  move USDY into vault\n  Withdraw ← pull USDY back to wallet\n  Enable Atlas → grant autonomous permission to Atlas` },
-  },
-  "erc8004": {
-    kicker: "PROTOCOL · ERC-8004",
-    title: ["AI identity", "on the blockchain."],
-    body: "ERC-8004 is Mantle's official standard for AI agent identity. Every RWAi agent — Nexus, Shield, Yield, Atlas — has a unique identity NFT on Mantle that stores their track record.\n\nEvery time an agent successfully completes a task, its reputation score goes up. If an agent fails or breaks the rules, the score drops. This score determines how autonomously an agent can act: higher score → can manage larger amounts without human confirmation.\n\nThis isn't a cosmetic feature — it's a real AI accountability system running on the blockchain.",
-    code: { title: "current agent reputation scores", body: `Agent     ID    Score   Autonomy Level\n────────────────────────────────────\nNexus     41    85/100  Medium (level 3)\nShield    42    75/100  Medium (level 3)\nYield     43    75/100  Medium (level 3)\nAtlas     44    75/100  Medium (level 3)\n\nLevel 1 = restricted  (score < 50)\nLevel 2 = limited     (score 50–69)\nLevel 3 = medium      (score 70–89)\nLevel 4 = full        (score ≥ 90)` },
-  },
-  "contracts": {
-    kicker: "PROTOCOL · CONTRACTS",
-    title: ["8 contracts,", "all on-chain."],
-    body: "All of RWAi's logic runs on smart contracts on Mantle Sepolia — not on hidden servers that can be shut down or manipulated.\n\nEvery agent action is permanently recorded in AgentExecutor. Every tokenized asset is logged in RWAiRegistry. Every compliance score is stored in ComplianceLog. Yield data lives in YieldOracle.\n\nAll contracts are open-source and verifiable on Mantlescan — anyone can audit without permission.",
-    code: { title: "contract addresses (Mantle Sepolia)", body: `AgentExecutor     ${ADDRESSES.AgentExecutor}\nRWAiRegistry      ${ADDRESSES.RWAiRegistry}\nComplianceLog     ${ADDRESSES.ComplianceLog}\nYieldOracle       ${ADDRESSES.YieldOracle}\nPortfolioVault    ${ADDRESSES.PortfolioVault}\nHybridVault       ${ADDRESSES.HybridVault}\nAssetToken        ${ADDRESSES.AssetToken}\n\nVerify at:\nhttps://sepolia.mantlescan.xyz` },
-  },
-  "orchestration": {
-    kicker: "PROTOCOL · ORCHESTRATION",
-    title: ["Atlas leads,", "agents execute."],
-    body: "When you ask Atlas to work, Atlas doesn't work alone — it automatically coordinates the entire agent team.\n\nExample: you ask Atlas to build a new portfolio. Atlas will:\n① Ask Yield to check today's rates for all assets\n② Ask Shield to verify the assets being included\n③ Calculate optimal allocation based on your risk score\n④ Write the plan to PortfolioVault on Mantle\n⑤ Store the reasoning in AgentExecutor — permanently\n\nAll of this happens in seconds. You see the result, not the process — but the process is fully auditable any time.",
-    code: { title: "Atlas on-chain action trail", body: `You: "Build a conservative $10k portfolio"\n       ↓\nAtlas → Yield.getAPY()           [internal]\nAtlas → Shield.verify()           [internal]\nAtlas → executeAllocation()       [on-chain TX]\n         → AgentExecutor.sol\n         → TX: 0x77a66d7a...\n         → stored permanently\n         → verify: sepolia.mantlescan.xyz` },
-  },
+  message: { agent, allowance: parseEther("500"), deadline, nonce }
+};
+
+const sig = await walletClient.signTypedData(consent);`} />
+      <Code title="2. Atlas executes autonomously within cap" lang="solidity" body={`// Atlas calls this — no user confirmation needed per tx
+HybridVault.agentExecute(
+  user,         // your wallet
+  asset,        // e.g. mETH address
+  amount,       // deducted from remaining allowance
+  reason        // Atlas-generated reasoning, stored on AgentExecutor
+)
+// Each call deducts from allowance. When exhausted → Atlas requests new consent.`} />
+      <Callout type="warn">The signature is <strong>not</strong> a full wallet approval — it caps Atlas to the exact allowance amount you specify. Atlas cannot move more than the cap under any circumstances.</Callout>
+    </>
+  );
+}
+
+function Tokenomics() {
+  return (
+    <>
+      <P>$RWAI is the protocol governance and fee-capture token. Total supply: <strong>100,000,000 RWAI — fixed cap, no inflation, ever.</strong> It is not required to use the product — retail users pay gas in MNT only. $RWAI aligns long-term stakeholders.</P>
+      <H2>Token Utility</H2>
+      <Table
+        headers={["#", "Utility", "How"]}
+        rows={[
+          ["①", "Governance", "Vote on fee parameters, asset type whitelists, autonomy thresholds"],
+          ["②", "Fee sharing", "Stake RWAI → earn 70% of all protocol fees pro-rata"],
+          ["③", "Agent licensing", "Bond 10,000 RWAI to register ERC-8004 agent. Slashed on malicious action."],
+          ["④", "Fee discount", "Tokenization fee: 0.5% → 0.2% when paid in RWAI (60% saving)"],
+          ["⑤", "Reputation boost", "Bonded agents start with +10 reputation points"],
+        ]}
+      />
+      <H2>Supply Allocation</H2>
+      <Table
+        headers={["Allocation", "Tokens", "%", "Vesting"]}
+        rows={[
+          ["Ecosystem & grants",  "25,000,000", "25%", "4yr linear, no cliff"],
+          ["Protocol treasury",   "20,000,000", "20%", "DAO-controlled (no vesting)"],
+          ["Team & contributors", "18,000,000", "18%", "1yr cliff + 3yr linear (revocable)"],
+          ["Community & airdrops","15,000,000", "15%", "6mo cliff + 2.5yr linear (revocable)"],
+          ["Investors (seed)",    "12,000,000", "12%", "6mo cliff + 2yr linear (revocable)"],
+          ["Liquidity provision", "10,000,000", "10%", "Unlocked at TGE for DEX pools"],
+        ]}
+      />
+      <H2>Token Contracts</H2>
+      <Code title="contracts (Mantle Sepolia — deploy with: npm run deploy:token)" lang="text" body={`RWAiToken        — ERC-20Votes + staking + agent bond + fee discount
+RWAiVesting      — cliff + linear vesting for all allocations
+ProtocolTreasury — fee collection: 70% stakers / 30% treasury
+
+Source: contracts/contracts/RWAiToken.sol
+        contracts/contracts/RWAiVesting.sol
+        contracts/contracts/ProtocolTreasury.sol`} />
+      <Callout type="tip">$RWAI will launch on <strong>FusionX</strong> (Mantle-native DEX) at mainnet. No presale, no VC dump — team tokens cliff at 12 months.</Callout>
+    </>
+  );
+}
+
+function Revenue() {
+  return (
+    <>
+      <P>RWAi captures value at three protocol layers. Every fee is enforced by smart contracts — no hidden charges, no off-chain billing. All fee rates are governance-updatable within hard caps by $RWAI stakers.</P>
+      <H2>Fee Streams</H2>
+      <Table
+        headers={["Stream", "Rate", "Contract", "Hard Cap"]}
+        rows={[
+          ["Tokenization fee", "0.5% of asset value (0.2% in RWAI)", "ProtocolTreasury.collectTokenizationFee()", "2%"],
+          ["AUM fee",          "0.3% / year on HybridVault deposits", "ProtocolTreasury.collectAumFee()",          "1% / yr"],
+          ["Market fee",       "0.15% of each buy/sell",              "ProtocolTreasury.collectMarketFee()",       "1%"],
+        ]}
+      />
+      <H2>Fee Distribution</H2>
+      <Code title="ProtocolTreasury.distributeFees()" lang="solidity" body={`// Called by anyone — incentivises regular distribution
+function distributeFees() external {
+    uint256 toStakers  = (pending * 7_000) / 10_000;  // 70%
+    uint256 toTreasury = pending - toStakers;           // 30%
+
+    rwaiStaking.depositFees(toStakers);   // → RWAI stakers pro-rata
+    // toTreasury stays in contract       // → DAO spend
+}`} />
+      <H2>Unit Economics (illustrative)</H2>
+      <Table
+        headers={["Scenario", "Annual Revenue"]}
+        rows={[
+          ["100 tokenizations × avg $500k asset  → 0.5% fee", "$250,000 / quarter"],
+          ["$50M AUM in HybridVault              → 0.3% / yr", "$150,000 / year"],
+          ["$5M / month trade volume             → 0.15% fee",  "$90,000 / year"],
+          ["Combined (illustrative @ scale)",                    "~$490,000 / year"],
+        ]}
+      />
+      <Callout type="info">Revenue is denominated in $RWAI. Protocol fees paid in MNT or RWA tokens are converted to RWAI before distribution — creating natural buy pressure as usage grows.</Callout>
+    </>
+  );
+}
+
+function GTM() {
+  return (
+    <>
+      <P>RWAi targets three segments across four deployment phases. The core growth loop: every on-chain AI decision that accumulates in <IC>AgentExecutor.sol</IC> is a benchmark competitors cannot fake retroactively.</P>
+      <H2>Target Segments</H2>
+      <Table
+        headers={["Segment", "Profile", "Acquisition"]}
+        rows={[
+          ["Crypto-native retail", "Mantle holders of USDY/mETH/mUSD/fBTC — no intelligent allocation layer exists today", "JARVIS voice demo · free to use"],
+          ["SME asset owners", "Real estate, invoice, commodity owners who cannot afford $100k traditional tokenization", "RWAi = gas fees + 0.5%"],
+          ["Institutional desks", "Need verifiable AI decision audit trails for compliance", "AgentExecutor.sol = first on-chain AI benchmark"],
+        ]}
+      />
+      <H2>Roadmap</H2>
+      <Table
+        headers={["Phase", "Timeline", "Milestones"]}
+        rows={[
+          ["Phase 1 — Seed",         "Now (Testnet)",  "Hackathon → developer mindshare · Open source distribution · ERC-8004 standard as dependency"],
+          ["Phase 2 — Alpha",        "Q3 2026",        "Mainnet deploy · Mantle Foundation partnership · First 10 real tokenizations · $RWAI token contracts"],
+          ["Phase 3 — Growth",       "Q4 2026",        "Real KYC integration (Fractal ID) · $RWAI TGE on FusionX · Enterprise API · Agent marketplace"],
+          ["Phase 4 — Scale",        "2027+",          "Cross-chain via LayerZero · RWA index products · MAS Singapore regulatory sandbox"],
+        ]}
+      />
+      <H2>Competitive Positioning</H2>
+      <Table
+        headers={["Competitor", "Gap", "RWAi Advantage"]}
+        rows={[
+          ["Ondo Finance",   "No AI, no voice, no execution",          "Atlas executes autonomously, not just recommends"],
+          ["Centrifuge",     "No AI layer, not Mantle-native",          "Mantle-native + JARVIS voice interface"],
+          ["OpenTrade",      "Institutional only, $50k minimum",        "Retail-first from $10k via HybridVault"],
+          ["Generic AI bots","No on-chain proof, no audit trail",       "AgentExecutor.sol = immutable AI benchmark"],
+        ]}
+      />
+    </>
+  );
+}
+
+// ── Content router ──────────────────────────────────────────────
+function PageContent({ id }: { id: string }) {
+  if (id === "getting-started") return <GettingStarted />;
+  if (id === "architecture")    return <Architecture />;
+  if (id === "tokenize")        return <Tokenize />;
+  if (id === "market")          return <Market />;
+  if (id === "portfolio-doc")   return <Portfolio />;
+  if (id === "erc8004")         return <ERC8004 />;
+  if (id === "contracts")       return <Contracts />;
+  if (id === "consent")         return <Consent />;
+  if (id === "tokenomics")      return <Tokenomics />;
+  if (id === "revenue")         return <Revenue />;
+  if (id === "gtm")             return <GTM />;
+  if (["atlas-doc","nexus-doc","shield-doc","yield-doc","orchestration"].includes(id))
+    return <AgentDoc id={id} />;
+  return null;
+}
+
+// ── Page ────────────────────────────────────────────────────────
+const META: Record<string, { title: string; subtitle: string; tag: string }> = {
+  "getting-started": { title:"Getting Started",      subtitle:"Connect your wallet and start in under 5 minutes.", tag:"OVERVIEW" },
+  "architecture":    { title:"Architecture",          subtitle:"How the three layers work together.",               tag:"OVERVIEW" },
+  "tokenize":        { title:"Tokenize",              subtitle:"Upload documents, deploy ERC-20 on Mantle.",        tag:"FEATURE" },
+  "market":          { title:"RWA Market",            subtitle:"Buy and sell fractions of tokenized assets.",       tag:"FEATURE" },
+  "portfolio-doc":   { title:"Portfolio",             subtitle:"Real-time allocation + Atlas autonomous mode.",     tag:"FEATURE" },
+  "atlas-doc":       { title:"Atlas",                 subtitle:"Your AI portfolio manager. Voice + text.",          tag:"AGENT · ERC-8004 #44" },
+  "nexus-doc":       { title:"Nexus",                 subtitle:"Tokenizes real-world assets from documents.",       tag:"AGENT · ERC-8004 #41" },
+  "shield-doc":      { title:"Shield",                subtitle:"AI compliance — KYC/AML, sanctions, risk score.",  tag:"AGENT · ERC-8004 #42" },
+  "yield-doc":       { title:"Yield",                 subtitle:"Monitors APY via Pyth, writes to YieldOracle.",    tag:"AGENT · ERC-8004 #43" },
+  "orchestration":   { title:"Orchestration",         subtitle:"How Atlas coordinates the multi-agent system.",     tag:"PROTOCOL" },
+  "erc8004":         { title:"ERC-8004 Identity",     subtitle:"Mantle's standard for on-chain AI agent identity.", tag:"PROTOCOL" },
+  "contracts":       { title:"Contract Addresses",    subtitle:"All 8 contracts deployed on Mantle Sepolia.",       tag:"PROTOCOL" },
+  "consent":         { title:"EIP-712 Consent",       subtitle:"Bounded, revocable autonomous agent permission.",   tag:"PROTOCOL" },
+  "tokenomics":      { title:"$RWAI Tokenomics",      subtitle:"100M fixed supply. Governance + fee capture.",      tag:"TOKENOMICS" },
+  "revenue":         { title:"Revenue Model",         subtitle:"Three on-chain fee streams. All governance-capped.", tag:"BUSINESS" },
+  "gtm":             { title:"Go-to-Market",          subtitle:"Four phases. One compounding on-chain moat.",       tag:"BUSINESS" },
 };
 
 export default function DocsPage() {
-  const [active, setActive] = useState<SectionId>("getting-started");
-  const content = CONTENT[active] ?? CONTENT["getting-started"];
+  const [active, setActive] = useState("getting-started");
+  const meta     = META[active] ?? META["getting-started"];
+  const flatIdx  = FLAT.findIndex(i => i.id === active);
+  const prev     = flatIdx > 0 ? FLAT[flatIdx - 1] : null;
+  const next     = flatIdx < FLAT.length - 1 ? FLAT[flatIdx + 1] : null;
 
   return (
-    <div style={{ maxWidth:1280, margin:"0 auto", padding:"32px", display:"grid", gridTemplateColumns:"220px 1fr", gap:0 }}>
+    <div style={{ display:"grid", gridTemplateColumns:"240px 1fr", maxWidth:1300, margin:"0 auto", height:"calc(100vh - 48px)", overflow:"hidden" }}>
 
-      {/* Sidebar nav */}
-      <div style={{ borderRight:"1px solid var(--line)", paddingRight:24 }}>
-        <div className="mono" style={{ marginBottom:16, color:"var(--fg-3)" }}>DOCUMENTATION</div>
-        {SECTIONS.map(s => (
-          <button key={s.id} onClick={() => setActive(s.id)}
-            style={{
-              display:"block", width:"100%", textAlign:"left", padding:"8px 10px", marginBottom:2,
-              fontFamily:"var(--font-mono)", fontSize:11, letterSpacing:"0.06em", textTransform:"uppercase",
-              background: active === s.id ? "var(--bg-2)" : "transparent",
-              color: active === s.id ? "var(--fg-0)" : "var(--fg-2)",
-              border: "none", borderRadius:2, cursor:"pointer",
-              borderLeft: active === s.id ? "2px solid var(--accent)" : "2px solid transparent",
-            }}>
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ paddingLeft:40 }}>
-        <div className="mono" style={{ color:"var(--accent)", marginBottom:14 }}>{content.kicker}</div>
-        <h1 className="display" style={{ fontSize:64, marginBottom:20, lineHeight:1.05 }}>
-          {content.title.map((line, i) => <span key={i}>{i > 0 && <br/>}{line}</span>)}
-        </h1>
-        <p style={{ fontSize:14, color:"var(--fg-1)", maxWidth:600, marginBottom:32, lineHeight:1.65 }}>
-          {content.body}
-        </p>
-
-        {content.code && (
-          <div className="panel" style={{ maxWidth:640 }}>
-            <div className="panel-header">
-              <span className="mono-sm" style={{ textTransform:"none", letterSpacing:0, fontFamily:"var(--font-mono)" }}>
-                {content.code.title}
-              </span>
-            </div>
-            <pre style={{ padding:"16px", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--fg-1)", lineHeight:1.8, overflowX:"auto", whiteSpace:"pre-wrap" }}>
-              {content.code.body}
-            </pre>
+      {/* ── Sidebar ── */}
+      <aside style={{
+        borderRight:"1px solid var(--line)", overflowY:"auto",
+        padding:"24px 0",
+        scrollbarWidth:"thin",
+      }}>
+        {/* Search bar (UI only) */}
+        <div style={{ padding:"0 16px 20px" }}>
+          <div style={{
+            display:"flex", alignItems:"center", gap:8,
+            background:"rgba(255,255,255,0.04)", border:"1px solid var(--line)",
+            borderRadius:3, padding:"7px 10px",
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              placeholder="Search docs…"
+              style={{ background:"transparent", border:"none", outline:"none", color:"var(--fg-2)", fontFamily:"var(--font-mono)", fontSize:11, width:"100%" }}
+            />
           </div>
-        )}
-      </div>
+        </div>
+
+        {/* Nav groups */}
+        {SIDEBAR.map(group => (
+          <div key={group.group} style={{ marginBottom:8 }}>
+            <div style={{
+              padding:"4px 16px", fontSize:9, letterSpacing:"0.14em",
+              color:"var(--fg-3)", fontFamily:"var(--font-mono)", fontWeight:600,
+            }}>
+              {group.group}
+            </div>
+            {group.items.map(item => (
+              <button key={item.id} onClick={() => setActive(item.id)} style={{
+                display:"block", width:"100%", textAlign:"left",
+                padding:"7px 16px 7px 20px",
+                fontFamily:"var(--font-mono)", fontSize:11.5, letterSpacing:"0.03em",
+                background: active === item.id ? "rgba(0,229,160,0.07)" : "transparent",
+                color: active === item.id ? "var(--accent)" : "var(--fg-2)",
+                border:"none", borderLeft: active === item.id ? "2px solid var(--accent)" : "2px solid transparent",
+                cursor:"pointer", transition:"all 0.12s",
+              }}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ))}
+
+        {/* External links */}
+        <div style={{ padding:"16px 16px 0", borderTop:"1px solid var(--line)", marginTop:8 }}>
+          {[
+            { label:"Mantlescan Explorer", href:"https://sepolia.mantlescan.xyz" },
+            { label:"GitHub Repository",   href:"https://github.com/ntfound-dev/RWAI" },
+            { label:"API Reference",       href:"http://localhost:8001/docs" },
+          ].map(l=>(
+            <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{
+              display:"flex", alignItems:"center", gap:6,
+              padding:"6px 0", fontSize:11, color:"var(--fg-3)",
+              textDecoration:"none", fontFamily:"var(--font-mono)",
+              transition:"color 0.12s",
+            }}
+            onMouseEnter={e=>(e.currentTarget.style.color="var(--accent)")}
+            onMouseLeave={e=>(e.currentTarget.style.color="var(--fg-3)")}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              {l.label}
+            </a>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Main content ── */}
+      <main style={{ overflowY:"auto", padding:"32px 48px 60px", scrollbarWidth:"thin" }}>
+
+        {/* Breadcrumb */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:20, fontFamily:"var(--font-mono)", fontSize:10, color:"var(--fg-3)" }}>
+          <span>DOCS</span>
+          <span style={{ color:"var(--line)" }}>›</span>
+          <span style={{ color:"var(--accent)", letterSpacing:"0.08em" }}>{meta.tag}</span>
+        </div>
+
+        {/* Page header */}
+        <div style={{ marginBottom:32, paddingBottom:24, borderBottom:"1px solid var(--line)" }}>
+          <h1 style={{ fontSize:36, fontWeight:700, lineHeight:1.1, marginBottom:8, color:"var(--fg-0)" }}>
+            {meta.title}
+          </h1>
+          <p style={{ fontSize:14, color:"var(--fg-3)", fontFamily:"var(--font-mono)", margin:0 }}>
+            {meta.subtitle}
+          </p>
+        </div>
+
+        {/* Dynamic content */}
+        <PageContent id={active} />
+
+        {/* Prev / Next nav */}
+        <div style={{
+          display:"grid", gridTemplateColumns:"1fr 1fr", gap:12,
+          marginTop:48, paddingTop:24, borderTop:"1px solid var(--line)",
+        }}>
+          {prev ? (
+            <button onClick={()=>setActive(prev.id)} style={{
+              background:"rgba(255,255,255,0.03)", border:"1px solid var(--line)",
+              borderRadius:4, padding:"14px 16px", cursor:"pointer",
+              textAlign:"left", transition:"border-color 0.15s",
+            }}
+            onMouseEnter={e=>(e.currentTarget.style.borderColor="rgba(0,229,160,0.4)")}
+            onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--line)")}
+            >
+              <div style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--fg-3)", marginBottom:4 }}>← PREVIOUS</div>
+              <div style={{ fontFamily:"var(--font-mono)", fontSize:12, color:"var(--fg-1)" }}>{prev.label}</div>
+            </button>
+          ) : <div/>}
+
+          {next ? (
+            <button onClick={()=>setActive(next.id)} style={{
+              background:"rgba(255,255,255,0.03)", border:"1px solid var(--line)",
+              borderRadius:4, padding:"14px 16px", cursor:"pointer",
+              textAlign:"right", transition:"border-color 0.15s",
+            }}
+            onMouseEnter={e=>(e.currentTarget.style.borderColor="rgba(0,229,160,0.4)")}
+            onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--line)")}
+            >
+              <div style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--fg-3)", marginBottom:4 }}>NEXT →</div>
+              <div style={{ fontFamily:"var(--font-mono)", fontSize:12, color:"var(--fg-1)" }}>{next.label}</div>
+            </button>
+          ) : <div/>}
+        </div>
+      </main>
     </div>
   );
 }

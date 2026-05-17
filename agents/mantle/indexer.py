@@ -17,7 +17,7 @@ from .db import (
 log = logging.getLogger("rwai.indexer")
 
 POLL_INTERVAL   = 15    # seconds between polls
-BLOCK_CHUNK     = 2000  # max blocks per fetch (avoids RPC timeout)
+BLOCK_CHUNK     = 500   # Mantle Sepolia RPC rejects ranges >~500 blocks
 CONFIRMATIONS   = 2     # wait N blocks before indexing (reorg safety)
 
 _indexer_thread: Optional[threading.Thread] = None
@@ -148,10 +148,11 @@ def _run(deployments: dict) -> None:
     while not _stop_event.is_set():
         try:
             tip = w3.eth.block_number - CONFIRMATIONS
-            if tip > last:
-                chunk_end = min(last + BLOCK_CHUNK, tip)
-                log.debug("Indexing blocks %d → %d", last + 1, chunk_end)
-                _index_range(w3, contracts, last + 1, chunk_end)
+            from_block = last + 1
+            if tip >= from_block:
+                chunk_end = min(from_block + BLOCK_CHUNK - 1, tip)
+                log.debug("Indexing blocks %d → %d", from_block, chunk_end)
+                _index_range(w3, contracts, from_block, chunk_end)
                 set_last_indexed_block(chunk_end)
                 last = chunk_end
         except Exception as e:

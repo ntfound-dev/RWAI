@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // surface as Next.js dev-mode overlays inside our app.
 const _suppressExtensionErrors = `
 (function(){
-  var BAD = ['chrome-extension://', 'not been authorized yet', 'WalletConnect'];
+  var BAD = ['chrome-extension://', 'not been authorized yet', 'WalletConnect', 'translate.googleapis'];
   function isBad(s){ return s && BAD.some(function(b){ return String(s).indexOf(b) !== -1; }); }
   var _onError = window.onerror;
   window.onerror = function(msg, src, line, col, err){
@@ -30,7 +30,7 @@ const _suppressExtensionErrors = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" translate="no">
       <head>
         <script dangerouslySetInnerHTML={{ __html: _suppressExtensionErrors }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -23,6 +23,7 @@
       "atlas": 44
     }
   },
+  "deployedAtBlock": 38500000,
   "isTestnet": true,
   "assets": {
     "USDY": "0xcE265E23aAc349cEf9Fa3CC058062A44080f2289",

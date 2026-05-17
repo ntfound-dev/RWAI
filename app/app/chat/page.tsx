@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AgentMonogram, AGENTS } from "@/components/agents/AgentMonogram";
 import { MeshBackground } from "@/components/ui/MeshBackground";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
+import { JarvisPanel } from "@/components/ui/JarvisPanel";
 
 // ── Transcript data ───────────────────────────────────────────────
 type MsgKind = "text" | "reasoning" | "tool" | "plan-options";
@@ -121,14 +122,14 @@ function TokenRow({ id, color, target, busy }: { id: string; color: string; targ
     <div style={{ marginBottom:10 }}>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, alignItems:"center" }}>
         <span className="mono-sm" style={{ color, display:"flex", alignItems:"center", gap:6 }}>
-          {busy && <span style={{ width:6, height:6, borderRadius:"50%", background:color, animation:"pulseDot 1s ease-out infinite" }} />}
+          <span style={{ width:6, height:6, borderRadius:"50%", background:color, animation:"pulseDot 1s ease-out infinite", opacity: busy ? 1 : 0, transition:"opacity 0.2s" }} />
           {id}
         </span>
         <span className="mono-sm" style={{ color: busy ? color : "var(--fg-1)" }}>{v} tok</span>
       </div>
       <div style={{ height:4, background:"var(--bg-2)", position:"relative", overflow:"hidden" }}>
         <div style={{ width:`${pct}%`, height:"100%", background:color, transition:"width 600ms cubic-bezier(0.4,0,0.2,1)" }} />
-        {busy && <div style={{ position:"absolute", inset:0, background:`linear-gradient(90deg,transparent,${color},transparent)`, opacity:0.3, animation:"tokenSweep 1.4s linear infinite" }} />}
+        <div style={{ position:"absolute", inset:0, background:`linear-gradient(90deg,transparent,${color},transparent)`, opacity: busy ? 0.3 : 0, animation: busy ? "tokenSweep 1.4s linear infinite" : "none", transition:"opacity 0.2s" }} />
       </div>
     </div>
   );
@@ -168,49 +169,53 @@ function CallGraph({ status, activeEdge, animKey }: { status: Record<string,stri
       <line x1="140" y1="40" x2="220" y2="120" stroke={eColor("shield")} strokeWidth="1.5" markerEnd="url(#arr)" strokeDasharray={edgeOn("shield") ? "4 4" : "none"} style={{ animation: edgeOn("shield") ? "edgeDash 0.8s linear infinite" : "none" }} />
       <line x1="140" y1="40" x2="140" y2="120" stroke="var(--line-strong)" strokeDasharray="3 3" strokeWidth="1.5" />
 
-      {edgeOn("yield") && (
-        <circle key={`py-${animKey}`} r="4" fill="var(--yield)">
-          <animate attributeName="cx" values="140;60"  dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="40;120"  dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" />
-        </circle>
-      )}
-      {edgeOn("shield") && (
-        <circle key={`ps-${animKey}`} r="4" fill="var(--shield)">
-          <animate attributeName="cx" values="140;220" dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="40;120"  dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" />
-        </circle>
-      )}
-      {edgeOn("aggregate") && (<>
-        <circle r="3" fill="var(--yield)">
-          <animate attributeName="cx" values="60;140"  dur="0.9s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="120;40"  dur="0.9s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="indefinite" />
-        </circle>
-        <circle r="3" fill="var(--shield)">
-          <animate attributeName="cx" values="220;140" dur="0.9s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="120;40"  dur="0.9s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="indefinite" />
-        </circle>
-      </>)}
+      {/* edge travel particles — always rendered, opacity=0 when inactive */}
+      <circle key={`py-${animKey}`} r="4" fill="var(--yield)" style={{ opacity: edgeOn("yield") ? 1 : 0 }}>
+        <animate attributeName="cx" values="140;60"  dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="cy" values="40;120"  dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" />
+      </circle>
+      <circle key={`ps-${animKey}`} r="4" fill="var(--shield)" style={{ opacity: edgeOn("shield") ? 1 : 0 }}>
+        <animate attributeName="cx" values="140;220" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="cy" values="40;120"  dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" />
+      </circle>
+      <circle key={`agy-${animKey}`} r="3" fill="var(--yield)" style={{ opacity: edgeOn("aggregate") ? 1 : 0 }}>
+        <animate attributeName="cx" values="60;140"  dur="0.9s" repeatCount="indefinite" />
+        <animate attributeName="cy" values="120;40"  dur="0.9s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="indefinite" />
+      </circle>
+      <circle key={`ags-${animKey}`} r="3" fill="var(--shield)" style={{ opacity: edgeOn("aggregate") ? 1 : 0 }}>
+        <animate attributeName="cx" values="220;140" dur="0.9s" repeatCount="indefinite" />
+        <animate attributeName="cy" values="120;40"  dur="0.9s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="indefinite" />
+      </circle>
 
       {/* user */}
       <circle cx="140" cy="20" r="8" fill="var(--bg-3)" stroke="var(--line)" />
       <text x="140" y="23" textAnchor="middle" fontFamily="var(--font-mono)" fontSize="8" fill="var(--fg-1)">U</text>
 
-      {/* atlas */}
-      {active("atlas") && <circle cx="140" cy="40" r="14" fill="none" stroke="var(--atlas)" strokeWidth="1"><animate attributeName="r" values="14;22" dur="1.4s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" /></circle>}
+      {/* atlas — pulse ring always rendered, opacity drives visibility */}
+      <circle cx="140" cy="40" r="14" fill="none" stroke="var(--atlas)" strokeWidth="1" style={{ opacity: active("atlas") ? 1 : 0 }}>
+        <animate attributeName="r" values="14;22" dur="1.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" />
+      </circle>
       <circle cx="140" cy="40" r="14" fill="var(--bg-2)" stroke={active("atlas") ? "var(--atlas)" : done("atlas") ? "var(--accent)" : "var(--atlas)"} strokeWidth={active("atlas") ? "2" : "1.5"} style={{ transition:"all 300ms" }} />
       <text x="140" y="45" textAnchor="middle" fontFamily="var(--font-display)" fontStyle="italic" fontSize="18" fill="var(--atlas)">A</text>
 
-      {/* yield */}
-      {active("yield") && <circle cx="60" cy="135" r="13" fill="none" stroke="var(--yield)" strokeWidth="1"><animate attributeName="r" values="13;20" dur="1.4s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" /></circle>}
+      {/* yield — pulse ring always rendered */}
+      <circle cx="60" cy="135" r="13" fill="none" stroke="var(--yield)" strokeWidth="1" style={{ opacity: active("yield") ? 1 : 0 }}>
+        <animate attributeName="r" values="13;20" dur="1.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" />
+      </circle>
       <circle cx="60" cy="135" r="13" fill="var(--bg-2)" stroke={done("yield") ? "var(--accent)" : "var(--yield)"} strokeWidth={active("yield") ? "2" : "1.5"} style={{ transition:"all 300ms" }} />
       <text x="60" y="140" textAnchor="middle" fontFamily="var(--font-display)" fontStyle="italic" fontSize="16" fill="var(--yield)">Y</text>
 
-      {/* shield */}
-      {active("shield") && <circle cx="220" cy="135" r="13" fill="none" stroke="var(--shield)" strokeWidth="1"><animate attributeName="r" values="13;20" dur="1.4s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" /></circle>}
+      {/* shield — pulse ring always rendered */}
+      <circle cx="220" cy="135" r="13" fill="none" stroke="var(--shield)" strokeWidth="1" style={{ opacity: active("shield") ? 1 : 0 }}>
+        <animate attributeName="r" values="13;20" dur="1.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" />
+      </circle>
       <circle cx="220" cy="135" r="13" fill="var(--bg-2)" stroke={done("shield") ? "var(--accent)" : "var(--shield)"} strokeWidth={active("shield") ? "2" : "1.5"} style={{ transition:"all 300ms" }} />
       <text x="220" y="140" textAnchor="middle" fontFamily="var(--font-display)" fontStyle="italic" fontSize="16" fill="var(--shield)">S</text>
 
@@ -429,10 +434,12 @@ function Message({ m, animKey }: { m: Msg; animKey: number }) {
 
 // ── Main page ─────────────────────────────────────────────────────
 const HISTORY = [
-  ["Conservative $10k plan", "Atlas", "now", true],
-  ["Tokenize Manhattan deed", "Nexus + Shield", "2h", false],
-  ["MI4 yield drift alert", "Yield", "yest", false],
-  ["Portfolio rebalance Q2", "Atlas", "3d", false],
+  ["Conservative $10k plan", "Atlas",          "now",  true],
+  ["Tokenize Manhattan deed","Nexus + Shield",  "2h",   false],
+  ["MI4 yield drift alert",  "Yield",           "yest", false],
+  ["Portfolio rebalance Q2", "Atlas",           "3d",   false],
+  ["fBTC vault deposit",     "Jarvis",          "5d",   false],
+  ["Stress test 2025-Q4",    "Shield",          "6d",   false],
 ] as const;
 
 const SUGGESTIONS = [
@@ -442,81 +449,14 @@ const SUGGESTIONS = [
   "Explain CVaR",
 ];
 
-type VoiceState = "idle" | "listening" | "speaking";
-const VOICE_COLOR: Record<VoiceState, string> = {
-  idle: "var(--fg-3)", listening: "var(--accent)", speaking: "var(--yield)",
-};
-
 export default function ChatPage() {
   const [visibleCount, setVisibleCount] = useState(0);
   const [animKey, setAnimKey]           = useState(0);
   const [extraMessages, setExtraMessages] = useState<Msg[]>([]);
   const [input, setInput]   = useState("");
   const [thinking, setThinking] = useState(false);
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
-  const scrollRef   = useRef<HTMLDivElement>(null);
-  const recRef      = useRef<any>(null);
-  const synthRef    = useRef<SpeechSynthesis | null>(null);
-  const voicesRef   = useRef<SpeechSynthesisVoice[]>([]);
-  const pendingRef  = useRef("");   // holds transcript across closure boundary
-  const sendRef     = useRef<(t: string) => void>(() => {});
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    synthRef.current = window.speechSynthesis;
-    const load = () => { voicesRef.current = synthRef.current?.getVoices() ?? []; };
-    load();
-    synthRef.current?.addEventListener("voiceschanged", load);
-    return () => synthRef.current?.removeEventListener("voiceschanged", load);
-  }, []);
-
-  const speakReply = (text: string) => {
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    const pick = voicesRef.current.find(v =>
-      v.name.includes("Daniel") || v.name.includes("Google UK English Male") ||
-      v.name.includes("Alex") || (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
-    );
-    if (pick) utt.voice = pick;
-    utt.rate = 0.88; utt.pitch = 0.78;
-    utt.onstart = () => setVoiceState("speaking");
-    utt.onend   = () => setVoiceState("idle");
-    synthRef.current.speak(utt);
-  };
-
-  const toggleVoice = () => {
-    // If already listening — stop
-    if (voiceState === "listening") { recRef.current?.stop(); return; }
-    if (typeof window === "undefined") return;
-    synthRef.current?.cancel();
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert("Voice requires Chrome or Edge."); return; }
-    const rec = new SR();
-    recRef.current = rec;
-    pendingRef.current = "";
-    rec.continuous = false; rec.interimResults = true; rec.lang = "en-US";
-    rec.onstart  = () => setVoiceState("listening");
-    rec.onresult = (e: any) => {
-      const t = Array.from(e.results).map((r: any) => r[0].transcript).join("");
-      pendingRef.current = t;
-      setInput(t);
-    };
-    rec.onend = () => {
-      setVoiceState("idle");
-      const heard = pendingRef.current.trim();
-      pendingRef.current = "";
-      if (heard) {
-        setInput("");
-        sendRef.current(heard);   // use ref — always latest send()
-      }
-    };
-    rec.onerror = (e: any) => {
-      setVoiceState("idle");
-      if (e.error === "not-allowed") alert("Microphone permission denied. Click the 🔒 in the address bar to allow.");
-    };
-    rec.start();
-  };
+  const [showJarvis, setShowJarvis] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
 
@@ -539,149 +479,207 @@ export default function ChatPage() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, thinking]);
 
-  const send = async (text?: string) => {
+  const send = useCallback(async (text?: string) => {
     const q = (text ?? input).trim();
     if (!q || thinking) return;
-    sendRef.current = send;   // keep ref fresh
     const userMessage: Msg = { role:"user", kind:"text", body:q };
     const nextMessages = [...messages, userMessage];
     setInput("");
     setExtraMessages(m => [...m, userMessage]);
     setThinking(true);
-
     try {
       const chatMessages = nextMessages
         .filter((m): m is Msg & { body: string } => m.kind === "text" && typeof m.body === "string")
-        .map(m => ({
-          role: m.role === "user" ? "user" : "assistant",
-          body: m.body,
-        }));
+        .map(m => ({ role: m.role === "user" ? "user" : "assistant", body: m.body }));
       const data = await agentApi<AgentChatResponse>("/chat", {
         method: "POST",
         body: JSON.stringify({ agent_id:"atlas", messages: chatMessages }),
       });
       const reply = data.reply ?? "Atlas unavailable.";
       setExtraMessages(m => [...m, { role:"atlas", kind:"text", body: reply }]);
-      if (voiceState !== "idle" || pendingRef.current !== undefined) speakReply(reply);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Atlas backend unavailable.";
-      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:`Production backend error: ${message}` }]);
+      const msg = error instanceof Error ? error.message : "Atlas backend unavailable.";
+      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:`Error: ${msg}` }]);
     } finally {
       setThinking(false);
     }
-  };
+  }, [input, thinking, messages]);
 
   return (
-    <div style={{ height:"calc(100vh - 76px)", display:"grid", gridTemplateColumns:"260px 1fr 300px", position:"relative", overflow:"hidden", minHeight:0 }}>
+    <div style={{ height:"calc(100vh - 76px)", display:"grid", gridTemplateRows:"1fr auto", position:"relative", overflow:"hidden", minHeight:0 }}>
       {/* particle mesh background */}
       <div style={{ position:"absolute", inset:0, pointerEvents:"none", opacity:0.28, zIndex:0 }}>
         <MeshBackground />
       </div>
 
-      {/* ── LEFT sidebar — history ── */}
-      <aside style={{ borderRight:"1px solid var(--line)", display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden", zIndex:1 }}>
-        <div style={{ padding:"14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div>
-            <div style={{ fontSize:13, fontWeight:500, color:"var(--fg-0)" }}>Chat History</div>
-            <div className="mono-sm" style={{ color:"var(--fg-3)", marginTop:2 }}>your conversations with agents</div>
+      {/* ── 3-column main area ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"260px 1fr 300px", minHeight:0, overflow:"hidden" }}>
+
+        {/* ── LEFT sidebar ── */}
+        <aside style={{ borderRight:"1px solid var(--line)", display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden", zIndex:1 }}>
+          {/* CHAT / SYSTEM tabs */}
+          <div style={{ display:"flex", borderBottom:"1px solid var(--line)", flexShrink:0 }}>
+            {["CHAT","SYSTEM"].map(tab => (
+              <button key={tab} style={{
+                flex:1, padding:"10px 0", background:"transparent", border:"none",
+                borderBottom: tab === "CHAT" ? "2px solid var(--accent)" : "2px solid transparent",
+                color: tab === "CHAT" ? "var(--accent)" : "var(--fg-3)",
+                fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.1em",
+                cursor:"pointer",
+              }}>{tab}</button>
+            ))}
           </div>
-          <button className="btn btn-sm">+ New</button>
-        </div>
-        <div style={{ flex:1, overflow:"auto" }}>
-          {HISTORY.map(([t, who, when, active], i) => (
-            <div key={i} style={{ padding:"12px 14px", borderBottom:"1px solid var(--line)", borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent", background: active ? "var(--bg-2)" : "transparent", cursor:"pointer" }}>
-              <div style={{ fontSize:13, fontWeight:500, color:"var(--fg-0)", marginBottom:4 }}>{t}</div>
-              <div style={{ display:"flex", justifyContent:"space-between" }}>
-                <span className="mono-sm">{who}</span>
-                <span className="mono-sm">{when}</span>
+          <div style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+            <div className="mono-sm" style={{ color:"var(--fg-3)" }}>YOUR CONVERSATIONS WITH AGENTS</div>
+            <button className="btn btn-sm">+ NEW</button>
+          </div>
+          <div style={{ flex:1, overflow:"auto" }}>
+            {HISTORY.map(([t, who, when, active], i) => (
+              <div key={i} style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent", background: active ? "var(--bg-2)" : "transparent", cursor:"pointer" }}>
+                <div style={{ fontSize:12, fontWeight:500, color:"var(--fg-0)", marginBottom:3 }}>{t}</div>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  <span className="mono-sm" style={{ color: active ? "var(--accent)" : "var(--fg-3)", textTransform:"uppercase" }}>{who}</span>
+                  <span className="mono-sm">{when}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding:14, borderTop:"1px solid var(--line)", flexShrink:0 }}>
+            <div className="mono-sm" style={{ marginBottom:8 }}>CONNECTED AGENTS</div>
+            <div style={{ display:"flex", gap:6 }}>
+              {(["atlas","nexus","shield","yield"] as const).map(id => (
+                <AgentMonogram key={id} agent={id} active />
+              ))}
+              {/* JARVIS monogram */}
+              <div style={{ width:28, height:28, borderRadius:2, border:"1px solid rgba(168,85,247,0.5)", background:"rgba(168,85,247,0.08)", display:"grid", placeItems:"center", fontFamily:"var(--font-display)", fontStyle:"italic", fontSize:14, color:"#a855f7" }}>J</div>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── CENTER — messages ── */}
+        <main style={{ display:"flex", flexDirection:"column", minWidth:0, minHeight:0, overflow:"hidden", zIndex:1 }}>
+          <div style={{ padding:"14px 24px", borderBottom:"1px solid var(--line)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <AgentMonogram agent="atlas" size="lg" active />
+              <div>
+                <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>Conservative $10k plan</div>
+                <div className="mono-sm">JARVIS · VIA ATLAS · ORCHESTRATING YIELD, SHIELD, NEXUS</div>
               </div>
             </div>
-          ))}
-        </div>
-        <div style={{ padding:14, borderTop:"1px solid var(--line)" }}>
-          <div className="mono-sm" style={{ marginBottom:8 }}>Connected agents</div>
-          <div style={{ display:"flex", gap:8 }}>
-            {(["nexus","shield","yield","atlas"] as const).map(id => (
-              <AgentMonogram key={id} agent={id} active />
-            ))}
-          </div>
-        </div>
-      </aside>
-
-      {/* ── CENTER — messages ── */}
-      <main style={{ display:"flex", flexDirection:"column", minWidth:0, minHeight:0, overflow:"hidden", zIndex:1 }}>
-        <div style={{ padding:"14px 24px", borderBottom:"1px solid var(--line)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <AgentMonogram agent="atlas" size="lg" active />
-            <div>
-              <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>Conservative $10k plan</div>
-              <div className="mono-sm">Atlas · orchestrating Yield, Shield, Nexus</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <span className="tag tag-accent">● LIVE</span>
+              <button className="btn btn-sm" onClick={replay}>↻ REPLAY</button>
             </div>
           </div>
-          <div style={{ display:"flex", gap:8 }}>
-            <span className="tag tag-accent">● Live</span>
-            <button className="btn btn-sm" onClick={replay}>↻ Replay</button>
-          </div>
-        </div>
 
-        <div ref={scrollRef} style={{ flex:1, overflow:"auto", padding:"20px 24px", display:"flex", flexDirection:"column", gap:16 }}>
-          {messages.map((m, i) => <Message key={`${animKey}-${i}`} m={m} animKey={animKey} />)}
-          {thinking && <ThinkingDots agent="atlas" />}
-        </div>
-
-        <div style={{ padding:"14px 24px", borderTop:"1px solid var(--line)" }}>
-          <div style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
-            {SUGGESTIONS.map(s => (
-              <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
-            ))}
+          <div ref={scrollRef} style={{ flex:1, overflow:"auto", padding:"20px 24px", display:"flex", flexDirection:"column", gap:16 }}>
+            {messages.map((m, i) => <Message key={`${animKey}-${i}`} m={m} animKey={animKey} />)}
+            {thinking && <ThinkingDots agent="atlas" />}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:8, alignItems:"center", background:"var(--bg-2)", border:"1px solid var(--line-strong)", borderRadius:2, padding:"4px 4px 4px 14px" }}>
-            <input
-              style={{ background:"transparent", border:0, outline:"none", color:"var(--fg-0)", fontFamily:"var(--font-sans)", fontSize:13, padding:"10px 0", width:"100%" }}
-              placeholder={voiceState === "listening" ? "Listening…" : "Ask Atlas to plan, delegate, or execute…"}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-            />
-            {/* Mic toggle button */}
+
+          <div style={{ padding:"10px 24px", borderTop:"1px solid var(--line)" }}>
+            <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+              {SUGGESTIONS.map(s => (
+                <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
+              ))}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"auto 1fr auto", gap:0, alignItems:"stretch", border:"1px solid var(--line-strong)", background:"var(--bg-2)" }}>
+              <button
+                onClick={() => setShowJarvis(v => !v)}
+                disabled={thinking}
+                title={showJarvis ? "Switch to Orchestration" : "Open JARVIS voice panel"}
+                style={{
+                  width:40, background:"transparent", border:"none",
+                  borderRight:"1px solid var(--line-strong)",
+                  color: showJarvis ? "var(--accent)" : "rgba(168,85,247,0.7)",
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                  boxShadow: showJarvis ? "inset 0 0 12px rgba(0,229,160,0.1)" : "none",
+                  transition:"all 0.2s",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={showJarvis ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3"/>
+                  <path d="M5 10a7 7 0 0 0 14 0"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                  <line x1="8"  y1="22" x2="16" y2="22"/>
+                </svg>
+              </button>
+              <input
+                style={{ background:"transparent", border:0, outline:"none", color:"var(--fg-0)", fontFamily:"var(--font-sans)", fontSize:13, padding:"10px 14px", width:"100%" }}
+                placeholder="Ask JARVIS — Atlas will execute…"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && send()}
+              />
+              <button className="btn btn-primary btn-sm" onClick={() => send()} style={{ borderRadius:0, padding:"0 18px", letterSpacing:"0.05em" }}>SEND ↗</button>
+            </div>
+          </div>
+        </main>
+
+        {/* ── RIGHT — orchestration / JARVIS panel ── */}
+        <div style={{ zIndex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
+          {/* Tab strip */}
+          <div style={{ display:"flex", borderBottom:"1px solid var(--line)", flexShrink:0, alignItems:"stretch" }}>
             <button
-              className="btn btn-sm"
-              onClick={toggleVoice}
-              disabled={thinking || voiceState === "speaking"}
-              title={voiceState === "listening" ? "Stop listening" : "Click to speak"}
+              onClick={() => setShowJarvis(false)}
               style={{
-                color: voiceState === "listening" ? "var(--accent)" : "var(--fg-2)",
-                borderColor: voiceState === "listening" ? "var(--accent)" : "var(--line)",
-                padding:"0 12px",
-                boxShadow: voiceState === "listening" ? "0 0 14px var(--accent)" : "none",
-                background: voiceState === "listening" ? "rgba(0,212,255,0.08)" : "transparent",
-                transition:"all 0.2s",
-                position:"relative",
+                flex:1, padding:"10px 0", background:"transparent", border:"none",
+                borderBottom: !showJarvis ? "2px solid var(--accent)" : "2px solid transparent",
+                color: !showJarvis ? "var(--accent)" : "var(--fg-3)",
+                fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.1em",
+                cursor:"pointer", transition:"all 0.2s",
+              }}
+            >ORCHESTRATION</button>
+            <button
+              onClick={() => setShowJarvis(true)}
+              style={{
+                flex:1, padding:"10px 0", background:"transparent", border:"none",
+                borderBottom: showJarvis ? "2px solid #00d4ff" : "2px solid transparent",
+                color: showJarvis ? "#00d4ff" : "var(--fg-3)",
+                fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.1em",
+                cursor:"pointer", transition:"all 0.2s",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:5,
               }}
             >
-              {voiceState === "listening" && (
-                <span style={{
-                  position:"absolute", inset:-3, borderRadius:4,
-                  border:"1px solid var(--accent)", opacity:0.5,
-                  animation:"voiceOrbPulse 0.8s ease-in-out infinite",
-                  pointerEvents:"none",
-                }}/>
-              )}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={voiceState === "listening" ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <rect x="9" y="2" width="6" height="11" rx="3"/>
-                <path d="M5 10a7 7 0 0 0 14 0"/>
-                <line x1="12" y1="19" x2="12" y2="22"/>
-                <line x1="8"  y1="22" x2="16" y2="22"/>
-              </svg>
+              <span style={{ width:5, height:5, borderRadius:"50%", background:"#00d4ff", display:"inline-block", opacity: showJarvis ? 1 : 0, transition:"opacity 0.2s", boxShadow: showJarvis ? "0 0 6px #00d4ff" : "none" }}/>
+              JARVIS
+              {showJarvis && <span style={{ fontSize:7, color:"#00e5a0", marginLeft:2 }}>● STANDBY</span>}
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => send()}>Send ↵</button>
+          </div>
+          {/* Panel content */}
+          <div key={showJarvis ? "jarvis" : "orch"} style={{ flex:1, minHeight:0, overflow:"hidden" }}>
+            {showJarvis ? (
+              <JarvisPanel
+                onMessage={(role, text) => {
+                  setExtraMessages(m => [...m, {
+                    role: role === "user" ? "user" : "atlas",
+                    kind: "text" as const,
+                    body: text,
+                  }]);
+                }}
+              />
+            ) : (
+              <OrchestrationPanel visibleCount={visibleCount} animKey={animKey} />
+            )}
           </div>
         </div>
-      </main>
+      </div>
 
-      {/* ── RIGHT — orchestration panel ── */}
-      <div style={{ zIndex:1 }}>
-        <OrchestrationPanel visibleCount={visibleCount} animKey={animKey} />
+      {/* ── BOTTOM stats strip ── */}
+      <div style={{ zIndex:1, borderTop:"1px solid var(--line)", display:"grid", gridTemplateColumns:"repeat(6,1fr)", background:"var(--bg-1)" }}>
+        {[
+          { label:"PRIMARY OBJECTIVES · MISSION STATUS", val:"",        accent:false },
+          { label:"PORTFOLIO VALUE",    val:"$10,000",   accent:false },
+          { label:"YIELD-WEIGHTED APY", val:"4.88%",     accent:true  },
+          { label:"AGENTS ONLINE",      val:"4 / 4",     accent:false },
+          { label:"IN PROGRESS",        val:"52",        accent:false },
+          { label:"OBJECTIVE STATUS",   val:"ENGAGED",   accent:true  },
+        ].map((s, i) => (
+          <div key={i} style={{ padding:"8px 14px", borderRight: i < 5 ? "1px solid var(--line)" : "none" }}>
+            <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:2 }}>{s.label}</div>
+            {s.val && <div style={{ fontFamily:"var(--font-mono)", fontSize:13, fontWeight:500, color: s.accent ? "var(--accent)" : "var(--fg-0)" }}>{s.val}</div>}
+          </div>
+        ))}
       </div>
     </div>
   );
