@@ -492,8 +492,17 @@ export default function ChatPage() {
   const [showJarvis, setShowJarvis] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { connected: wsConnected, heartbeat } = useAgentSocket();
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
   const messages = activeSession
@@ -597,11 +606,24 @@ export default function ChatPage() {
         <MeshBackground />
       </div>
 
+      {/* ── mobile sidebar overlay backdrop ── */}
+      {isMobile && showSidebar && (
+        <div onClick={() => setShowSidebar(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:40 }} />
+      )}
+
       {/* ── 3-column main area ── */}
-      <div style={{ display:"grid", gridTemplateColumns:"260px 1fr 300px", minHeight:0, overflow:"hidden" }}>
+      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr 300px", minHeight:0, overflow:"hidden" }}>
 
         {/* ── LEFT sidebar ── */}
-        <aside style={{ borderRight:"1px solid var(--line)", display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden", zIndex:1 }}>
+        <aside style={{
+          borderRight:"1px solid var(--line)", display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden", zIndex: isMobile ? 50 : 1,
+          ...(isMobile ? {
+            position:"fixed", top:0, left:0, bottom:0, width:280,
+            background:"var(--bg-0)",
+            transform: showSidebar ? "translateX(0)" : "translateX(-100%)",
+            transition:"transform 0.25s ease",
+          } : {}),
+        }}>
           {/* CHAT / SYSTEM tabs */}
           <div style={{ display:"flex", borderBottom:"1px solid var(--line)", flexShrink:0 }}>
             {["CHAT","SYSTEM"].map(tab => (
@@ -613,6 +635,9 @@ export default function ChatPage() {
                 cursor:"pointer",
               }}>{tab}</button>
             ))}
+            {isMobile && (
+              <button onClick={() => setShowSidebar(false)} style={{ padding:"10px 14px", background:"transparent", border:"none", color:"var(--fg-3)", cursor:"pointer", fontSize:16 }}>✕</button>
+            )}
           </div>
           <div style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
             <div className="mono-sm" style={{ color:"var(--fg-3)" }}>YOUR CONVERSATIONS WITH AGENTS</div>
@@ -653,8 +678,11 @@ export default function ChatPage() {
 
         {/* ── CENTER — messages ── */}
         <main style={{ display:"flex", flexDirection:"column", minWidth:0, minHeight:0, overflow:"hidden", zIndex:1 }}>
-          <div style={{ padding:"14px 24px", borderBottom:"1px solid var(--line)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ padding: isMobile ? "10px 14px" : "14px 24px", borderBottom:"1px solid var(--line)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 12 }}>
+              {isMobile && (
+                <button onClick={() => setShowSidebar(true)} style={{ background:"transparent", border:"1px solid var(--line)", color:"var(--fg-1)", cursor:"pointer", padding:"5px 8px", fontFamily:"var(--font-mono)", fontSize:12 }}>☰</button>
+              )}
               <AgentMonogram agent="atlas" size="lg" active />
               <div>
                 <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>
@@ -678,7 +706,7 @@ export default function ChatPage() {
             {thinking && <ThinkingDots agent="atlas" />}
           </div>
 
-          <div style={{ padding:"10px 24px", borderTop:"1px solid var(--line)" }}>
+          <div style={{ padding: isMobile ? "8px 12px" : "10px 24px", borderTop:"1px solid var(--line)" }}>
             <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
               {SUGGESTIONS.map(s => (
                 <button key={s} className="btn btn-sm" onClick={() => send(s)}>{s}</button>
@@ -718,7 +746,7 @@ export default function ChatPage() {
         </main>
 
         {/* ── RIGHT — orchestration / JARVIS panel ── */}
-        <div style={{ zIndex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
+        <div style={{ zIndex:1, display: isMobile ? "none" : "flex", flexDirection:"column", minHeight:0 }}>
           {/* Tab strip */}
           <div style={{ display:"flex", borderBottom:"1px solid var(--line)", flexShrink:0, alignItems:"stretch" }}>
             <button
@@ -767,21 +795,27 @@ export default function ChatPage() {
       </div>
 
       {/* ── BOTTOM stats strip ── */}
-      <div style={{ zIndex:1, borderTop:"1px solid var(--line)", display:"grid", gridTemplateColumns:"repeat(6,1fr)", background:"var(--bg-1)" }}>
-        {[
-          { label:"MISSION STATUS", val: wsConnected ? "● WSS LIVE" : "○ CONNECTING", accent: wsConnected },
-          { label:"PORTFOLIO VALUE",    val:"$10,000",   accent:false },
-          { label:"YIELD-WEIGHTED APY", val:"4.88%",     accent:true  },
-          { label:"AGENTS ONLINE",      val: heartbeat ? `${Object.values(heartbeat.agents).filter(a => a.online).length} / 4` : "4 / 4", accent:false },
-          { label:"MANTLE BLOCK",       val: heartbeat?.block ? heartbeat.block.toLocaleString() : "—", accent:false },
-          { label:"OBJECTIVE STATUS",   val:"ENGAGED",   accent:true  },
-        ].map((s, i) => (
-          <div key={i} style={{ padding:"8px 14px", borderRight: i < 5 ? "1px solid var(--line)" : "none" }}>
-            <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:2 }}>{s.label}</div>
-            {s.val && <div style={{ fontFamily:"var(--font-mono)", fontSize:13, fontWeight:500, color: s.accent ? "var(--accent)" : "var(--fg-0)" }}>{s.val}</div>}
+      {(() => {
+        const stats = [
+          { label:"WSS",          val: wsConnected ? "● LIVE" : "○ …", accent: wsConnected },
+          { label:"BLOCK",        val: heartbeat?.block ? heartbeat.block.toLocaleString() : "—", accent:false },
+          { label:"APY",          val:"4.88%",     accent:true  },
+          { label:"AGENTS",       val: heartbeat ? `${Object.values(heartbeat.agents).filter(a => a.online).length}/4` : "4/4", accent:false },
+          { label:"GAS",          val:"~$0.001",   accent:false },
+          { label:"STATUS",       val:"ENGAGED",   accent:true  },
+        ];
+        const visible = isMobile ? stats.slice(0, 3) : stats;
+        return (
+          <div style={{ zIndex:1, borderTop:"1px solid var(--line)", display:"grid", gridTemplateColumns:`repeat(${visible.length},1fr)`, background:"var(--bg-1)" }}>
+            {visible.map((s, i) => (
+              <div key={i} style={{ padding: isMobile ? "6px 10px" : "8px 14px", borderRight: i < visible.length - 1 ? "1px solid var(--line)" : "none" }}>
+                <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:2, fontSize: isMobile ? 9 : undefined }}>{s.label}</div>
+                {s.val && <div style={{ fontFamily:"var(--font-mono)", fontSize: isMobile ? 11 : 13, fontWeight:500, color: s.accent ? "var(--accent)" : "var(--fg-0)" }}>{s.val}</div>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </div>
   );
 }
