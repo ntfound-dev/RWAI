@@ -432,15 +432,48 @@ function Message({ m, animKey }: { m: Msg; animKey: number }) {
   return null;
 }
 
+// ── Session persistence ───────────────────────────────────────────
+interface ChatSession {
+  id: string;
+  title: string;
+  agents: string[];
+  messages: Msg[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+const SESSIONS_KEY = "rwai_chat_sessions";
+const MAX_SESSIONS = 20;
+const KNOWN_AGENTS = new Set(["atlas", "nexus", "shield", "yield"]);
+
+function loadSessions(): ChatSession[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    return raw ? (JSON.parse(raw) as ChatSession[]) : [];
+  } catch { return []; }
+}
+
+function saveSessions(sessions: ChatSession[]): void {
+  try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, MAX_SESSIONS))); }
+  catch { /* storage quota */ }
+}
+
+function relTime(ts: number): string {
+  const d = Date.now() - ts;
+  if (d < 60_000) return "now";
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}m`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h`;
+  return `${Math.floor(d / 86_400_000)}d`;
+}
+
+function agentLabels(msgs: Msg[]): string[] {
+  const seen = new Set<string>();
+  for (const m of msgs) if (KNOWN_AGENTS.has(m.role)) seen.add(m.role.toUpperCase());
+  return Array.from(seen);
+}
+
 // ── Main page ─────────────────────────────────────────────────────
-const HISTORY = [
-  ["Conservative $10k plan", "Atlas",          "now",  true],
-  ["Tokenize Manhattan deed","Nexus + Shield",  "2h",   false],
-  ["MI4 yield drift alert",  "Yield",           "yest", false],
-  ["Portfolio rebalance Q2", "Atlas",           "3d",   false],
-  ["fBTC vault deposit",     "Jarvis",          "5d",   false],
-  ["Stress test 2025-Q4",    "Shield",          "6d",   false],
-] as const;
 
 const SUGGESTIONS = [
   "Show alternative allocations",
@@ -456,9 +489,19 @@ export default function ChatPage() {
   const [input, setInput]   = useState("");
   const [thinking, setThinking] = useState(false);
   const [showJarvis, setShowJarvis] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const messages = [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
+  const activeSession = sessions.find(s => s.id === activeId) ?? null;
+  const messages = activeSession
+    ? activeSession.messages
+    : [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
+
+  useEffect(() => {
+    const stored = loadSessions();
+    if (stored.length > 0) setSessions(stored);
+  }, []);
 
   const replay = () => {
     setExtraMessages([]);
@@ -479,31 +522,71 @@ export default function ChatPage() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, thinking]);
 
+  const newConversation = useCallback(() => {
+    const id = `sess_${Date.now()}`;
+    const sess: ChatSession = { id, title: "New conversation", agents: [], messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    setSessions(prev => { const u = [sess, ...prev]; saveSessions(u); return u; });
+    setActiveId(id);
+  }, []);
+
   const send = useCallback(async (text?: string) => {
     const q = (text ?? input).trim();
     if (!q || thinking) return;
-    const userMessage: Msg = { role:"user", kind:"text", body:q };
-    const nextMessages = [...messages, userMessage];
+
+    const sessId = activeId ?? `sess_${Date.now()}`;
+    const baseMessages: Msg[] = sessions.find(s => s.id === sessId)?.messages ?? [];
+    const userMsg: Msg = { role: "user", kind: "text", body: q };
+    const allMsgs = [...baseMessages, userMsg];
+
     setInput("");
-    setExtraMessages(m => [...m, userMessage]);
     setThinking(true);
+
+    setSessions(prev => {
+      const exists = prev.find(s => s.id === sessId);
+      const updated: ChatSession[] = exists
+        ? prev.map(s => s.id !== sessId ? s : {
+            ...s, messages: allMsgs, updatedAt: Date.now(),
+            title: s.messages.length === 0 ? (q.length > 40 ? q.slice(0, 37) + "…" : q) : s.title,
+          })
+        : [{ id: sessId, title: q.length > 40 ? q.slice(0, 37) + "…" : q, agents: [], messages: allMsgs, createdAt: Date.now(), updatedAt: Date.now() }, ...prev];
+      saveSessions(updated);
+      return updated;
+    });
+    if (!activeId) setActiveId(sessId);
+
     try {
-      const chatMessages = nextMessages
+      const chatMessages = allMsgs
         .filter((m): m is Msg & { body: string } => m.kind === "text" && typeof m.body === "string")
         .map(m => ({ role: m.role === "user" ? "user" : "assistant", body: m.body }));
       const data = await agentApi<AgentChatResponse>("/chat", {
         method: "POST",
-        body: JSON.stringify({ agent_id:"atlas", messages: chatMessages }),
+        body: JSON.stringify({ agent_id: "atlas", messages: chatMessages }),
       });
       const reply = data.reply ?? "Atlas unavailable.";
-      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body: reply }]);
+      const atlasMsg: Msg = { role: "atlas", kind: "text", body: reply };
+      setSessions(prev => {
+        const updated = prev.map(s => {
+          if (s.id !== sessId) return s;
+          const newMsgs = [...s.messages, atlasMsg];
+          return { ...s, messages: newMsgs, updatedAt: Date.now(), agents: agentLabels(newMsgs) };
+        });
+        saveSessions(updated);
+        return updated;
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Atlas backend unavailable.";
-      setExtraMessages(m => [...m, { role:"atlas", kind:"text", body:`Error: ${msg}` }]);
+      setSessions(prev => {
+        const updated = prev.map(s => {
+          if (s.id !== sessId) return s;
+          return { ...s, messages: [...s.messages, { role: "atlas", kind: "text" as MsgKind, body: `Error: ${msg}` }], updatedAt: Date.now() };
+        });
+        saveSessions(updated);
+        return updated;
+      });
     } finally {
       setThinking(false);
     }
-  }, [input, thinking, messages]);
+  }, [input, thinking, activeId, sessions]);
 
   return (
     <div style={{ height:"calc(100vh - 76px)", display:"grid", gridTemplateRows:"1fr auto", position:"relative", overflow:"hidden", minHeight:0 }}>
@@ -531,18 +614,28 @@ export default function ChatPage() {
           </div>
           <div style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
             <div className="mono-sm" style={{ color:"var(--fg-3)" }}>YOUR CONVERSATIONS WITH AGENTS</div>
-            <button className="btn btn-sm">+ NEW</button>
+            <button className="btn btn-sm" onClick={newConversation}>+ NEW</button>
           </div>
           <div style={{ flex:1, overflow:"auto" }}>
-            {HISTORY.map(([t, who, when, active], i) => (
-              <div key={i} style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent", background: active ? "var(--bg-2)" : "transparent", cursor:"pointer" }}>
-                <div style={{ fontSize:12, fontWeight:500, color:"var(--fg-0)", marginBottom:3 }}>{t}</div>
-                <div style={{ display:"flex", justifyContent:"space-between" }}>
-                  <span className="mono-sm" style={{ color: active ? "var(--accent)" : "var(--fg-3)", textTransform:"uppercase" }}>{who}</span>
-                  <span className="mono-sm">{when}</span>
-                </div>
+            {sessions.length === 0 ? (
+              <div style={{ padding:"20px 14px", textAlign:"center" }}>
+                <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:4 }}>No conversations yet</div>
+                <div style={{ fontSize:11, color:"var(--fg-3)" }}>Click + NEW or send a message to start</div>
               </div>
-            ))}
+            ) : (
+              sessions.map(s => (
+                <div key={s.id} onClick={() => setActiveId(s.id)}
+                  style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", borderLeft: s.id === activeId ? "2px solid var(--accent)" : "2px solid transparent", background: s.id === activeId ? "var(--bg-2)" : "transparent", cursor:"pointer" }}>
+                  <div style={{ fontSize:12, fontWeight:500, color:"var(--fg-0)", marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.title}</div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span className="mono-sm" style={{ color: s.id === activeId ? "var(--accent)" : "var(--fg-3)", textTransform:"uppercase" }}>
+                      {s.agents.length > 0 ? s.agents.join(" + ") : "ATLAS"}
+                    </span>
+                    <span className="mono-sm">{relTime(s.updatedAt)}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
           <div style={{ padding:14, borderTop:"1px solid var(--line)", flexShrink:0 }}>
             <div className="mono-sm" style={{ marginBottom:8 }}>CONNECTED AGENTS</div>
@@ -562,13 +655,19 @@ export default function ChatPage() {
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <AgentMonogram agent="atlas" size="lg" active />
               <div>
-                <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>Conservative $10k plan</div>
-                <div className="mono-sm">JARVIS · VIA ATLAS · ORCHESTRATING YIELD, SHIELD, NEXUS</div>
+                <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>
+                  {activeSession ? activeSession.title : "Conservative $10k plan"}
+                </div>
+                <div className="mono-sm">
+                  {activeSession
+                    ? (activeSession.agents.length > 0 ? activeSession.agents.join(" · ") + " · ACTIVE" : "ATLAS · READY")
+                    : "JARVIS · VIA ATLAS · ORCHESTRATING YIELD, SHIELD, NEXUS"}
+                </div>
               </div>
             </div>
             <div style={{ display:"flex", gap:8 }}>
-              <span className="tag tag-accent">● LIVE</span>
-              <button className="btn btn-sm" onClick={replay}>↻ REPLAY</button>
+              <span className="tag tag-accent">● {activeSession ? "ACTIVE" : "LIVE"}</span>
+              {!activeSession && <button className="btn btn-sm" onClick={replay}>↻ REPLAY</button>}
             </div>
           </div>
 

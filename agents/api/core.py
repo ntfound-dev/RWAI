@@ -34,6 +34,8 @@ class ChatMessage(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     reply: str
     model_used: str
     fallback: bool = False
