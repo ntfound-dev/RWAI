@@ -1,21 +1,49 @@
-MIT License
+MIT License with Attribution Requirement
 
-Copyright (c) 2026 RWAi Contributors
+Copyright (c) 2026 ntfound-dev (https://github.com/ntfound-dev)
+All original work by ntfound-dev. All rights reserved on original authorship.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+of this software and associated documentation files (the "Software"), to use,
+copy, and distribute the Software, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. ATTRIBUTION REQUIRED
+   The above copyright notice, this permission notice, and the original author
+   credit ("ntfound-dev — https://github.com/ntfound-dev") must be included in:
+   - All copies or substantial portions of the Software
+   - All modified versions of the Software
+   - Any derivative works, forks, or redistributions based on this Software
+   - Any product, service, or publication that uses this Software
+
+2. MODIFIED FILES MUST BE MARKED
+   If you modify any file from this Software, you must add a prominent notice
+   in the modified file stating:
+   - That the file has been modified
+   - The date of modification
+   - That the original work is by ntfound-dev (https://github.com/ntfound-dev)
+
+   Example notice to add at the top of modified files:
+   // Modified from original work by ntfound-dev (https://github.com/ntfound-dev)
+   // Original: https://github.com/ntfound-dev/RWAI
+   // Modified: [DATE] by [YOUR NAME]
+
+3. NO MISREPRESENTATION
+   You may not claim this Software as your own original work. You may not
+   remove or alter any copyright, trademark, or attribution notices.
+
+4. COMMERCIAL USE
+   Commercial use is permitted provided that the attribution requirements
+   above are fully satisfied.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+Original Author : ntfound-dev
+Repository      : https://github.com/ntfound-dev/RWAI
+Project         : RWAi — Sovereign AI Agents for Real World Assets on Mantle

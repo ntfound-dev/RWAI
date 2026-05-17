@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 ntfound-dev (https://github.com/ntfound-dev)
+// Modified versions must retain this notice. See LICENSE in root.
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
