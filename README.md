@@ -62,6 +62,99 @@ The three defining criteria of this hackathon — built into RWAi's core:
 
 ---
 
+## System Architecture
+
+```mermaid
+graph TB
+    subgraph FE["🌐 Frontend · Next.js 14 · Vercel"]
+        UI["Tokenize · Market · Portfolio · Hub · Chat"]
+    end
+
+    subgraph BE["⚡ FastAPI Backend · Railway · Python 3.11"]
+        direction TB
+        AT["Atlas #44 · Orchestrator"]
+        NX["Nexus #41 · Tokenization"]
+        SH["Shield #42 · Compliance"]
+        YL["Yield #43 · Market Monitor"]
+        LLM["LLM Chain: OpenClaw → Groq → Claude"]
+        AT -->|delegates| NX
+        AT -->|delegates| SH
+        AT -->|delegates| YL
+        YL -.->|drift signal| AT
+        NX -.->|new asset| YL
+        NX & SH & YL & AT --> LLM
+    end
+
+    subgraph CH["🔗 Mantle Sepolia · chainId 5003"]
+        AE["AgentExecutor.sol · immutable AI log"]
+        YO["YieldOracle.sol · APY snapshots"]
+        CL["ComplianceLog.sol · KYC records"]
+        RR["RWAiRegistry.sol · asset registry"]
+        HV["HybridVault.sol · EIP-712 consent"]
+        AR["AgentReputationManager + ERC-8004"]
+    end
+
+    FE -->|HTTPS REST + WebSocket| BE
+    NX -->|logTokenization| AE
+    NX -->|registerAsset| RR
+    SH -->|logComplianceReview| AE & CL
+    YL -->|updateYields| YO
+    YL -->|recordYieldSnapshot| AE
+    AT -->|executeAllocation| AE
+    AT -->|agentExecute| HV
+    AE --> AR
+```
+
+---
+
+## Per-Agent Architecture
+
+### Nexus #41 — Tokenization
+```
+User uploads PDF/DOCX
+  → Nexus: extract value · supply · APY · symbol · concerns
+  → Shield: auto-delegated compliance review (4-category score)
+  → AgentExecutor.logTokenization() + RWAiRegistry.registerAsset()
+  → [background] Yield notified: new asset enters monitoring immediately
+  → Token live in Market
+```
+
+### Shield #42 — Compliance
+```
+Asset document + jurisdiction + owner wallet
+  → 4-category scoring:
+      Document completeness  (30%) — all required docs present?
+      Ownership clarity      (25%) — clean title, no encumbrances?
+      Jurisdictional risk    (25%) — Reg D / MiFID II / MAS / FCA?
+      Sanctions screening    (20%) — wallet vs OFAC / EU sanctions lists
+  → Score ≥ 70 → CLEARED  → ComplianceLog.sol + AgentExecutor
+  → Score < 70 → BLOCKED  → deployment prevented (score defaults to 0 on failure)
+```
+
+### Yield #43 — Market Monitor
+```
+[30s after startup] then [every 6 hours] + [on every new tokenization]
+  → LLM: fetch USDY · mETH · MI4 · fBTC · mUSD yields
+  → Compare vs previous snapshot — drift > 100bps triggers DRIFT ALERT
+  → YieldOracle.updateYields() + AgentExecutor.recordYieldSnapshot()
+  → DRIFT ALERT written on-chain as separate action → Atlas receives signal
+```
+
+### Atlas #44 — Orchestration
+```
+User message (text or voice)
+  → Intent detection:
+      yield / apy / market   → delegate to Yield (live APY data)
+      compliance / kyc       → delegate to Shield (review context)
+      tokenize / asset       → delegate to Nexus (tokenization brief)
+  → Sub-agent result injected into Atlas context
+  → Read live APY from YieldOracle.getLatestYield() on-chain
+  → Strategy → AgentExecutor.executeAllocation()
+  → HybridVault EIP-712 consent → autonomous rebalance within user's cap
+```
+
+---
+
 ## The 4 ERC-8004 Agents
 
 | Agent | ERC-8004 ID | Role | Primary On-Chain Action |

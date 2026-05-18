@@ -266,6 +266,203 @@ make dev
   );
 }
 
+function ArchDiagram() {
+  const L = { nexus:"#ff8c00", shield:"#ef4444", yield:"#00e5a0", atlas:"#00d4ff", chain:"#818cf8" };
+  return (
+    <svg viewBox="0 0 700 480" style={{ width:"100%", maxWidth:700, height:"auto", display:"block", margin:"24px auto" }} aria-label="RWAi system architecture">
+      <defs>
+        <marker id="ah"  markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill={L.yield}/></marker>
+        <marker id="ahd" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill={L.atlas} opacity="0.6"/></marker>
+        <marker id="ahn" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill={L.nexus} opacity="0.5"/></marker>
+      </defs>
+
+      {/* ── Layer 1: Frontend ── */}
+      <rect x="10" y="8" width="680" height="82" rx="4" fill="rgba(0,229,160,0.04)" stroke="rgba(0,229,160,0.25)" strokeWidth="1"/>
+      <text x="22" y="26" fontFamily="monospace" fontSize="9" fill={L.yield} opacity="0.8">LAYER 1 · FRONTEND · Next.js 14 · Vercel</text>
+      <text x="22" y="48" fontFamily="monospace" fontSize="12" fill="#ddd">Tokenize · Market · Portfolio · Hub · Docs · Chat</text>
+      <text x="22" y="66" fontFamily="monospace" fontSize="9" fill="#555">wagmi v2 · viem · RainbowKit · WalletConnect · Mantle Sepolia</text>
+      <text x="22" y="80" fontFamily="monospace" fontSize="9" fill="#444">WebSocket /ws — live agent heartbeat every 5 s</text>
+
+      {/* ── Connector 1→2 ── */}
+      <line x1="350" y1="90" x2="350" y2="118" stroke={L.yield} strokeWidth="1" markerEnd="url(#ah)"/>
+      <text x="358" y="108" fontFamily="monospace" fontSize="8" fill="#555">HTTPS · REST + WS</text>
+
+      {/* ── Layer 2: Backend ── */}
+      <rect x="10" y="118" width="680" height="185" rx="4" fill="rgba(0,0,0,0.15)" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+      <text x="22" y="136" fontFamily="monospace" fontSize="9" fill="#888">LAYER 2 · FASTAPI BACKEND · Railway · Python 3.11</text>
+
+      {/* Agent boxes */}
+      {/* Nexus */}
+      <rect x="22" y="144" width="148" height="68" rx="3" fill="rgba(255,140,0,0.07)" stroke={L.nexus} strokeWidth="1"/>
+      <text x="96" y="162" fontFamily="monospace" fontSize="11" fill={L.nexus} textAnchor="middle" fontWeight="bold">Nexus</text>
+      <text x="96" y="177" fontFamily="monospace" fontSize="8" fill="#888" textAnchor="middle">ERC-8004 #41</text>
+      <text x="96" y="190" fontFamily="monospace" fontSize="8" fill="#666" textAnchor="middle">Tokenization</text>
+      <text x="96" y="202" fontFamily="monospace" fontSize="7" fill="#555" textAnchor="middle">logTokenization()</text>
+
+      {/* Shield */}
+      <rect x="182" y="144" width="148" height="68" rx="3" fill="rgba(239,68,68,0.07)" stroke={L.shield} strokeWidth="1"/>
+      <text x="256" y="162" fontFamily="monospace" fontSize="11" fill={L.shield} textAnchor="middle" fontWeight="bold">Shield</text>
+      <text x="256" y="177" fontFamily="monospace" fontSize="8" fill="#888" textAnchor="middle">ERC-8004 #42</text>
+      <text x="256" y="190" fontFamily="monospace" fontSize="8" fill="#666" textAnchor="middle">Compliance</text>
+      <text x="256" y="202" fontFamily="monospace" fontSize="7" fill="#555" textAnchor="middle">logComplianceReview()</text>
+
+      {/* Yield */}
+      <rect x="342" y="144" width="148" height="68" rx="3" fill="rgba(0,229,160,0.07)" stroke={L.yield} strokeWidth="1"/>
+      <text x="416" y="162" fontFamily="monospace" fontSize="11" fill={L.yield} textAnchor="middle" fontWeight="bold">Yield</text>
+      <text x="416" y="177" fontFamily="monospace" fontSize="8" fill="#888" textAnchor="middle">ERC-8004 #43</text>
+      <text x="416" y="190" fontFamily="monospace" fontSize="8" fill="#666" textAnchor="middle">Market Monitor · 6h cron</text>
+      <text x="416" y="202" fontFamily="monospace" fontSize="7" fill="#555" textAnchor="middle">updateYields() · drift detect</text>
+
+      {/* Atlas */}
+      <rect x="502" y="144" width="178" height="68" rx="3" fill="rgba(0,212,255,0.07)" stroke={L.atlas} strokeWidth="2"/>
+      <text x="591" y="162" fontFamily="monospace" fontSize="11" fill={L.atlas} textAnchor="middle" fontWeight="bold">Atlas</text>
+      <text x="591" y="177" fontFamily="monospace" fontSize="8" fill="#888" textAnchor="middle">ERC-8004 #44 · Orchestrator</text>
+      <text x="591" y="190" fontFamily="monospace" fontSize="8" fill="#666" textAnchor="middle">Portfolio strategy · Voice</text>
+      <text x="591" y="202" fontFamily="monospace" fontSize="7" fill="#555" textAnchor="middle">executeAllocation() · HybridVault</text>
+
+      {/* Atlas → Nexus delegation arc */}
+      <path d="M 502 162 C 420 130 220 130 170 158" fill="none" stroke={L.atlas} strokeWidth="0.8" strokeDasharray="4 3" opacity="0.55" markerEnd="url(#ahd)"/>
+      {/* Atlas → Shield delegation arc */}
+      <path d="M 502 172 C 430 148 330 148 330 172" fill="none" stroke={L.atlas} strokeWidth="0.8" strokeDasharray="4 3" opacity="0.55" markerEnd="url(#ahd)"/>
+      {/* Atlas → Yield delegation arc */}
+      <path d="M 502 180 L 490 180" fill="none" stroke={L.atlas} strokeWidth="0.8" strokeDasharray="4 3" opacity="0.55" markerEnd="url(#ahd)"/>
+
+      {/* Nexus → Yield notification (new asset) */}
+      <path d="M 170 178 L 342 178" fill="none" stroke={L.nexus} strokeWidth="0.7" strokeDasharray="3 3" opacity="0.4" markerEnd="url(#ahn)"/>
+      <text x="240" y="174" fontFamily="monospace" fontSize="7" fill="#444" textAnchor="middle">new asset notify</text>
+
+      {/* Yield → Atlas drift signal */}
+      <path d="M 490 158 L 502 158" fill="none" stroke={L.yield} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.5" markerEnd="url(#ah)"/>
+      <text x="496" y="152" fontFamily="monospace" fontSize="6" fill="#555" textAnchor="middle">drift</text>
+
+      {/* LLM bar */}
+      <rect x="22" y="224" width="658" height="68" rx="3" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+      <text x="351" y="244" fontFamily="monospace" fontSize="9" fill="#555" textAnchor="middle">LLM RUNTIME  (model-agnostic · 4-level fallback chain)</text>
+      <text x="351" y="262" fontFamily="monospace" fontSize="10" fill="#777" textAnchor="middle">OpenClaw / CMDOP  →  Groq llama-3.3-70b  →  Claude Sonnet  →  Ollama (local)</text>
+      <text x="351" y="280" fontFamily="monospace" fontSize="8" fill="#444" textAnchor="middle">decision logged on-chain BEFORE response returned to frontend</text>
+
+      {/* Agents → LLM lines */}
+      <line x1="96"  y1="212" x2="96"  y2="224" stroke="#333" strokeWidth="0.8"/>
+      <line x1="256" y1="212" x2="256" y2="224" stroke="#333" strokeWidth="0.8"/>
+      <line x1="416" y1="212" x2="416" y2="224" stroke="#333" strokeWidth="0.8"/>
+      <line x1="591" y1="212" x2="591" y2="224" stroke="#333" strokeWidth="0.8"/>
+
+      {/* ── Connector 2→3 ── */}
+      <line x1="350" y1="292" x2="350" y2="320" stroke={L.chain} strokeWidth="1" markerEnd="url(#ah)"/>
+      <text x="358" y="310" fontFamily="monospace" fontSize="8" fill="#555">web3.py · RPC</text>
+
+      {/* ── Layer 3: Mantle ── */}
+      <rect x="10" y="320" width="680" height="152" rx="4" fill="rgba(99,102,241,0.05)" stroke="rgba(99,102,241,0.25)" strokeWidth="1"/>
+      <text x="22" y="338" fontFamily="monospace" fontSize="9" fill={L.chain} opacity="0.8">LAYER 3 · MANTLE SEPOLIA · chainId 5003 · ~$0.001 gas · ERC-8004 native</text>
+
+      {/* Contract boxes row 1 */}
+      {([
+        [22,  "AgentExecutor",          "immutable AI log",    L.chain],
+        [162, "YieldOracle",            "APY snapshots",       L.yield],
+        [302, "ComplianceLog",          "Shield reviews",      L.shield],
+        [442, "AgentReputation",        "score gating",        L.chain],
+        [562, "ERC-8004 Registry",      "identity NFTs",       L.atlas],
+      ] as [number,string,string,string][]).map(([x, label, sub, col]) => (
+        <g key={label}>
+          <rect x={x} y="346" width="128" height="40" rx="2" fill="rgba(99,102,241,0.06)" stroke={col} strokeWidth="0.8" opacity="0.7"/>
+          <text x={x+64} y="363" fontFamily="monospace" fontSize="8.5" fill={col} textAnchor="middle">{label}</text>
+          <text x={x+64} y="378" fontFamily="monospace" fontSize="7.5" fill="#555" textAnchor="middle">{sub}</text>
+        </g>
+      ))}
+
+      {/* Contract boxes row 2 */}
+      {([
+        [22,  "HybridVault",    "EIP-712 consent",  L.atlas],
+        [162, "PortfolioVault", "strategy + exec",  L.chain],
+        [302, "RWAiRegistry",   "asset registry",   L.nexus],
+        [442, "AssetToken",     "ERC-20 RWA",       L.nexus],
+      ] as [number,string,string,string][]).map(([x, label, sub, col]) => (
+        <g key={label}>
+          <rect x={x} y="396" width="128" height="38" rx="2" fill="rgba(99,102,241,0.04)" stroke={col} strokeWidth="0.7" opacity="0.6"/>
+          <text x={x+64} y="412" fontFamily="monospace" fontSize="8.5" fill={col} textAnchor="middle">{label}</text>
+          <text x={x+64} y="426" fontFamily="monospace" fontSize="7.5" fill="#555" textAnchor="middle">{sub}</text>
+        </g>
+      ))}
+
+      {/* Agent write-to-chain annotations */}
+      <text x="22"  y="445" fontFamily="monospace" fontSize="7" fill="#444">Nexus → AgentExecutor + RWAiRegistry</text>
+      <text x="22"  y="456" fontFamily="monospace" fontSize="7" fill="#444">Shield → AgentExecutor + ComplianceLog</text>
+      <text x="320" y="445" fontFamily="monospace" fontSize="7" fill="#444">Yield → YieldOracle + AgentExecutor</text>
+      <text x="320" y="456" fontFamily="monospace" fontSize="7" fill="#444">Atlas → AgentExecutor + HybridVault + PortfolioVault</text>
+    </svg>
+  );
+}
+
+function AgentFlowDiagram({ agent }: { agent: "nexus"|"shield"|"yield"|"atlas" }) {
+  const flows: Record<string, { steps: string[]; colors: string[]; note: string }> = {
+    nexus: {
+      steps: ["User uploads PDF/DOCX", "Nexus extracts metadata\n(value · supply · APY · symbol)", "Shield compliance\nreview (auto-delegated)", "AgentExecutor.logTokenization()\nRWAiRegistry.registerAsset()", "Yield notified\n(new asset monitoring)", "Token live in Market"],
+      colors: ["#555","#ff8c00","#ef4444","#818cf8","#00e5a0","#00e5a0"],
+      note: "Nexus→Yield notification runs in background — user sees token live in seconds",
+    },
+    shield: {
+      steps: ["Asset document received\n(from Nexus or direct call)", "4-category scoring:\ndoc · ownership · jurisdiction · sanctions", "Owner wallet screened\nvs OFAC / EU sanctions list", "ComplianceLog.sol record\n+ AgentExecutor.logComplianceReview()", "Score ≥ 70 → CLEARED\nScore < 70 → BLOCKED"],
+      colors: ["#555","#ef4444","#ef4444","#818cf8","#00e5a0"],
+      note: "Score defaults to 0 on parse failure — never silently passes a blocked asset",
+    },
+    yield: {
+      steps: ["6h cron scheduler\n(+ immediate on new token)", "Yield LLM fetches\nUSYD · mETH · MI4 · fBTC · mUSD", "Compare vs previous\nsnapshot (drift > 100bps?)", "YieldOracle.updateYields()\nAgentExecutor.recordYieldSnapshot()", "Drift → DRIFT ALERT\n→ on-chain + Atlas notified"],
+      colors: ["#555","#00e5a0","#00e5a0","#818cf8","#ef4444"],
+      note: "First snapshot fires 30s after backend startup, then every 6 hours autonomously",
+    },
+    atlas: {
+      steps: ["User message (text/voice)\nor portfolio plan request", "Intent detection:\nyield? → Yield\ncompliance? → Shield\ntoken? → Nexus", "Sub-agent called\nresult injected into context", "Atlas reads live APY\nfrom YieldOracle on-chain", "Strategy built +\nAgentExecutor.executeAllocation()", "HybridVault consent\n→ autonomous rebalance"],
+      colors: ["#555","#00d4ff","#00d4ff","#00e5a0","#818cf8","#00d4ff"],
+      note: "Atlas is the only agent that delegates — it always orchestrates, never acts alone",
+    },
+  };
+  const f = flows[agent];
+  const W = 680, cx = W / 2;
+  const boxW = 160, boxH = 52, gap = 14;
+  const cols = agent === "atlas" ? 3 : (f.steps.length <= 5 ? f.steps.length : 3);
+  const rows = Math.ceil(f.steps.length / cols);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${rows * (boxH + gap) + 50}`} style={{ width:"100%", maxWidth:W, height:"auto", display:"block", margin:"16px auto" }} aria-label={`${agent} agent flow`}>
+      {f.steps.map((step, i) => {
+        const col = i % cols, row = Math.floor(i / cols);
+        const totalInRow = i < f.steps.length - (f.steps.length % cols || cols) ? cols : (f.steps.length % cols || cols);
+        const rowOffset = (W - totalInRow * boxW - (totalInRow - 1) * gap) / 2;
+        const x = rowOffset + col * (boxW + gap);
+        const y = 10 + row * (boxH + gap);
+        const lines = step.split("\n");
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={boxW} height={boxH} rx="3"
+              fill={`${f.colors[i]}10`} stroke={f.colors[i]} strokeWidth="1" opacity="0.9"/>
+            {lines.map((ln, li) => (
+              <text key={li} x={x + boxW/2} y={y + 18 + li * 14}
+                fontFamily="monospace" fontSize="8.5" fill={li === 0 ? f.colors[i] : "#888"} textAnchor="middle">{ln}</text>
+            ))}
+            {/* Arrow right within row */}
+            {col < (totalInRow - 1) && (
+              <line x1={x + boxW + 1} y1={y + boxH/2} x2={x + boxW + gap - 1} y2={y + boxH/2}
+                stroke={f.colors[i]} strokeWidth="1" markerEnd={`url(#ah-${agent})`}/>
+            )}
+            {/* Arrow down to next row */}
+            {col === totalInRow - 1 && row < rows - 1 && (
+              <line x1={x + boxW/2} y1={y + boxH + 1} x2={x + boxW/2} y2={y + boxH + gap - 1}
+                stroke={f.colors[i]} strokeWidth="1" markerEnd={`url(#ah-${agent})`}/>
+            )}
+          </g>
+        );
+      })}
+      <defs>
+        <marker id={`ah-${agent}`} markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+          <polygon points="0 0,7 2.5,0 5" fill="#888"/>
+        </marker>
+      </defs>
+      <text x={cx} y={rows * (boxH + gap) + 38}
+        fontFamily="monospace" fontSize="8" fill="#444" textAnchor="middle">{f.note}</text>
+    </svg>
+  );
+}
+
 function Architecture() {
   return (
     <>
@@ -276,22 +473,19 @@ function Architecture() {
         { label:"AUDIT TRAIL",         value:"Permanent on-chain" },
       ]} />
       <P>RWAi is a three-layer system: a Next.js frontend, a FastAPI AI backend, and 8 Solidity contracts on Mantle Sepolia. Every AI decision is logged on-chain before the response is returned to the user.</P>
-      <Code title="system diagram" lang="text" body={`Browser (Next.js 14)
-  wagmi v2 + viem · RainbowKit · Mantle Sepolia · WalletConnect
-  ↓
-FastAPI Backend  (agents/)
-  OpenClaw/CMDOP → Groq llama-3.3-70b → Claude (4-level fallback)
-  Every decision logged on-chain BEFORE response returned
-  ↓
-Mantle Sepolia (chainId 5003)
-  ├── AgentExecutor.sol          — immutable AI action log
-  ├── AgentReputationManager.sol — ERC-8004 reputation scores
-  ├── YieldOracle.sol            — Pyth price feeds + APY snapshots
-  ├── ComplianceLog.sol          — Shield KYC/AML decisions
-  ├── RWAiRegistry.sol           — tokenized asset registry
-  ├── AssetToken.sol             — ERC-20 fractional RWA token
-  ├── PortfolioVault.sol         — allocation strategy + execution
-  └── HybridVault.sol            — user deposits + EIP-712 consent`} />
+      <ArchDiagram />
+      <H2>Agent Interconnections</H2>
+      <P>The four agents are not independent — they form a live delegation graph. Atlas orchestrates; the others execute and signal back.</P>
+      <Code title="delegation protocol" lang="text" body={`Atlas detects intent → calls sub-agent → injects result → responds
+  "what's mETH yield?"     → Yield snapshot  → Atlas answers with real APY
+  "is this asset compliant?"→ Shield review  → Atlas explains findings
+  "tell me about tokenizing"→ Nexus brief    → Atlas guides user
+
+Nexus tokenizes → notifies Yield (background task, non-blocking)
+  new BALI500 token deployed → Yield immediately adds to monitoring
+
+Yield 6h scheduler → detects drift → writes DRIFT ALERT on-chain
+  USDY +120bps drift detected → logged as separate AgentExecutor action`} />
       <H2>AI Runtime Chain</H2>
       <Table
         headers={["Priority", "Provider", "Model", "Condition"]}
@@ -448,6 +642,7 @@ function AgentDoc({ id }: { id: string }) {
             { label:"REVENUE STREAM",  value:"AUM 0.3% / market 0.15%" },
           ]} />
           <P>Atlas is the primary AI you chat with — by text or voice. It knows your portfolio, understands your goals, and coordinates Nexus, Shield, and Yield to execute your strategy.</P>
+          <AgentFlowDiagram agent="atlas" />
           <Callout type="tip">Most AI portfolio tools stop at recommendations. Atlas executes — it submits on-chain transactions autonomously within your EIP-712 consent cap. Every action is signed by Atlas's ERC-8004 identity (#44) and stored permanently on Mantle.</Callout>
           <Divider label="TECHNICAL REFERENCE" />
           <H3>On-chain actions</H3>
@@ -483,6 +678,7 @@ Atlas : "Here's my recommended allocation:
             { label:"REVENUE STREAM", value:"Tokenization 0.5% fee" },
           ]} />
           <P>Nexus reads PDF and DOCX documents — deeds, appraisals, certificates — and extracts the metadata needed to deploy an ERC-20 token on Mantle. It works in seconds versus the months traditional tokenization takes.</P>
+          <AgentFlowDiagram agent="nexus" />
           <Callout type="tip">A $500k real estate tokenization traditionally costs $100k+ in legal and dev fees. Through Nexus: gas (~$0.01 on Mantle) + 0.5% protocol fee ($2,500). The asset owner retains 99.5% of value from day one — and can accept fractional buyers globally.</Callout>
           <Divider label="TECHNICAL REFERENCE" />
           <H3>On-chain actions</H3>
@@ -513,6 +709,7 @@ Atlas : "Here's my recommended allocation:
             { label:"STORED ON-CHAIN",value:"ComplianceLog.sol" },
           ]} />
           <P>Shield reviews every asset before it can go live. It checks document completeness, jurisdictional legal risks, and wallet sanctions status. Every review is stored permanently in <IC>ComplianceLog.sol</IC>.</P>
+          <AgentFlowDiagram agent="shield" />
           <Callout type="tip">Traditional compliance consultants charge $5,000–$20,000 per asset review and take weeks. Shield delivers an AI compliance score in seconds — stored on-chain so investors can verify it themselves without trusting a third party.</Callout>
           <Divider label="TECHNICAL REFERENCE" />
           <H3>Scoring</H3>
@@ -539,10 +736,11 @@ Atlas : "Here's my recommended allocation:
           <BizStrip items={[
             { label:"WHO BENEFITS",   value:"All investors" },
             { label:"DATA SOURCE",    value:"Pyth (tamper-proof)" },
-            { label:"UPDATE FREQ",   value:"Every few hours" },
+            { label:"UPDATE FREQ",   value:"Every 6 hours + on-demand" },
             { label:"STORED ON-CHAIN",value:"YieldOracle.sol" },
           ]} />
-          <P>Yield monitors interest rates across all Mantle RWA assets every few hours. It writes live prices and APY snapshots to <IC>YieldOracle.sol</IC> — publicly verifiable, not a number that can be manually changed.</P>
+          <P>Yield monitors interest rates across all Mantle RWA assets every 6 hours. It writes APY snapshots to <IC>YieldOracle.sol</IC>, detects drift vs the previous snapshot, and signals Atlas when rebalancing is warranted.</P>
+          <AgentFlowDiagram agent="yield" />
           <Callout type="tip">Traditional yield data is provided by platforms who could manipulate it. Yield writes APY snapshots directly to <IC>YieldOracle.sol</IC> via Pyth — a decentralized price oracle. Any investor can query the contract themselves and verify the rates are real.</Callout>
           <Divider label="TECHNICAL REFERENCE" />
           <H3>Supported price feeds (Pyth)</H3>
