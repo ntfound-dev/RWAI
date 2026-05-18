@@ -202,9 +202,9 @@ rwai/
 
 | Resource | Link |
 |----------|------|
-| Frontend | *(Vercel URL — add after deploy)* |
-| Backend API | *(Railway URL — add after deploy)* |
-| Swagger UI | `{backend-url}/docs` |
+| Frontend | https://rwai-theta.vercel.app |
+| Backend API | https://rwai-production.up.railway.app |
+| Swagger UI | https://rwai-production.up.railway.app/docs |
 | Mantle Explorer | https://sepolia.mantlescan.xyz |
 | Agent Wallet | [0x834De...Ac7](https://sepolia.mantlescan.xyz/address/0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7) |
 | AgentExecutor | [0x9a822B...501](https://sepolia.mantlescan.xyz/address/0x9a822B9A50D090CfcCa1e6474efCd653112d8501) |
@@ -388,8 +388,8 @@ Swagger UI: http://localhost:8001/docs
 - [x] Portfolio management with Atlas
 - [x] Atlas voice interface (Jarvis-style) — speak to your AI agent
 - [x] 46 contract tests passing
-- [ ] Live frontend on Vercel
-- [ ] Agent backend deployed (Railway / Render)
+- [x] Live frontend on Vercel — https://rwai-theta.vercel.app
+- [x] Agent backend deployed on Railway — https://rwai-production.up.railway.app
 - [ ] Demo video (3–4 min) — voice command → Atlas executes → on-chain proof shown
 
 ---
