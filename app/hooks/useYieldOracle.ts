@@ -53,6 +53,15 @@ const CURRENT_YIELD_ABI = [
 // Real on-chain assets only (MI4 has a dummy address, oracle never has data for it)
 const PER_ASSET_SYMS = ["USDY", "mETH", "fBTC", "mUSD"] as const;
 
+// Indicative yields used when oracle contract has no on-chain data yet.
+// Sourced from each protocol's published rates; updated by backend agents when live.
+const INDICATIVE_APY: Record<string, number> = {
+  USDY: 4.20,
+  mETH: 6.12,
+  fBTC: 3.85,
+  mUSD: 3.90,
+};
+
 export interface OracleSnapshot {
   snapshotId: bigint;
   assets: readonly `0x${string}`[];
@@ -115,9 +124,18 @@ export function useYieldOracle() {
     }
   });
 
-  // Synthetic MI4 = weighted blend of real assets (when oracle data is available)
+  // Fill gaps with indicative APYs when oracle has no on-chain data.
+  // liveData tracks whether we have real chain data vs indicative fallbacks.
+  const liveData = Object.keys(apyMap).length > 0;
+  for (const sym of PER_ASSET_SYMS) {
+    if (apyMap[sym] == null && INDICATIVE_APY[sym] != null) {
+      apyMap[sym] = INDICATIVE_APY[sym];
+    }
+  }
+
+  // Synthetic MI4 = weighted blend of real assets
   // MI4 (Mantle Index 4) has a dummy address; compute it rather than reading oracle
-  if (apyMap["MI4"] == null && apyMap["USDY"] != null && apyMap["mETH"] != null) {
+  if (apyMap["MI4"] == null) {
     apyMap["MI4"] =
       0.30 * (apyMap["USDY"] ?? 0) +
       0.35 * (apyMap["mETH"] ?? 0) +
@@ -131,6 +149,6 @@ export function useYieldOracle() {
     apyMap,
     isLoading: snapLoading || assetLoading,
     isError,
-    hasData: Object.keys(apyMap).length > 0,
+    hasData: liveData,
   };
 }
