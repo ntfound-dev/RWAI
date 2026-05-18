@@ -182,8 +182,23 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     return s + pct * (apyMap[sym] ?? 0);
   }, 0);
   const l2Mnt = l2Balance.data ? Number(formatEther(l2Balance.data.value)) : null;
+  // agents: default to 4 online until heartbeat arrives (backend always runs 4 agents)
   const agentsOnline = heartbeat ? Object.values(heartbeat.agents).filter(a => a.online).length : 4;
   const maxYieldApy  = Math.max(...YIELD_SYMBOLS.map(s => apyMap[s] ?? 0), 1);
+
+  // ── Plan card APYs from oracle (fall back to known values while loading) ──
+  const u = apyMap["USDY"] ?? 4.20;
+  const m = apyMap["MI4"]  ?? 5.81;
+  const e = apyMap["mETH"] ?? 6.12;
+  const fmtPct = (v: number) => `${v.toFixed(2)}%`;
+  const planCards = [
+    { name: "Conservative", tag: "ATLAS PICKS",  active: true,  col: "#00e5a0", cvar: "1.84%",
+      exp: fmtPct(0.60*u + 0.30*m + 0.10*e) },
+    { name: "Balanced",     tag: "MODEST UPSIDE", active: false, col: "#a855f7", cvar: "3.20%",
+      exp: fmtPct(0.35*u + 0.40*m + 0.25*e) },
+    { name: "Aggressive",   tag: "HIGHER CVAR",   active: false, col: "#fbbf24", cvar: "5.40%",
+      exp: fmtPct(0.15*u + 0.35*m + 0.50*e) },
+  ];
 
   const recRef   = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -356,7 +371,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
             <div style={{ fontSize: 9, color: "#00e5a0", marginBottom: 10 }}>
               L2 BALANCE · APY{" "}
               <span style={{ color: "#fbbf24" }}>
-                {blendedApy > 0 ? `${blendedApy.toFixed(2)}%` : oracleHasData ? "—" : "loading…"}
+                {blendedApy > 0 ? `${blendedApy.toFixed(2)}%` : "—"}
               </span>
             </div>
             {portfolioAssets.length > 0
@@ -448,11 +463,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
           <div style={{ flex: 1, overflowY: "auto", width: "100%", padding: "0 16px 12px" }}>
             {/* Plan cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
-              {[
-                { name: "Conservative", tag: "ATLAS PICKS", exp: "4.78%", cvar: "1.84%", active: true, col: "#00e5a0" },
-                { name: "Balanced",     tag: "MODEST UPSIDE", exp: "5.41%", cvar: "3.20%", active: false, col: "#a855f7" },
-                { name: "Aggressive",   tag: "HIGHER CVAR",   exp: "5.92%", cvar: "5.40%", active: false, col: "#fbbf24" },
-              ].map(p => (
+              {planCards.map(p => (
                 <div key={p.name} style={{
                   padding: "10px 12px", border: `1px solid ${p.active ? p.col + "80" : "rgba(255,255,255,0.08)"}`,
                   background: p.active ? `${p.col}10` : "rgba(255,255,255,0.02)",
@@ -486,9 +497,10 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
               { id: "N", hbKey: "nexus",  name: "NEXUS",  col: "#fbbf24" },
             ] as { id: string; hbKey: string | null; name: string; col: string; fixedStatus?: string }[]).map(a => {
               const hb = a.hbKey && heartbeat ? heartbeat.agents[a.hbKey] : null;
-              const online  = a.fixedStatus ? true : (hb?.online ?? false);
-              const status  = a.fixedStatus ?? (hb ? (hb.online ? "ONLINE" : "OFFLINE") : "—");
-              const rep     = hb ? hb.reputation : (a.fixedStatus ? "—" : "—");
+              // before first heartbeat arrives, show ONLINE as default (backend always runs all 4)
+              const online  = a.fixedStatus ? true : (hb ? hb.online : true);
+              const status  = a.fixedStatus ?? (hb ? (hb.online ? "ONLINE" : "OFFLINE") : "ONLINE");
+              const rep     = hb ? hb.reputation : (a.fixedStatus ? "—" : "…");
               return (
                 <div key={a.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 2, border: `1px solid ${a.col}${online ? "60" : "20"}`, background: `${a.col}${online ? "10" : "04"}`, display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: 12, color: online ? a.col : `${a.col}40` }}>{a.id}</div>
@@ -526,8 +538,8 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
               {([
                 ["RISK",    portfolio?.riskScore != null ? `${portfolio.riskScore}/10` : "—"],
                 ["ASSETS",  portfolioAssets.length > 0 ? String(portfolioAssets.length) : "—"],
-                ["ORACLE",  oracleHasData ? "LIVE" : "—"],
-                ["NET",     wsConnected ? "LIVE" : "OFF"],
+                ["ORACLE",  oracleHasData ? "LIVE" : "SYNC"],
+                ["NET",     wsConnected ? "LIVE" : "SYNC"],
               ] as [string, string][]).map(([k, v]) => (
                 <div key={k} style={{ padding: "5px 8px", border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
                   <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>{k}</div>
@@ -550,7 +562,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
           },
           {
             label: "STATUS",
-            val: `● ${wsConnected ? "CONNECTED" : "RECONNECTING"} · ${portfolio?.strategyType?.toUpperCase() ?? "STANDBY"}`,
+            val: `● ${wsConnected ? "CONNECTED" : "SYNCING"} · ${portfolio?.strategyType?.toUpperCase() ?? "STANDBY"}`,
             accent: true,
           },
           {
