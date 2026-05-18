@@ -36,13 +36,45 @@ from .routes.market        import router as market_router
 from ..mantle.client       import get_addresses, is_connected, get_block_number, get_agent_ids, _load_deployments
 from ..mantle.reputation   import get_agent_reputation_scores
 from ..mantle              import indexer
+from ..mantle.executor     import publish_yield_snapshot, record_yield_on_executor
+
+_yield_log = logging.getLogger("rwai.yield_scheduler")
+
+async def _yield_scheduler():
+    """Auto-publish yield snapshot every 6 hours so Yield always has on-chain actions."""
+    # Wait for startup to settle, then run immediately, then every 6h
+    await asyncio.sleep(30)
+    while True:
+        try:
+            from .core import agent_complete, ChatMessage
+            prompt = (
+                "Fetch current yield data for: USDY, mETH, fBTC, mUSD. "
+                "Respond ONLY with the JSON format defined in your skill."
+            )
+            reply, model, _ = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
+            import json as _json
+            start = reply.find("{"); end = reply.rfind("}") + 1
+            result = _json.loads(reply[start:end]) if start >= 0 and end > start else {}
+            yields_bps = {a["symbol"]: a["apyBps"] for a in result.get("assets", []) if "symbol" in a and "apyBps" in a}
+            note = result.get("agentNote", "Scheduled yield snapshot by RWAi Yield agent")
+            if yields_bps:
+                tx1 = publish_yield_snapshot(yields_bps, note)
+                tx2 = record_yield_on_executor(yields_bps, note)
+                _yield_log.info("Yield snapshot published — oracle=%s executor=%s", tx1, tx2)
+            else:
+                _yield_log.warning("Yield scheduler: no bps data extracted from agent reply")
+        except Exception as exc:
+            _yield_log.error("Yield scheduler error: %s", exc)
+        await asyncio.sleep(6 * 3600)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     deployments = _load_deployments()
     if deployments.get("contracts"):
         indexer.start(deployments)
+    task = asyncio.create_task(_yield_scheduler())
     yield
+    task.cancel()
     indexer.stop()
 
 app = FastAPI(title="RWAi Agent API", version="1.0.0", lifespan=lifespan)

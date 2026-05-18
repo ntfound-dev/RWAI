@@ -1,10 +1,10 @@
 "use client";
 
 export const AGENTS = {
-  nexus: { id: "nexus",  name: "Nexus",  role: "Tokenization",   glyph: "N", color: "var(--nexus)",  rep: 4.92, runs: 1247, blurb: "Parses asset documents, valuates, and proposes token structure.", tools: ["parse_pdf", "valuate_asset", "draft_erc20", "register_rwa"] },
-  shield:{ id: "shield", name: "Shield", role: "Compliance",     glyph: "S", color: "var(--shield)", rep: 4.97, runs: 1189, blurb: "Reviews KYC, ownership, and jurisdictional risk before deploy.",  tools: ["kyc_check", "ownership_verify", "jurisdiction_scan", "risk_score"] },
-  yield: { id: "yield",  name: "Yield",  role: "Market Monitor", glyph: "Y", color: "var(--yield)",  rep: 4.85, runs: 3402, blurb: "Watches yields across mETH, USDY, MI4 and surfaces drift.",     tools: ["yield_feed", "price_oracle", "rebalance_signal", "apy_diff"] },
-  atlas: { id: "atlas",  name: "Atlas",  role: "Portfolio",      glyph: "A", color: "var(--atlas)",  rep: 4.94, runs: 2156, blurb: "Talks with users to set strategy and orchestrates the others.",  tools: ["plan_strategy", "delegate", "rebalance", "explain"] },
+  nexus: { id: "nexus",  name: "Nexus",  role: "Tokenization",   glyph: "N", color: "var(--nexus)",  rep: 5.00, runs: 0, blurb: "Parses asset documents, valuates, and proposes token structure.", tools: ["parse_pdf", "valuate_asset", "draft_erc20", "register_rwa"] },
+  shield:{ id: "shield", name: "Shield", role: "Compliance",     glyph: "S", color: "var(--shield)", rep: 5.00, runs: 0, blurb: "Reviews KYC, ownership, and jurisdictional risk before deploy.",  tools: ["kyc_check", "ownership_verify", "jurisdiction_scan", "risk_score"] },
+  yield: { id: "yield",  name: "Yield",  role: "Market Monitor", glyph: "Y", color: "var(--yield)",  rep: 3.75, runs: 0, blurb: "Watches yields across mETH, USDY, MI4 and surfaces drift.",     tools: ["yield_feed", "price_oracle", "rebalance_signal", "apy_diff"] },
+  atlas: { id: "atlas",  name: "Atlas",  role: "Portfolio",      glyph: "A", color: "var(--atlas)",  rep: 4.25, runs: 0, blurb: "Talks with users to set strategy and orchestrates the others.",  tools: ["plan_strategy", "delegate", "rebalance", "explain"] },
 } as const;
 
 export type AgentId = keyof typeof AGENTS;
