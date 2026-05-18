@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { cookieToInitialState } from "wagmi";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
-import { wagmiConfig } from "@/lib/wagmi";
+import { wagmiSSRConfig } from "@/lib/wagmi-ssr";
 
 export const metadata: Metadata = {
   title: "RWAi — AI-Native Real World Assets on Mantle",
@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Parse wagmi cookie on the server so WagmiProvider can rehydrate the connected
   // wallet before first paint — prevents the disconnect flash on refresh.
   const cookieStore = await cookies();
-  const initialState = cookieToInitialState(wagmiConfig, cookieStore.toString());
+  const initialState = cookieToInitialState(wagmiSSRConfig, cookieStore.toString());
 
   return (
     <html lang="en" translate="no">
