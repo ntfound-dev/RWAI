@@ -148,7 +148,7 @@ export default function MarketPage() {
     <div style={{ maxWidth:1480, margin:"0 auto", padding:"32px" }}>
 
       {/* Header */}
-      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:32 }}>
+      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:24 }}>
         <div>
           <div className="mono" style={{ color:"var(--nexus)", marginBottom:8 }}>§ market · nexus listed</div>
           <h1 className="display" style={{ fontSize:64 }}>RWA Market.</h1>
@@ -156,9 +156,17 @@ export default function MarketPage() {
             Buy fractions of tokenized real-world assets. Every trade logged on Mantle by Atlas.
           </p>
         </div>
-        <a href="/tokenize" className="btn btn-primary" style={{ textDecoration:"none" }}>
-          List your asset →
-        </a>
+        <div style={{ display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end" }}>
+          <a href="/tokenize" className="btn btn-primary" style={{ textDecoration:"none" }}>List your asset →</a>
+          <a href="https://faucet.sepolia.mantle.xyz" target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ textDecoration:"none", fontSize:11 }}>⛽ Get testnet MNT ↗</a>
+        </div>
+      </div>
+
+      {/* Gasless banner */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", background:"rgba(0,229,160,0.04)", border:"1px solid rgba(0,229,160,0.2)", borderRadius:2, marginBottom:24 }}>
+        <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--accent)", letterSpacing:"0.08em" }}>⚡ NEAR-ZERO GAS</span>
+        <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>Every trade costs ~$0.001 on Mantle L2 — 1000× cheaper than Ethereum mainnet. Web3 is effectively free here.</span>
+        <a href="https://faucet.sepolia.mantle.xyz" target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", marginLeft:"auto", whiteSpace:"nowrap" }}>Get testnet MNT ↗</a>
       </div>
 
       {/* Stats */}
@@ -401,10 +409,15 @@ export default function MarketPage() {
                         </div>
                       )}
                       {txForThis ? (
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                          <span className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{statusForThis}</span>
-                          <a href={`https://sepolia.mantlescan.xyz/tx/${txForThis}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
-                            ↗ {txForThis.slice(0,8)}…{txForThis.slice(-6)}
+                        <div>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                            <span className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{statusForThis}</span>
+                            <a href={`https://sepolia.mantlescan.xyz/tx/${txForThis}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
+                              ↗ {txForThis.slice(0,8)}…{txForThis.slice(-6)}
+                            </a>
+                          </div>
+                          <a href="/portfolio" style={{ display:"block", textDecoration:"none" }}>
+                            <button className="btn btn-primary" style={{ width:"100%", fontSize:11 }}>View in Portfolio →</button>
                           </a>
                         </div>
                       ) : (

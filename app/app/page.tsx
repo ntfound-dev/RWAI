@@ -109,8 +109,8 @@ export default function LandingPage() {
 
             <div style={{ display:"flex", gap:10, marginBottom:36, flexWrap:"wrap" }}>
               <Link href="/tokenize"><button className="btn btn-primary">Start tokenizing →</button></Link>
-              <Link href="/bridge"><button className="btn">Bridge MNT</button></Link>
               <Link href="/chat"><button className="btn">Talk to Atlas</button></Link>
+              <Link href="/portfolio"><button className="btn">Open portfolio</button></Link>
               <Link href="/hub"><button className="btn btn-ghost">Meet the agents</button></Link>
             </div>
 
@@ -283,9 +283,9 @@ export default function LandingPage() {
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             <Link href="/tokenize"><button className="btn btn-primary" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>Start tokenizing</span><span>→</span></button></Link>
-            <Link href="/bridge"><button className="btn" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>Bridge MNT</span><span>→</span></button></Link>
             <Link href="/chat"><button className="btn" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>Open Atlas chat</span><span>→</span></button></Link>
-            <Link href="/portfolio"><button className="btn btn-ghost" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>View demo portfolio</span><span>→</span></button></Link>
+            <Link href="/portfolio"><button className="btn" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>Open portfolio</span><span>→</span></button></Link>
+            <a href="https://faucet.sepolia.mantle.xyz" target="_blank" rel="noopener noreferrer" style={{ width:"100%" }}><button className="btn btn-ghost" style={{ justifyContent:"space-between", padding:"14px 18px", fontSize:12, width:"100%" }}><span>⛽ Get testnet MNT</span><span>↗</span></button></a>
           </div>
         </section>
 

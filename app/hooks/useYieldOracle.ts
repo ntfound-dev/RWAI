@@ -80,6 +80,6 @@ export function useYieldOracle() {
     apyMap,
     isLoading,
     isError,
-    hasData: snapshotCount != null && snapshotCount > 0n,
+    hasData: snapshotCount != null && snapshotCount > BigInt(0),
   };
 }

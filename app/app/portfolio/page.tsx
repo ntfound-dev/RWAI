@@ -10,6 +10,7 @@ import { MANTLE_ASSETS } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
 import { useYieldOracle } from "@/hooks/useYieldOracle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
+import { useGaslessConsent } from "@/hooks/useGaslessConsent";
 
 const ASSET_META: Record<string, { name: string; color: string; apy: number }> = {
   USDY: { name:"Ondo US Dollar Yield", color:"var(--accent)",  apy:4.20 },
@@ -84,7 +85,8 @@ const GAS_BADGE = (
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
   const { apyMap, hasData, snapshotCount } = useYieldOracle();
-  const wallet = useWalletPortfolio(address);
+  const wallet  = useWalletPortfolio(address);
+  const consent = useGaslessConsent();
   const [showAtlas, setShowAtlas] = useState(false);
   const [atlasInput, setAtlasInput] = useState("");
   const [autonomyAmount, setAutonomyAmount] = useState("100");
@@ -499,31 +501,62 @@ export default function PortfolioPage() {
 
         {/* Step 2: Enable Atlas */}
         <div style={{ padding:"12px 16px" }}>
-          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:8 }}>STEP 2 · Grant Atlas capped allowance</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
-            <label style={{ display:"grid", gap:6 }}>
-              <span className="mono-sm">USDY allowance</span>
-              <input className="input-field" value={autonomyAmount} onChange={e => setAutonomyAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
-            </label>
-            <label style={{ display:"grid", gap:6 }}>
-              <span className="mono-sm">Expiry days</span>
-              <input className="input-field" value={autonomyDays} onChange={e => setAutonomyDays(e.target.value.replace(/[^\d]/g, ""))}/>
-            </label>
-            <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
-              <button className="btn btn-primary" onClick={enableAtlasAutonomy} disabled={!isConnected || autonomyBusy}>
-                {autonomyBusy ? "Signing..." : "Enable Atlas"}
-              </button>
-              {GAS_BADGE}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+            <div className="mono-sm" style={{ color:"var(--fg-3)" }}>STEP 2 · Grant Atlas capped allowance</div>
+            <span style={{ fontFamily:"var(--font-mono)", fontSize:9, padding:"2px 7px", background:"rgba(0,229,160,0.1)", border:"1px solid rgba(0,229,160,0.35)", borderRadius:2, color:"var(--accent)", letterSpacing:"0.08em" }}>⚡ GASLESS</span>
+          </div>
+          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:10, textTransform:"none", letterSpacing:0, fontSize:11 }}>You sign once (EIP-712). RWAi relays the tx on-chain — you pay zero gas for this step.</div>
+          {consent.status === "success" ? (
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <span style={{ fontFamily:"var(--font-mono)", fontSize:12, color:"var(--accent)" }}>✅ Atlas autonomy active — consent relayed gaslessly</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Agent: {consent.agentAddr.slice(0,10)}…{consent.agentAddr.slice(-6)}</span>
+                <a href={`https://sepolia.mantlescan.xyz/tx/${consent.tx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)" }}>
+                  ↗ {consent.tx.slice(0,10)}…{consent.tx.slice(-6)}
+                </a>
+              </div>
+              <button className="btn btn-ghost" style={{ marginTop:8, fontSize:11 }} onClick={consent.reset}>Reset →</button>
             </div>
-          </div>
-          <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center" }}>
-            <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>{autonomyStatus}</span>
-            {autonomyTx && (
-              <a href={`https://sepolia.mantlescan.xyz/tx/${autonomyTx}`} target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", whiteSpace:"nowrap" }}>
-                ↗ {autonomyTx.slice(0, 10)}...{autonomyTx.slice(-6)}
-              </a>
-            )}
-          </div>
+          ) : (
+            <>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
+                <label style={{ display:"grid", gap:6 }}>
+                  <span className="mono-sm">USDY allowance</span>
+                  <input className="input-field" value={autonomyAmount} onChange={e => setAutonomyAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
+                </label>
+                <label style={{ display:"grid", gap:6 }}>
+                  <span className="mono-sm">Expiry days</span>
+                  <input className="input-field" value={autonomyDays} onChange={e => setAutonomyDays(e.target.value.replace(/[^\d]/g, ""))}/>
+                </label>
+                <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => address && consent.grant({ userAddress: address, amountUsdy: autonomyAmount, days: Number(autonomyDays) })}
+                    disabled={!isConnected || consent.status === "preparing" || consent.status === "awaiting_signature" || consent.status === "relaying"}
+                  >
+                    {consent.status === "preparing"        ? "Preparing…"  :
+                     consent.status === "awaiting_signature" ? "Sign wallet…" :
+                     consent.status === "relaying"         ? "Relaying…"   : "Enable Atlas ⚡"}
+                  </button>
+                  <span style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"var(--accent)", letterSpacing:"0.06em" }}>⚡ gasless · backend pays</span>
+                </div>
+              </div>
+              {(consent.error || consent.status !== "idle") && (
+                <div style={{ marginTop:8 }}>
+                  {consent.error
+                    ? <span className="mono-sm" style={{ color:"var(--warn)", textTransform:"none", letterSpacing:0 }}>{consent.error}</span>
+                    : <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>
+                        {consent.status === "preparing"         ? "Fetching EIP-712 typed data from HybridVault…"  :
+                         consent.status === "awaiting_signature" ? "Waiting for wallet signature (no gas required)…" :
+                         consent.status === "relaying"          ? "Backend relaying tx to Mantle — you pay $0 gas…" : ""}
+                      </span>
+                  }
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
