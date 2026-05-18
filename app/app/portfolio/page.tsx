@@ -6,7 +6,7 @@ import { AgentMonogram } from "@/components/agents/AgentMonogram";
 import { useAccount } from "wagmi";
 import { parseEther, type Address, encodeFunctionData } from "viem";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
-import { MANTLE_ASSETS } from "@/lib/contracts";
+import { MANTLE_ASSETS, ADDRESSES } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
 import { useYieldOracle } from "@/hooks/useYieldOracle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
@@ -91,9 +91,6 @@ export default function PortfolioPage() {
   const [atlasInput, setAtlasInput] = useState("");
   const [autonomyAmount, setAutonomyAmount] = useState("100");
   const [autonomyDays, setAutonomyDays] = useState("7");
-  const [autonomyBusy, setAutonomyBusy] = useState(false);
-  const [autonomyStatus, setAutonomyStatus] = useState("Atlas autonomy is not enabled for this wallet.");
-  const [autonomyTx, setAutonomyTx] = useState("");
   const [depositAmount, setDepositAmount] = useState("100");
   const [depositBusy, setDepositBusy] = useState(false);
   const [depositTx, setDepositTx] = useState("");
@@ -173,7 +170,7 @@ export default function PortfolioPage() {
         setPlanStatus(`${plan.label} plan activated — reasoning stored on-chain.`);
         setTimeout(refreshActions, 3000);
       } else {
-        setPlanStatus(`${plan.label} plan set. (On-chain write pending — backend signing.)`);
+        setPlanStatus(`${plan.label} plan built by Atlas. On-chain log requires agent wallet (AGENT_PRIVATE_KEY) on backend.`);
       }
     } catch {
       setPlanStatus("Plan set locally. Backend unavailable.");
@@ -221,7 +218,7 @@ export default function PortfolioPage() {
     try {
       const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
       const token = MANTLE_ASSETS.USDY.address;
-      const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
+      const vault = ADDRESSES.HybridVault as Address;
       const amount = parseEther(depositAmount || "100");
 
       // 1. Approve
@@ -256,7 +253,7 @@ export default function PortfolioPage() {
     try {
       const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
       const token = MANTLE_ASSETS.USDY.address;
-      const vault = "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D" as Address;
+      const vault = ADDRESSES.HybridVault as Address;
       const amount = parseEther(withdrawAmount || "0");
 
       const data = encodeFunctionData({
@@ -271,67 +268,6 @@ export default function PortfolioPage() {
       setWithdrawStatus(err instanceof Error ? err.message : "Withdraw failed.");
     } finally {
       setWithdrawBusy(false);
-    }
-  };
-
-  const enableAtlasAutonomy = async () => {
-    if (!address) {
-      setAutonomyStatus("Connect wallet before signing Atlas autonomy consent.");
-      return;
-    }
-
-    try {
-      setAutonomyBusy(true);
-      setAutonomyTx("");
-      setAutonomyStatus("Preparing HybridVault EIP-712 consent...");
-
-      const amountWei = parseEther(autonomyAmount || "0").toString();
-      const days = Math.max(1, Number(autonomyDays) || 1);
-      const expiry = Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
-      const token = MANTLE_ASSETS.USDY.address;
-
-      const consent = await agentApi<{
-        typedData: Record<string, unknown>;
-        agent: string;
-        vault: string;
-        nonce: string;
-      }>("/vault/consent", {
-        method: "POST",
-        body: JSON.stringify({
-          user_address: address,
-          token,
-          amount_wei: amountWei,
-          expiry,
-        }),
-      });
-
-      setAutonomyStatus("Wallet signature requested. This grants Atlas a capped HybridVault allowance.");
-      const walletClient = await getWalletClient(wagmiConfig, { chainId: mantleTestnet.id });
-      const signature = await walletClient.request({
-        method: "eth_signTypedData_v4",
-        params: [address as Address, JSON.stringify(consent.typedData)],
-      });
-
-      setAutonomyStatus("Relaying signed allowance to HybridVault...");
-      const relay = await agentApi<{ onChainTx: string }>("/vault/relay-allowance", {
-        method: "POST",
-        body: JSON.stringify({
-          user_address: address,
-          token,
-          amount_wei: amountWei,
-          expiry,
-          nonce: consent.nonce,
-          signature,
-          agent_address: consent.agent,
-        }),
-      });
-
-      setAutonomyTx(relay.onChainTx);
-      setAutonomyStatus(`Atlas autonomy enabled through HybridVault ${consent.vault.slice(0, 10)}...${consent.vault.slice(-6)}.`);
-    } catch (error) {
-      setAutonomyStatus(error instanceof Error ? error.message : "Unable to enable Atlas autonomy.");
-    } finally {
-      setAutonomyBusy(false);
     }
   };
 
@@ -398,7 +334,7 @@ export default function PortfolioPage() {
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0 }}>
           {PLANS.map((plan, i) => {
-            const blended = plan.allocations.reduce((s,a) => s + (a.pct/100)*(ASSET_META[a.symbol]?.apy ?? 0), 0);
+            const blended = plan.allocations.reduce((s,a) => s + (a.pct/100)*((apyMap[a.symbol] ?? ASSET_META[a.symbol]?.apy) ?? 0), 0);
             const active = selectedPlan === plan.id;
             return (
               <div key={plan.id} style={{

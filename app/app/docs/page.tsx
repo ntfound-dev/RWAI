@@ -877,10 +877,54 @@ function Contracts() {
   );
 }
 
+function ConsentDiagram() {
+  const C = { user:"#00e5a0", backend:"#00d4ff", chain:"#818cf8", warn:"#ef4444" };
+  const steps = [
+    { x:20,  w:130, col:C.user,    label:"User Wallet",    sub:"MetaMask / RainbowKit" },
+    { x:170, w:130, col:C.backend, label:"RWAi Backend",   sub:"Railway · gasless relayer" },
+    { x:320, w:130, col:C.chain,   label:"HybridVault.sol",sub:"Mantle Sepolia" },
+    { x:470, w:130, col:C.chain,   label:"AgentExecutor",  sub:"immutable log" },
+  ];
+  return (
+    <svg viewBox="0 0 640 260" style={{ width:"100%", maxWidth:640, height:"auto", display:"block", margin:"16px auto" }}>
+      <defs>
+        <marker id="cah" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#555"/></marker>
+      </defs>
+      {steps.map(s => (
+        <g key={s.label}>
+          <rect x={s.x} y="8" width={s.w} height="40" rx="3" fill={`${s.col}10`} stroke={s.col} strokeWidth="1"/>
+          <text x={s.x+s.w/2} y="24" fontFamily="monospace" fontSize="9" fill={s.col} textAnchor="middle" fontWeight="bold">{s.label}</text>
+          <text x={s.x+s.w/2} y="38" fontFamily="monospace" fontSize="7.5" fill="#555" textAnchor="middle">{s.sub}</text>
+          <line x1={s.x+s.w/2} y1="48" x2={s.x+s.w/2} y2="255" stroke={s.col} strokeWidth="0.5" strokeDasharray="3 3" opacity="0.3"/>
+        </g>
+      ))}
+      {[
+        { y:70,  x1:150, x2:170, col:C.user,    dir:1,  label:"① Deposit USDY + approve(vault)" },
+        { y:90,  x1:300, x2:320, col:C.chain,   dir:-1, label:"② Deposited — balance recorded" },
+        { y:120, x1:85,  x2:170, col:C.user,    dir:1,  label:"③ Request typed data (no gas)" },
+        { y:140, x1:170, x2:150, col:C.backend, dir:-1, label:"④ Return EIP-712 typed data + nonce" },
+        { y:165, x1:150, x2:50,  col:C.user,    dir:-1, label:"⑤ User signs (no tx · $0 gas)" },
+        { y:185, x1:85,  x2:170, col:C.user,    dir:1,  label:"⑥ Send signature to backend" },
+        { y:205, x1:300, x2:320, col:C.backend, dir:1,  label:"⑦ Backend relays · pays gas" },
+        { y:225, x1:450, x2:470, col:C.chain,   dir:1,  label:"⑧ Atlas allowance set on-chain" },
+      ].map((a, i) => (
+        <g key={i}>
+          <line x1={a.x1} y1={a.y} x2={a.x2} y2={a.y} stroke={a.col} strokeWidth="1" markerEnd="url(#cah)"/>
+          <text x={(a.x1+a.x2)/2} y={a.y-4} fontFamily="monospace" fontSize="7.5" fill={a.col} textAnchor="middle">{a.label}</text>
+        </g>
+      ))}
+      <rect x="468" y="230" width="164" height="20" rx="2" fill="rgba(0,229,160,0.07)" stroke="rgba(0,229,160,0.4)" strokeWidth="0.8"/>
+      <text x="550" y="244" fontFamily="monospace" fontSize="7.5" fill="#00e5a0" textAnchor="middle">Atlas now acts within cap · no further user input</text>
+    </svg>
+  );
+}
+
 function Consent() {
   return (
     <>
       <P>HybridVault uses EIP-712 typed-data signatures to grant Atlas a bounded, revocable allowance to act autonomously on your behalf — without exposing your private key or requiring approval for each transaction.</P>
+      <H2>Consent Flow</H2>
+      <ConsentDiagram />
       <H2>How It Works</H2>
       <Code title="1. User signs once" lang="typescript" body={`const consent = {
   domain: { name: "RWAi HybridVault", chainId: 5003 },
