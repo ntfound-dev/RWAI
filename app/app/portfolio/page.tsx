@@ -9,6 +9,7 @@ import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { MANTLE_ASSETS } from "@/lib/contracts";
 import { mantleTestnet, wagmiConfig } from "@/lib/wagmi";
 import { useYieldOracle } from "@/hooks/useYieldOracle";
+import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
 
 const ASSET_META: Record<string, { name: string; color: string; apy: number }> = {
   USDY: { name:"Ondo US Dollar Yield", color:"var(--accent)",  apy:4.20 },
@@ -72,7 +73,7 @@ interface TokenizedAsset {
   _source?: string;
 }
 
-const TOTAL_VALUE = 10000;
+const DEMO_VALUE = 10000;
 
 const GAS_BADGE = (
   <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
@@ -83,6 +84,7 @@ const GAS_BADGE = (
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
   const { apyMap, hasData, snapshotCount } = useYieldOracle();
+  const wallet = useWalletPortfolio(address);
   const [showAtlas, setShowAtlas] = useState(false);
   const [atlasInput, setAtlasInput] = useState("");
   const [autonomyAmount, setAutonomyAmount] = useState("100");
@@ -108,7 +110,7 @@ export default function PortfolioPage() {
   const [planStatus, setPlanStatus] = useState("");
   const [allocations, setAllocations] = useState<Allocation[]>(
     DEFAULT_ALLOCATIONS.map(a => ({
-      ...a, ...ASSET_META[a.symbol], value: TOTAL_VALUE * a.pct / 100,
+      ...a, ...ASSET_META[a.symbol], value: DEMO_VALUE * a.pct / 100,
     }))
   );
   const [myAssets, setMyAssets] = useState<TokenizedAsset[]>([]);
@@ -142,11 +144,12 @@ export default function PortfolioPage() {
 
     // Optimistic UI update — use live oracle APY when available, fall back to static
     setSelectedPlan(planId);
+    const planValue = isConnected && wallet.hasBalance ? wallet.totalValueUSD : DEMO_VALUE;
     setAllocations(plan.allocations.map(a => ({
       ...a,
       ...ASSET_META[a.symbol],
       apy: apyMap[a.symbol] ?? ASSET_META[a.symbol].apy,
-      value: TOTAL_VALUE * a.pct / 100,
+      value: planValue * a.pct / 100,
     })));
 
     setPlanBusy(true);
@@ -157,7 +160,7 @@ export default function PortfolioPage() {
         method: "POST",
         body: JSON.stringify({
           user_address: address,
-          amount: TOTAL_VALUE,
+          amount: planValue,
           goal: plan.goal,
           horizon: plan.horizon,
           risk_answer: plan.risk_answer,
@@ -344,20 +347,30 @@ export default function PortfolioPage() {
 
       {/* Stats row */}
       {(() => {
-        const plan = PLANS.find(p => p.id === selectedPlan) ?? PLANS[0];
-        const blended = allocations.reduce((s,a) => s + (a.pct/100)*a.apy, 0);
+        const plan    = PLANS.find(p => p.id === selectedPlan) ?? PLANS[0];
+        const isReal  = isConnected && !wallet.isLoading;
+        const total   = isReal && wallet.hasBalance ? wallet.totalValueUSD : (isConnected ? 0 : DEMO_VALUE);
+        const blended = isReal && wallet.hasBalance
+          ? wallet.holdings.reduce((s, h) => s + (h.pct / 100) * h.apy, 0)
+          : allocations.reduce((s, a) => s + (a.pct / 100) * a.apy, 0);
+        const isDemo  = !isConnected;
         return (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:24 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:`1px solid ${isDemo ? "rgba(245,158,11,0.4)" : "var(--line)"}`, marginBottom:24, position:"relative" }}>
+            {isDemo && (
+              <div style={{ position:"absolute", top:-10, left:16, background:"rgba(245,158,11,0.15)", border:"1px solid rgba(245,158,11,0.4)", borderRadius:2, padding:"1px 8px", zIndex:1 }}>
+                <span style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"#fbbf24", letterSpacing:"0.1em" }}>DEMO — connect wallet to see real balance</span>
+              </div>
+            )}
             {[
-              { label:"Portfolio Value", value:`$${TOTAL_VALUE.toLocaleString()}`, sub:`${plan.label} strategy` },
+              { label:"Portfolio Value", value: wallet.isLoading ? "…" : `$${total.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 })}`, sub: isDemo ? "Demo · $10k simulation" : isReal && wallet.hasBalance ? "Live wallet balance" : "No RWA assets found" },
               { label:"Blended APY",     value:`${blended.toFixed(2)}%`,           sub:"Atlas optimized" },
-              { label:"Monthly Income",  value:`$${((TOTAL_VALUE * blended/100)/12).toFixed(2)}`, sub:"Est. distribution" },
+              { label:"Monthly Income",  value: wallet.isLoading ? "…" : `$${((total * blended / 100) / 12).toFixed(2)}`, sub:"Est. distribution" },
               { label:"Risk Score",      value:`${plan.riskScore} / 10`,           sub: plan.riskScore <= 3 ? "Low risk" : plan.riskScore <= 6 ? "Medium risk" : "High risk" },
             ].map(({ label, value, sub }, i) => (
               <div key={i} style={{ padding:"16px 18px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
                 <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
-                <div style={{ fontFamily:"var(--font-mono)", fontSize:28, color:"var(--fg-0)" }}>{value}</div>
-                <div className="mono-sm" style={{ color:"var(--accent)", marginTop:4 }}>{sub}</div>
+                <div style={{ fontFamily:"var(--font-mono)", fontSize:28, color: isDemo ? "rgba(251,191,36,0.7)" : "var(--fg-0)" }}>{value}</div>
+                <div className="mono-sm" style={{ color: isDemo ? "#fbbf24" : "var(--accent)", marginTop:4 }}>{sub}</div>
               </div>
             ))}
           </div>
@@ -517,47 +530,73 @@ export default function PortfolioPage() {
       <div style={{ display:"grid", gridTemplateColumns: showAtlas ? "1fr 380px" : "1fr", gap:24 }}>
         <div>
           {/* Allocation chart */}
-          <div className="panel" style={{ marginBottom:24 }}>
-            <div className="panel-header">
-              <span className="mono">Allocation · {allocations.length} assets</span>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <AgentMonogram agent="atlas" active/>
-                <span className="mono-sm" style={{ color:"var(--atlas)" }}>Atlas managed</span>
-              </div>
-            </div>
-            <div style={{ padding:"20px" }}>
-              {/* Bar chart */}
-              <div style={{ display:"flex", height:40, borderRadius:2, overflow:"hidden", marginBottom:20, gap:2 }}>
-                {allocations.map(a => (
-                  <div key={a.symbol} style={{ flex:a.pct, background:a.color, opacity:0.7, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--bg-0)", fontWeight:600 }}>{a.pct}%</span>
-                  </div>
-                ))}
-              </div>
-              {/* Asset rows */}
-              {allocations.map(a => (
-                <div key={a.symbol} style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 80px 80px", alignItems:"center", gap:14, padding:"12px 0", borderBottom:"1px solid var(--line)" }}>
-                  <div style={{ width:12, height:12, borderRadius:2, background:a.color, opacity:0.8 }}/>
-                  <div>
-                    <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--fg-0)" }}>{a.symbol}</div>
-                    <div className="mono-sm" style={{ textTransform:"none", letterSpacing:0, color:"var(--fg-2)" }}>{a.name}</div>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div className="mono-sm" style={{ marginBottom:2 }}>ALLOCATION</div>
-                    <div style={{ fontFamily:"var(--font-mono)", fontSize:15, color:"var(--fg-0)" }}>{a.pct}%</div>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div className="mono-sm" style={{ marginBottom:2 }}>APY</div>
-                    <div style={{ fontFamily:"var(--font-mono)", fontSize:15, color:"var(--accent)" }}>{a.apy.toFixed(2)}%</div>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div className="mono-sm" style={{ marginBottom:2 }}>VALUE</div>
-                    <div style={{ fontFamily:"var(--font-mono)", fontSize:15, color:"var(--fg-0)" }}>${a.value.toLocaleString()}</div>
+          {(() => {
+            const showReal = isConnected && !wallet.isLoading && wallet.hasBalance;
+            const rows = showReal
+              ? wallet.holdings.filter(h => h.balance > 0).map(h => ({
+                  symbol: h.symbol, name: h.name, color: h.color,
+                  pct: h.pct, apy: h.apy, value: h.valueUSD,
+                  extra: `${h.balance < 0.0001 ? h.balance.toExponential(2) : h.balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${h.symbol}`,
+                }))
+              : allocations.map(a => ({ ...a, extra: null }));
+            const isEmpty = isConnected && !wallet.isLoading && !wallet.hasBalance;
+            return (
+              <div className="panel" style={{ marginBottom:24 }}>
+                <div className="panel-header">
+                  <span className="mono">
+                    {showReal ? `Holdings · ${rows.length} assets` : isEmpty ? "Holdings · no assets" : `Target allocation · ${allocations.length} assets`}
+                  </span>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    {showReal && <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>LIVE</span>}
+                    {!showReal && !isConnected && <span className="tag" style={{ fontSize:9, color:"#fbbf24", borderColor:"rgba(245,158,11,0.3)" }}>DEMO</span>}
+                    <AgentMonogram agent="atlas" active/>
+                    <span className="mono-sm" style={{ color:"var(--atlas)" }}>Atlas managed</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                {isEmpty ? (
+                  <div style={{ padding:"32px 16px", textAlign:"center" }}>
+                    <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--fg-3)", marginBottom:8 }}>No RWA assets detected in this wallet</div>
+                    <div style={{ fontSize:12, color:"var(--fg-3)", marginBottom:16 }}>Select a plan above → Atlas will write your target allocation on-chain</div>
+                    <a href="/market" style={{ fontFamily:"var(--font-mono)", fontSize:11, color:"var(--accent)", textDecoration:"none" }}>Buy assets on Market →</a>
+                  </div>
+                ) : (
+                  <div style={{ padding:"20px" }}>
+                    <div style={{ display:"flex", height:40, borderRadius:2, overflow:"hidden", marginBottom:20, gap:2 }}>
+                      {rows.filter(r => r.pct > 0).map(r => (
+                        <div key={r.symbol} style={{ flex: r.pct, background: r.color, opacity:0.7, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--bg-0)", fontWeight:600 }}>{Math.round(r.pct)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    {rows.map(r => (
+                      <div key={r.symbol} style={{ display:"grid", gridTemplateColumns:`28px 1fr 80px 80px ${showReal ? "120px" : "80px"}`, alignItems:"center", gap:14, padding:"12px 0", borderBottom:"1px solid var(--line)" }}>
+                        <div style={{ width:12, height:12, borderRadius:2, background:r.color, opacity:0.8 }}/>
+                        <div>
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:13, color:"var(--fg-0)" }}>{r.symbol}</div>
+                          <div className="mono-sm" style={{ textTransform:"none", letterSpacing:0, color:"var(--fg-2)" }}>{r.name}</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div className="mono-sm" style={{ marginBottom:2 }}>{showReal ? "SHARE" : "ALLOC"}</div>
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:15, color:"var(--fg-0)" }}>{r.pct.toFixed(1)}%</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div className="mono-sm" style={{ marginBottom:2 }}>APY</div>
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:15, color:"var(--accent)" }}>{r.apy.toFixed(2)}%</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div className="mono-sm" style={{ marginBottom:2 }}>{showReal ? "BALANCE" : "VALUE"}</div>
+                          <div style={{ fontFamily:"var(--font-mono)", fontSize:showReal ? 11 : 15, color:"var(--fg-0)" }}>
+                            {showReal ? r.extra : `$${r.value.toLocaleString()}`}
+                          </div>
+                          {showReal && <div style={{ fontFamily:"var(--font-mono)", fontSize:12, color:"var(--fg-2)" }}>${r.value.toLocaleString(undefined,{maximumFractionDigits:2})}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* My Tokenized Assets */}
           {(myAssets.length > 0 || isConnected) && (
@@ -701,8 +740,14 @@ export default function PortfolioPage() {
       </div>
 
       {!isConnected && (
-        <div style={{ marginTop:24, padding:"14px 18px", background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:2, fontSize:13, color:"var(--warn)" }}>
-          ⚠ Connect wallet to load your live portfolio from Mantle
+        <div style={{ marginTop:24, padding:"14px 18px", background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:2, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span style={{ fontSize:13, color:"var(--warn)" }}>⚠ Connect wallet to load your live RWA balance from Mantle — figures above are a $10,000 demo simulation</span>
+        </div>
+      )}
+      {isConnected && !wallet.isLoading && !wallet.hasBalance && (
+        <div style={{ marginTop:24, padding:"14px 18px", background:"rgba(0,229,160,0.04)", border:"1px solid rgba(0,229,160,0.2)", borderRadius:2, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+          <span style={{ fontSize:13, color:"var(--fg-2)" }}>Wallet connected — no USDY, mETH, mUSD or fBTC detected on Mantle Sepolia. Buy assets on Market or get testnet tokens.</span>
+          <a href="/market" style={{ fontFamily:"var(--font-mono)", fontSize:11, color:"var(--accent)", whiteSpace:"nowrap", textDecoration:"none" }}>Go to Market →</a>
         </div>
       )}
 
