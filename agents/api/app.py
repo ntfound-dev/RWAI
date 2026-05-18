@@ -5,10 +5,20 @@ import os
 import time
 import asyncio
 import secrets
+import logging
 from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
+
+# Railway tags WebSocket access log lines as severity:error regardless of log level.
+# Suppress them entirely — connection lifecycle adds no diagnostic value.
+class _NoWSAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return "WebSocket" not in msg and "connection open" not in msg and "connection closed" not in msg
+
+logging.getLogger("uvicorn.access").addFilter(_NoWSAccessFilter())
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
