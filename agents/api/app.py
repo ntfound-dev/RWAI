@@ -40,29 +40,67 @@ from ..mantle.executor     import publish_yield_snapshot, record_yield_on_execut
 
 _yield_log = logging.getLogger("rwai.yield_scheduler")
 
+# In-memory previous snapshot for drift detection: {symbol: apyBps}
+_prev_yields: dict[str, int] = {}
+_DRIFT_THRESHOLD_BPS = 100  # 1% APY shift triggers a rebalance signal
+
 async def _yield_scheduler():
-    """Auto-publish yield snapshot every 6 hours so Yield always has on-chain actions."""
-    # Wait for startup to settle, then run immediately, then every 6h
-    await asyncio.sleep(30)
+    """
+    Auto-publish yield snapshots every 6 hours.
+    Tracks mETH, USDY, MI4, fBTC, mUSD. Detects drift vs previous snapshot
+    and emits a DRIFT ALERT on-chain when any asset moves > 100bps.
+    """
+    global _prev_yields
+    await asyncio.sleep(30)  # let startup settle
     while True:
         try:
+            import json as _json
             from .core import agent_complete, ChatMessage
+
             prompt = (
-                "Fetch current yield data for: USDY, mETH, fBTC, mUSD. "
+                "Fetch current yield data for: USDY, mETH, MI4, fBTC, mUSD. "
                 "Respond ONLY with the JSON format defined in your skill."
             )
-            reply, model, _ = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
-            import json as _json
+            reply, _, _ = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
             start = reply.find("{"); end = reply.rfind("}") + 1
             result = _json.loads(reply[start:end]) if start >= 0 and end > start else {}
-            yields_bps = {a["symbol"]: a["apyBps"] for a in result.get("assets", []) if "symbol" in a and "apyBps" in a}
-            note = result.get("agentNote", "Scheduled yield snapshot by RWAi Yield agent")
-            if yields_bps:
+
+            yields_bps: dict[str, int] = {
+                a["symbol"]: int(a["apyBps"])
+                for a in result.get("assets", [])
+                if "symbol" in a and "apyBps" in a
+            }
+            note = result.get("agentNote", "Scheduled yield snapshot — RWAi Yield agent")
+
+            if not yields_bps:
+                _yield_log.warning("Yield scheduler: no APY data in agent reply")
+            else:
+                # Normal snapshot
                 tx1 = publish_yield_snapshot(yields_bps, note)
                 tx2 = record_yield_on_executor(yields_bps, note)
-                _yield_log.info("Yield snapshot published — oracle=%s executor=%s", tx1, tx2)
-            else:
-                _yield_log.warning("Yield scheduler: no bps data extracted from agent reply")
+                _yield_log.info("Yield snapshot — oracle=%s executor=%s assets=%s", tx1, tx2, list(yields_bps.keys()))
+
+                # Drift detection vs previous snapshot
+                if _prev_yields:
+                    drifted = {
+                        sym: (yields_bps[sym], _prev_yields[sym], yields_bps[sym] - _prev_yields[sym])
+                        for sym in yields_bps
+                        if sym in _prev_yields and abs(yields_bps[sym] - _prev_yields[sym]) >= _DRIFT_THRESHOLD_BPS
+                    }
+                    if drifted:
+                        drift_parts = [
+                            f"{sym}: {prev}→{cur}bps (Δ{delta:+d})"
+                            for sym, (cur, prev, delta) in drifted.items()
+                        ]
+                        drift_note = (
+                            f"DRIFT ALERT: {', '.join(drift_parts)}. "
+                            f"Rebalance signal emitted to Atlas. {note}"
+                        )
+                        tx3 = record_yield_on_executor(yields_bps, drift_note)
+                        _yield_log.info("Drift signal emitted — %s tx=%s", drift_parts, tx3)
+
+                _prev_yields = yields_bps
+
         except Exception as exc:
             _yield_log.error("Yield scheduler error: %s", exc)
         await asyncio.sleep(6 * 3600)
