@@ -113,15 +113,20 @@ async def call_ollama(system: str, user: str) -> str:
         return text
 
 
+_MAX_MESSAGES   = 20        # keep last N turns
+_MAX_MSG_CHARS  = 2_000     # truncate individual messages
+
 async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tuple[str, str, bool]:
     """
     Fallback chain: OpenClaw → Groq → Claude → Ollama (local opt-in)
     Returns: (reply, model_used, is_fallback)
     """
-    skill   = load_skill(agent_id)
+    skill = load_skill(agent_id)
+    # Cap history to prevent prompt bloat / cost abuse
+    capped = conversation[-_MAX_MESSAGES:]
     history = "\n".join(
-        f"{'User' if m.role == 'user' else agent_id.capitalize()}: {m.body}"
-        for m in conversation
+        f"{'User' if m.role == 'user' else agent_id.capitalize()}: {m.body[:_MAX_MSG_CHARS]}"
+        for m in capped
     )
     prompt = (
         f"{history}\n\n"

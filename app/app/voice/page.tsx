@@ -29,10 +29,13 @@ export default function VoicePage() {
   const [history, setHistory]     = useState<{ role: string; body: string }[]>([]);
   const [modelUsed, setModelUsed] = useState("");
 
-  const recRef     = useRef<any>(null);
-  const interimRef = useRef("");
-  const synthRef   = useRef<SpeechSynthesis | null>(null);
-  const voicesRef  = useRef<SpeechSynthesisVoice[]>([]);
+  const recRef      = useRef<any>(null);
+  const interimRef  = useRef("");
+  const synthRef    = useRef<SpeechSynthesis | null>(null);
+  const voicesRef   = useRef<SpeechSynthesisVoice[]>([]);
+  const [speakWords, setSpeakWords] = useState<string[]>([]);
+  const [wordIdx, setWordIdx]       = useState(-1);
+  const [hasSR, setHasSR]           = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -40,6 +43,8 @@ export default function VoicePage() {
     const load = () => { voicesRef.current = synthRef.current?.getVoices() ?? []; };
     load();
     synthRef.current?.addEventListener("voiceschanged", load);
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setHasSR(!!SR);
     return () => synthRef.current?.removeEventListener("voiceschanged", load);
   }, []);
 
@@ -54,15 +59,29 @@ export default function VoicePage() {
   const speak = useCallback((text: string) => {
     if (!synthRef.current) return;
     synthRef.current.cancel();
+    const words = text.split(/\s+/).filter(Boolean);
+    setSpeakWords(words);
+    setWordIdx(-1);
     const utt = new SpeechSynthesisUtterance(text);
+    const MALE_HINTS = ["Daniel","Google UK English Male","Google US English","Microsoft David","Microsoft Mark","Alex","en-GB-male"];
+    const SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa"];
     const pick = voicesRef.current.find(v =>
-      v.name.includes("Daniel") || v.name.includes("Google UK English Male") ||
-      v.name.includes("Alex") || (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
+      MALE_HINTS.some(h => v.name.includes(h))
+    ) ?? voicesRef.current.find(v =>
+      v.lang.startsWith("en") && !SKIP.some(s => v.name.toLowerCase().includes(s))
     );
     if (pick) utt.voice = pick;
-    utt.rate = 0.87; utt.pitch = 0.76;
+    utt.rate = 0.93; utt.pitch = 0.88;
     utt.onstart = () => setOrbState("speaking");
-    utt.onend   = () => setOrbState("idle");
+    utt.onend   = () => { setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
+    utt.onboundary = (e: SpeechSynthesisEvent) => {
+      if (e.name !== "word") return;
+      let pos = 0;
+      for (let i = 0; i < words.length; i++) {
+        if (e.charIndex >= pos && e.charIndex < pos + words[i].length) { setWordIdx(i); break; }
+        pos += words[i].length + 1;
+      }
+    };
     synthRef.current.speak(utt);
   }, []);
 
@@ -211,14 +230,33 @@ export default function VoicePage() {
 
         {/* Text display */}
         <div className="atlas-text" style={{ color: orbState === "idle" ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.82)" }}>
-          {interim
-            ? <><span style={{ color: s.color }}>{interim}</span><span className="atlas-cursor" style={{ background: s.color }} /></>
-            : displayed
-          }
+          {interim ? (
+            <><span style={{ color: s.color }}>{interim}</span><span className="atlas-cursor" style={{ background: s.color }} /></>
+          ) : orbState === "speaking" && speakWords.length > 0 ? (
+            <span>
+              {speakWords.map((w, i) => (
+                <span key={i} style={{
+                  color: i === wordIdx ? s.color : "rgba(255,255,255,0.82)",
+                  textShadow: i === wordIdx ? `0 0 18px ${s.color}` : "none",
+                  fontWeight: i === wordIdx ? 600 : 400,
+                  transition: "color 0.06s, text-shadow 0.06s",
+                  marginRight: "0.28em",
+                  display: "inline-block",
+                }}>{w}</span>
+              ))}
+            </span>
+          ) : (
+            displayed
+          )}
         </div>
 
-        {/* Mic button */}
-        <button
+        {/* Mic button — hidden if no SpeechRecognition support */}
+        {!hasSR && (
+          <div style={{ fontSize:9, letterSpacing:"0.2em", color:"rgba(255,100,100,0.6)", border:"1px solid rgba(255,100,100,0.2)", padding:"4px 12px", borderRadius:2 }}>
+            VOICE NOT SUPPORTED · USE TEXT INPUT BELOW
+          </div>
+        )}
+        {hasSR && <button
           className={`atlas-mic ${orbState === "listening" ? "atlas-mic-active" : ""}`}
           style={{
             borderColor: busy ? "rgba(255,255,255,0.12)" : `${s.color}60`,
@@ -246,9 +284,9 @@ export default function VoicePage() {
               <line x1="8"  y1="22" x2="16" y2="22"/>
             </svg>
           )}
-        </button>
+        </button>}
 
-        <p className="atlas-hint">HOLD TO SPEAK · RELEASE TO SEND</p>
+        <p className="atlas-hint">{hasSR ? "HOLD TO SPEAK · RELEASE TO SEND" : "TYPE COMMAND BELOW · ENTER TO SEND"}</p>
 
         {/* Text input fallback */}
         <div className="atlas-text-input-row">

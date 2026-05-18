@@ -4,11 +4,14 @@ RWAi Agent API — FastAPI backend
 import os
 import time
 import asyncio
+import secrets
+from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .core import agent_complete, ChatMessage, ChatResponse  # re-export for compat
 from contextlib import asynccontextmanager
@@ -34,16 +37,32 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RWAi Agent API", version="1.0.0", lifespan=lifespan)
 
-def _allowed_origins() -> list[str]:
-    raw = os.getenv("FRONTEND_URLS") or os.getenv("FRONTEND_URL") or "*"
-    if raw == "*":
-        return ["*"]
+import logging as _logging
+_log = _logging.getLogger("rwai.cors")
 
-    origins = [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
-    vercel_url = os.getenv("VERCEL_URL")
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("FRONTEND_URLS") or os.getenv("FRONTEND_URL", "")
+    in_production = bool(os.getenv("BACKEND_API_KEY", ""))
+
+    if not raw:
+        if in_production:
+            # Never silently open CORS in production — log loud warning and lock down
+            _log.warning(
+                "FRONTEND_URLS is not set. CORS locked to localhost only. "
+                "Set FRONTEND_URLS=https://your-app.vercel.app in Railway env vars."
+            )
+            return ["http://localhost:3000"]
+        # Local dev — allow localhost variants
+        return ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000"]
+
+    origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    # Auto-include VERCEL_URL if Railway injects it
+    vercel_url = os.getenv("VERCEL_URL", "")
     if vercel_url:
         origins.append(f"https://{vercel_url.strip().rstrip('/')}")
-    return sorted(set(["http://localhost:3000", *origins]))
+    # Always allow localhost for local dev / preview deploys
+    origins += ["http://localhost:3000"]
+    return sorted(set(origins))
 
 ALLOWED_ORIGINS = _allowed_origins()
 
@@ -54,6 +73,62 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── API Key auth middleware ────────────────────────────────────────
+_API_KEY = os.getenv("BACKEND_API_KEY", "")
+_PUBLIC_PATHS = {"/health", "/ws"}
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    if not _API_KEY or request.url.path in _PUBLIC_PATHS:
+        return await call_next(request)
+    incoming = request.headers.get("x-internal-api-key", "")
+    if not secrets.compare_digest(incoming, _API_KEY):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
+# ── Rate limiter middleware ────────────────────────────────────────
+# Per-IP sliding window (60s). No external deps — in-memory per worker.
+# Different limits per endpoint: AI routes cost money, so tighter caps.
+_LIMITS: list[tuple[str, int]] = [
+    ("/api/agents/chat",       20),   # ~$0.01/call via Claude
+    ("/api/agents/tokenize",   10),
+    ("/api/agents/compliance", 10),
+    ("/api/agents/portfolio",  10),
+    ("/api/agents/extract",     5),   # file upload — RAM heavy
+    ("/api/agents/",           60),   # other agent routes
+    ("/",                     120),   # health, status, ws
+]
+_buckets: dict[str, list[float]] = defaultdict(list)
+_rl_lock = asyncio.Lock()
+
+def _limit_for(path: str) -> int:
+    for prefix, cap in _LIMITS:
+        if path.startswith(prefix):
+            return cap
+    return 60
+
+def _real_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    ip   = _real_ip(request)
+    cap  = _limit_for(request.url.path)
+    key  = f"{ip}:{request.url.path[:50]}"
+    now  = time.time()
+    async with _rl_lock:
+        window = [t for t in _buckets[key] if now - t < 60.0]
+        if len(window) >= cap:
+            return JSONResponse(
+                {"error": f"Rate limit exceeded ({cap} req/min). Try again shortly."},
+                status_code=429,
+                headers={"Retry-After": "60"},
+            )
+        window.append(now)
+        _buckets[key] = window
+    return await call_next(request)
 
 # ── Routers ──────────────────────────────────────────────────────
 app.include_router(chat_router,      prefix="/api/agents")
@@ -69,12 +144,16 @@ app.include_router(market_router,    prefix="/api/agents")
 # ── Health & Status ──────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    chain_ok = is_connected()
-    block    = get_block_number()
+    # Minimal response for Railway health check — no sensitive data exposed
+    return {"status": "ok", "mantle": {"connected": is_connected()}}
+
+
+@app.get("/api/agents/info")
+async def agents_info():
+    """Detailed chain info — protected by API key middleware."""
     return {
-        "status":    "ok",
         "agents":    ["nexus", "shield", "yield", "atlas"],
-        "mantle":    {"connected": chain_ok, "block": block},
+        "mantle":    {"connected": is_connected(), "block": get_block_number()},
         "contracts": get_addresses(),
         "agentIds":  get_agent_ids(),
     }

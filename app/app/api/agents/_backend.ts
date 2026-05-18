@@ -31,6 +31,11 @@ export async function forwardAgentRequest(req: NextRequest, backendPath: string)
   const contentType = req.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   headers.set("accept", req.headers.get("accept") ?? "application/json");
+  const apiKey = process.env.BACKEND_API_KEY;
+  if (apiKey) headers.set("x-internal-api-key", apiKey);
+  // Forward real client IP so Railway rate-limits per user, not per Vercel egress IP
+  const realIp = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
+  if (realIp) headers.set("x-forwarded-for", realIp);
 
   const hasBody = !["GET", "HEAD"].includes(req.method);
   const body = hasBody ? await req.arrayBuffer() : undefined;

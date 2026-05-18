@@ -1,6 +1,7 @@
+import re
 import json
 import time
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
@@ -9,19 +10,29 @@ from ...mantle.db import record_user_tokenization
 
 router = APIRouter()
 
+# ── Input limits ─────────────────────────────────────────────────
+_MAX_DOC_CHARS   = 40_000   # ~10K tokens — enough for any real asset document
+_MAX_ASSET_TYPE  = 64
 
-class TokenizeRequest(BaseModel):
-    document_text: str
-    asset_type: Optional[str] = None
-    asset_id: int = 0                     # existing assetId if known (0 = new)
-    token_address: str = "0x" + "0" * 40  # address after deploy (or zero)
-    owner_address: Optional[str] = None   # wallet that owns the token
+# ── Prompt injection patterns ─────────────────────────────────────
+_INJECT_RE = re.compile(
+    r"(?im)^.*\b("
+    r"ignore\s+(all\s+)?(previous|above|prior|the\s+above)\s+(instructions?|prompts?|text|context|rules?)"
+    r"|forget\s+(everything|all|previous|above|prior)"
+    r"|disregard\s+(all|the|above|previous)"
+    r"|you\s+are\s+now\s+(a|an|the)\b"
+    r"|new\s+(role|persona|instructions?|task|objective|goal|prompt|system)\s*:"
+    r"|act\s+as\s+(a|an|the)\b"
+    r"|from\s+now\s+on[,\s]"
+    r"|override\s+(system|instructions?|rules?)"
+    r")\b.*$"
+)
 
-
-class ComplianceRequest(BaseModel):
-    asset_id: int
-    document_text: str
-    jurisdiction: Optional[str] = None
+def _sanitize_doc(text: str) -> str:
+    """Truncate and strip prompt injection patterns from user-supplied document text."""
+    if len(text) > _MAX_DOC_CHARS:
+        text = text[:_MAX_DOC_CHARS] + "\n[document truncated]"
+    return _INJECT_RE.sub("[content filtered]", text)
 
 
 def _parse_json(text: str) -> dict:
@@ -40,10 +51,14 @@ async def tokenize(req: TokenizeRequest):
     """Nexus analyzes a document and returns token parameters.
     If token_address is non-zero, also logs the tokenization on AgentExecutor.
     """
-    asset_hint = f" Asset type hint: {req.asset_type}." if req.asset_type else ""
+    if not req.document_text or not req.document_text.strip():
+        raise HTTPException(400, "document_text is required")
+    doc = _sanitize_doc(req.document_text)
+    asset_type = (req.asset_type or "")[:_MAX_ASSET_TYPE]
+    asset_hint = f" Asset type hint: {asset_type}." if asset_type else ""
     prompt = (
         f"Analyze this asset document and respond ONLY with the JSON format defined in your skill."
-        f"{asset_hint}\n\n{req.document_text}"
+        f"{asset_hint}\n\n{doc}"
     )
     reply, model, fallback = await agent_complete("nexus", [ChatMessage(role="user", body=prompt)])
     result = _parse_json(reply)
@@ -79,10 +94,14 @@ async def tokenize(req: TokenizeRequest):
 @router.post("/compliance")
 async def compliance(req: ComplianceRequest):
     """Shield reviews an asset for compliance and logs the result on AgentExecutor."""
+    if not req.document_text or not req.document_text.strip():
+        raise HTTPException(400, "document_text is required")
+    doc = _sanitize_doc(req.document_text)
+    jurisdiction = (req.jurisdiction or "unknown")[:64]
     prompt = (
         f"Review this asset (ID: {req.asset_id}) for compliance. "
-        f"Jurisdiction: {req.jurisdiction or 'unknown'}.\n\n"
-        f"{req.document_text}\n\nRespond ONLY with the JSON format defined in your skill."
+        f"Jurisdiction: {jurisdiction}.\n\n"
+        f"{doc}\n\nRespond ONLY with the JSON format defined in your skill."
     )
     reply, model, fallback = await agent_complete("shield", [ChatMessage(role="user", body=prompt)])
     result = _parse_json(reply)

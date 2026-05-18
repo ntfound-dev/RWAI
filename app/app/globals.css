@@ -591,6 +591,25 @@ html, body {
 }
 
 @keyframes voiceOrbPulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.5)} }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ── Mobile overrides for atlas shell ───────────────────────────── */
+@media (max-width: 768px) {
+  .atlas-hud-left { display: none; }
+  .atlas-log      { display: none; }
+  .atlas-topbar   { font-size: 7px; gap: 5px; letter-spacing: 0.1em; }
+  .atlas-orb-wrap { width: 180px; height: 180px; }
+  .atlas-orb      { width: 180px; height: 180px; }
+  .atlas-deco-ring-1 { width: 230px; height: 230px; }
+  .atlas-deco-ring-2 { width: 280px; height: 280px; }
+  .atlas-pulse-ring  { width: 180px; height: 180px; }
+  .atlas-centre   { gap: 22px; }
+  .atlas-mark     { font-size: 52px; }
+  .atlas-text     { font-size: 12px; padding: 0 16px; min-height: 44px; }
+  .atlas-mic      { width: 58px; height: 58px; }
+  .atlas-text-input-row { width: 92vw; }
+  .atlas-tick     { transform-origin: 0 0; }
+}
 
 /* ── Legacy voice classes (kept for any residual refs) ─────────── */
 .voice-shell {

@@ -745,6 +745,30 @@ export default function ChatPage() {
           </div>
         </main>
 
+        {/* ── MOBILE: JARVIS bottom-sheet ── */}
+        {isMobile && showJarvis && (
+          <>
+            <div onClick={() => setShowJarvis(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.65)", zIndex:60 }} />
+            <div style={{
+              position:"fixed", bottom:0, left:0, right:0, zIndex:70,
+              height:"72vh", display:"flex", flexDirection:"column",
+              background:"var(--bg-0)", borderTop:"1px solid rgba(0,212,255,0.2)",
+              borderRadius:"12px 12px 0 0",
+              animation:"slideUp 0.28s cubic-bezier(0.32,0.72,0,1)",
+            }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", borderBottom:"1px solid var(--line)", flexShrink:0 }}>
+                <span style={{ fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.18em", color:"#00d4ff" }}>JARVIS · Atlas Agent</span>
+                <button onClick={() => setShowJarvis(false)} style={{ background:"transparent", border:"none", color:"var(--fg-3)", cursor:"pointer", fontSize:16 }}>✕</button>
+              </div>
+              <div style={{ flex:1, minHeight:0 }}>
+                <JarvisPanel onMessage={(role, text) => {
+                  setExtraMessages(m => [...m, { role: role === "user" ? "user" : "atlas", kind:"text" as const, body: text }]);
+                }} />
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── RIGHT — orchestration / JARVIS panel ── */}
         <div style={{ zIndex:1, display: isMobile ? "none" : "flex", flexDirection:"column", minHeight:0 }}>
           {/* Tab strip */}

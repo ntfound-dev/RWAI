@@ -21,9 +21,10 @@ interface JarvisPanelProps {
 }
 
 // ── Typewriter bubble ─────────────────────────────────────────────
-function Bubble({ msg, p }: { msg: ChatMsg; p: string }) {
+function Bubble({ msg, p, activeWordIdx }: { msg: ChatMsg; p: string; activeWordIdx?: number }) {
   const isAtlas = msg.role === "atlas";
   const [shown, setShown] = useState(msg.isNew ? "" : msg.text);
+  const words = msg.text.split(/\s+/).filter(Boolean);
 
   useEffect(() => {
     if (!msg.isNew) { setShown(msg.text); return; }
@@ -57,8 +58,19 @@ function Bubble({ msg, p }: { msg: ChatMsg; p: string }) {
             <span style={{ fontSize:7, color:p, letterSpacing:"0.1em" }}>JARVIS · via Atlas</span>
           </div>
         )}
-        {shown}
-        {isAtlas && msg.isNew && shown.length < msg.text.length && (
+        {isAtlas && activeWordIdx !== undefined && activeWordIdx >= 0 ? (
+          words.map((w, i) => (
+            <span key={i} style={{
+              color: i === activeWordIdx ? p : "rgba(255,255,255,0.85)",
+              textShadow: i === activeWordIdx ? `0 0 12px ${p}` : "none",
+              fontWeight: i === activeWordIdx ? 600 : 400,
+              transition: "color 0.06s, text-shadow 0.06s",
+              marginRight: "0.28em",
+              display: "inline-block",
+            }}>{w}</span>
+          ))
+        ) : shown}
+        {isAtlas && msg.isNew && shown.length < msg.text.length && activeWordIdx === undefined && (
           <span style={{ display:"inline-block", width:2, height:10, background:p, marginLeft:2, verticalAlign:"middle", animation:"jPanelCaret 0.6s step-end infinite" }}/>
         )}
       </div>
@@ -173,6 +185,8 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   const [chatLog, setChatLog] = useState<ChatMsg[]>([]);
   const [modelUsed, setModelUsed] = useState("");
   const [history, setHistory] = useState<{ role: string; body: string }[]>([]);
+  const [speakWordIdx, setSpeakWordIdx] = useState(-1);
+  const speakWordsRef = useRef<string[]>([]);
 
   const recRef     = useRef<any>(null);
   const synthRef   = useRef<SpeechSynthesis | null>(null);
@@ -208,15 +222,30 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   const speak = useCallback((text: string) => {
     if (!synthRef.current) return;
     synthRef.current.cancel();
+    const words = text.split(/\s+/).filter(Boolean);
+    speakWordsRef.current = words;
+    setSpeakWordIdx(-1);
     const utt = new SpeechSynthesisUtterance(text);
+    const MALE_HINTS = ["Daniel","Google UK English Male","Google US English","Microsoft David","Microsoft Mark","Alex"];
+    const SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa"];
     const pick = voicesRef.current.find(v =>
-      v.name.includes("Daniel") || v.name.includes("Google UK English Male") ||
-      v.name.includes("Alex") || (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
+      MALE_HINTS.some(h => v.name.includes(h))
+    ) ?? voicesRef.current.find(v =>
+      v.lang.startsWith("en") && !SKIP.some(s => v.name.toLowerCase().includes(s))
     );
     if (pick) utt.voice = pick;
-    utt.rate = 0.85; utt.pitch = 0.74;
+    utt.rate = 0.93; utt.pitch = 0.88;
     utt.onstart = () => setJState("speaking");
-    utt.onend   = () => setJState("idle");
+    utt.onend   = () => { setJState("idle"); setSpeakWordIdx(-1); speakWordsRef.current = []; };
+    utt.onboundary = (e: SpeechSynthesisEvent) => {
+      if (e.name !== "word") return;
+      const ws = speakWordsRef.current;
+      let pos = 0;
+      for (let i = 0; i < ws.length; i++) {
+        if (e.charIndex >= pos && e.charIndex < pos + ws[i].length) { setSpeakWordIdx(i); break; }
+        pos += ws[i].length + 1;
+      }
+    };
     synthRef.current.speak(utt);
   }, []);
 
@@ -349,7 +378,11 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
 
       {/* Conversation log */}
       <div style={{ flex:1, overflowY:"auto", padding:"8px 12px", display:"flex", flexDirection:"column" }}>
-        {chatLog.map((msg, i) => <Bubble key={i} msg={msg} p={c.p}/>)}
+        {chatLog.map((msg, i) => (
+          <Bubble key={i} msg={msg} p={c.p}
+            activeWordIdx={jState === "speaking" && i === chatLog.length - 1 ? speakWordIdx : undefined}
+          />
+        ))}
         {busy && (
           <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
             <div style={{ width:5, height:5, borderRadius:"50%", background:c.p, boxShadow:`0 0 5px ${c.p}` }}/>
