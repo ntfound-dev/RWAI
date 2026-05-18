@@ -116,10 +116,13 @@ export const PORTFOLIO_VAULT_ABI = [
 
 export const HYBRID_VAULT_ABI = [
   "function DOMAIN_SEPARATOR() view returns (bytes32)",
+  "function DESTINATION_TIMELOCK() view returns (uint256)",
   "function balances(address user, address token) view returns (uint256)",
   "function allowances(address user, address agent, address token) view returns (uint256 amount, uint256 expiry, uint256 dailySpent, uint256 dailyWindowStart)",
   "function nonces(address user) view returns (uint256)",
   "function approvedAgents(address agent) view returns (bool)",
+  "function approvedDestinations(address dest) view returns (bool)",
+  "function pendingDestinations(address dest) view returns (uint256 unlockTime)",
   "function perTxCap() view returns (uint256)",
   "function perAgentDailyCap() view returns (uint256)",
   "function perUserPercentCapBps() view returns (uint256)",
@@ -130,10 +133,18 @@ export const HYBRID_VAULT_ABI = [
   "function executeOnBehalf(address user, address token, address to, uint256 amount, bytes data)",
   "function withdraw(address token, uint256 amount)",
   "function emergencyWithdraw(address token)",
+  "function proposeDestination(address dest)",
+  "function commitDestination(address dest)",
+  "function cancelDestinationProposal(address dest)",
+  "function revokeDestination(address dest)",
   "event Deposited(address indexed user, address indexed token, uint256 amount)",
   "event AgentAllowanceSet(address indexed user, address indexed agent, address indexed token, uint256 amount, uint256 expiry)",
   "event AgentAllowanceRevoked(address indexed user, address indexed agent, address indexed token)",
   "event AgentExecuted(address indexed user, address indexed agent, address indexed to, address token, uint256 amount, bytes32 dataHash)",
+  "event DestinationProposed(address indexed dest, uint256 unlockTime)",
+  "event DestinationCommitted(address indexed dest)",
+  "event DestinationProposalCancelled(address indexed dest)",
+  "event DestinationRevoked(address indexed dest)",
 ] as const;
 
 export const RWAI_REGISTRY_ABI = [

@@ -191,6 +191,30 @@ async function main() {
   await agentExecutor.grantAgentRole(agentExecutorAddr); // self for demo backend calls
   console.log("  Domain roles granted to AgentExecutor");
 
+  // HybridVault destination whitelist — PortfolioVault is the only approved destination.
+  // On testnet we bypass the 48-hour timelock by proposing then fast-forwarding via
+  // direct storage manipulation is not possible, so we use proposeDestination +
+  // simulate time by calling commitDestination after the timelock (hardhat only).
+  // On mainnet, the 48h timelock is enforced — propose first, commit after 2 days.
+  if (isTestnet) {
+    // Testnet: propose + immediately commit (hardhat can mine blocks to advance time)
+    await hybridVault.proposeDestination(portfolioVaultAddr);
+    // Fast-forward time on local hardhat node; on live testnet just commit after 48h
+    try {
+      await ethers.provider.send("evm_increaseTime", [48 * 3600 + 1]);
+      await ethers.provider.send("evm_mine", []);
+      await hybridVault.commitDestination(portfolioVaultAddr);
+      console.log("  HybridVault: PortfolioVault whitelisted as destination (testnet fast-path)");
+    } catch {
+      console.log("  HybridVault: PortfolioVault PROPOSED as destination — commit after 48h on live testnet");
+    }
+  } else {
+    // Mainnet: propose only. Operator must call commitDestination after 48 hours.
+    await hybridVault.proposeDestination(portfolioVaultAddr);
+    console.log("  HybridVault: PortfolioVault PROPOSED — call commitDestination after 48h");
+    console.log(`  hybridVault.commitDestination("${portfolioVaultAddr}")`);
+  }
+
   // Agent limits are set in registerAgents.ts after ERC-8004 IDs are known
   console.log("  Agent limits: pending ERC-8004 registration (run make register)");
 
