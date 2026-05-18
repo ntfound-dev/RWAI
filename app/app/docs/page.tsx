@@ -46,6 +46,18 @@ const SIDEBAR = [
       { id: "gtm",        label: "Go-to-Market" },
     ],
   },
+  {
+    group: "API REFERENCE",
+    items: [
+      { id: "api-auth",      label: "Auth & Rate Limits" },
+      { id: "api-chat",      label: "Chat & Status" },
+      { id: "api-portfolio", label: "Portfolio" },
+      { id: "api-tokenize",  label: "Tokenize & Extract" },
+      { id: "api-market",    label: "Market" },
+      { id: "api-vault",     label: "Vault" },
+      { id: "api-stats",     label: "Stats & WebSocket" },
+    ],
+  },
 ];
 
 const FLAT = SIDEBAR.flatMap(g => g.items);
@@ -813,6 +825,347 @@ function GTM() {
   );
 }
 
+// ── API Reference sections ──────────────────────────────────────
+function ApiAuth() {
+  return (
+    <>
+      <P>All <IC>/api/agents/*</IC> endpoints require this header. The Next.js proxy (Vercel) injects it automatically — it is never exposed to the browser.</P>
+      <Code title="request header" lang="http" body={`x-internal-api-key: <BACKEND_API_KEY>`} />
+      <Callout type="tip">Public endpoints (no key needed): <IC>GET /health</IC> and <IC>WS /ws</IC>.</Callout>
+      <H2>Rate Limits</H2>
+      <P>Per IP address, sliding 60-second window. Response on limit: <IC>HTTP 429</IC> with <IC>Retry-After: 60</IC>.</P>
+      <Table
+        headers={["Endpoint", "Limit"]}
+        rows={[
+          [<IC>/api/agents/chat</IC>,       "20 req / min"],
+          [<IC>/api/agents/tokenize</IC>,   "10 req / min"],
+          [<IC>/api/agents/compliance</IC>, "10 req / min"],
+          [<IC>/api/agents/portfolio/*</IC>,"10 req / min"],
+          [<IC>/api/agents/extract-text</IC>,"5 req / min"],
+          ["Other agent endpoints",          "60 req / min"],
+          [<IC>/health</IC>, <IC>/ws</IC>,  "120 req / min"],
+        ]}
+      />
+      <H2>Error Codes</H2>
+      <Table
+        headers={["HTTP", "Meaning"]}
+        rows={[
+          ["400", "Bad request — invalid input"],
+          ["401", "Unauthorized — wrong or missing API key"],
+          ["403", "Forbidden — feature disabled (e.g. autonomous execution)"],
+          ["413", "Payload Too Large — file exceeds 10 MB"],
+          ["429", "Too Many Requests — rate limit reached"],
+          ["500", "Internal server error"],
+          ["502", "Railway backend unreachable from Vercel"],
+          ["503", "Service unavailable — contracts not deployed or AGENT_PRIVATE_KEY missing"],
+        ]}
+      />
+    </>
+  );
+}
+
+function ApiChat() {
+  return (
+    <>
+      <H2>POST /api/agents/chat</H2>
+      <P>Send a message to any AI agent. Rate limit: 20 req/min.</P>
+      <Code title="request" lang="json" body={`{
+  "agent_id": "atlas",
+  "messages": [
+    {"role": "user",  "body": "What is my portfolio risk?"},
+    {"role": "atlas", "body": "Your current CVaR is 3.2%."},
+    {"role": "user",  "body": "How can I reduce it?"}
+  ]
+}`} />
+      <Table headers={["Field", "Type", "Detail"]} rows={[
+        [<IC>agent_id</IC>, "string", "atlas | nexus | shield | yield"],
+        [<IC>messages</IC>, "array",  "Max 20 messages, each body max 2,000 chars"],
+      ]} />
+      <Code title="response" lang="json" body={`{
+  "reply":      "To reduce CVaR, consider shifting 15% from mETH to USDY...",
+  "model_used": "llama-3.3-70b-versatile",
+  "fallback":   false
+}`} />
+      <Divider label="STATUS" />
+      <H2>GET /api/agents/status</H2>
+      <P>Live reputation scores for all agents from <IC>AgentReputationManager</IC> on-chain.</P>
+      <Code title="response" lang="json" body={`{
+  "atlas":  {"online": true, "reputation": 3.75, "localScore": 75, "autonomyLevel": 3, "actionCount": 12, "erc8004_id": 44},
+  "nexus":  {"online": true, "reputation": 3.75, "localScore": 75, "autonomyLevel": 3, "actionCount":  8, "erc8004_id": 41},
+  "shield": {"online": true, "reputation": 3.75, "localScore": 75, "autonomyLevel": 3, "actionCount":  5, "erc8004_id": 42},
+  "yield":  {"online": true, "reputation": 3.75, "localScore": 75, "autonomyLevel": 3, "actionCount":  9, "erc8004_id": 43}
+}`} />
+    </>
+  );
+}
+
+function ApiPortfolio() {
+  return (
+    <>
+      <H2>POST /api/agents/portfolio/plan</H2>
+      <P>Atlas builds a portfolio strategy based on investor profile. Rate limit: 10 req/min.</P>
+      <Code title="request" lang="json" body={`{
+  "goal":         "income",
+  "horizon":      "medium",
+  "risk_answer":  "hold",
+  "amount":       10000,
+  "avoid":        "",
+  "user_address": "0xabc..."
+}`} />
+      <Table headers={["Field", "Values", "Default"]} rows={[
+        [<IC>goal</IC>,        "income | growth | balanced", "income"],
+        [<IC>horizon</IC>,     "short | medium | long",      "medium"],
+        [<IC>risk_answer</IC>, "sell | hold | buy",          "hold"],
+        [<IC>amount</IC>,      "USD float",                  "10000"],
+        [<IC>avoid</IC>,       "comma-separated symbols",    '""'],
+        [<IC>user_address</IC>,"wallet — logs on-chain if set","null"],
+      ]} />
+      <Code title="response" lang="json" body={`{
+  "allocations":   [{"asset":"USDY","bps":5000},{"asset":"mETH","bps":2500},{"asset":"mUSD","bps":1500},{"asset":"fBTC","bps":1000}],
+  "riskScore":     3,
+  "strategyType":  "conservative",
+  "reasoning":     "High USDY allocation provides stable yield...",
+  "modelUsed":     "llama-3.3-70b-versatile",
+  "fallback":      false,
+  "onChainTx":     "0xabc123..."
+}`} />
+      <Divider label="REBALANCE" />
+      <H2>POST /api/agents/portfolio/rebalance</H2>
+      <Code title="request" lang="json" body={`{
+  "user_address": "0xabc...",
+  "from_assets":  ["mETH", "fBTC"],
+  "to_assets":    ["USDY", "mUSD"],
+  "amounts_usd":  [2500.0, 1000.0]
+}`} />
+      <Code title="response" lang="json" body={`{"reasoning":"...","modelUsed":"llama-3.3-70b-versatile","fallback":false,"onChainTx":"0xdef456..."}`} />
+      <Divider label="READ" />
+      <H2>GET /api/agents/portfolio/{"{user_address}"}</H2>
+      <P>Read portfolio from <IC>PortfolioVault</IC> on-chain.</P>
+      <Code title="response" lang="json" body={`{
+  "hasPortfolio":   true,
+  "assets":         ["USDY","mETH"],
+  "allocations":    [5000, 5000],
+  "riskScore":      4,
+  "strategyType":   "balanced",
+  "createdAt":      1748000000,
+  "lastRebalanced": 1748100000,
+  "atlasReasoning": "Balanced allocation for medium horizon..."
+}`} />
+    </>
+  );
+}
+
+function ApiTokenize() {
+  return (
+    <>
+      <H2>POST /api/agents/tokenize</H2>
+      <P>Nexus analyses an asset document and returns token parameters. Rate limit: 10 req/min. Input is sanitised — injection patterns are stripped automatically.</P>
+      <Code title="request" lang="json" body={`{
+  "document_text": "Property deed for 123 Main St...",
+  "asset_type":    "real_estate",
+  "asset_id":      0,
+  "token_address": "0x0000000000000000000000000000000000000000",
+  "owner_address": "0xabc..."
+}`} />
+      <Table headers={["Field", "Detail"]} rows={[
+        [<IC>document_text</IC>, "Required. Max 40,000 chars."],
+        [<IC>asset_type</IC>,    "Optional hint, max 64 chars."],
+        [<IC>token_address</IC>, "Non-zero → logs tokenization to AgentExecutor."],
+      ]} />
+      <Code title="response" lang="json" body={`{
+  "suggestedTokenName": "Main Street Property Token",
+  "suggestedSymbol":    "MSPT",
+  "suggestedSupply":    1000000,
+  "pricePerTokenUSD":   1.00,
+  "estimatedValueUSD":  1000000,
+  "annualYieldBps":     650,
+  "reasoning":          "Commercial property with stable rental income...",
+  "modelUsed":          "llama-3.3-70b-versatile",
+  "fallback":           false,
+  "onChainTx":          "0xabc..."
+}`} />
+      <Divider label="COMPLIANCE" />
+      <H2>POST /api/agents/compliance</H2>
+      <P>Shield reviews an asset for compliance and logs to AgentExecutor. Rate limit: 10 req/min.</P>
+      <Code title="request" lang="json" body={`{"asset_id":1,"document_text":"Asset prospectus...","jurisdiction":"US"}`} />
+      <Code title="response" lang="json" body={`{
+  "complianceScore": 87,
+  "passed":          true,
+  "flags":           [],
+  "reasoning":       "Asset meets SEC Reg D exemption requirements...",
+  "modelUsed":       "llama-3.3-70b-versatile",
+  "fallback":        false,
+  "onChainTx":       "0xabc..."
+}`} />
+      <Divider label="EXTRACT TEXT" />
+      <H2>POST /api/agents/extract-text</H2>
+      <P>Extract text from uploaded files to feed into <IC>/tokenize</IC>. Rate limit: 5 req/min.</P>
+      <Callout type="info">Content-Type: <IC>multipart/form-data</IC>. Max 5 files, max 10 MB each. Allowed: <IC>.pdf .docx .doc .txt .md</IC></Callout>
+      <Code title="response" lang="json" body={`{
+  "results": [
+    {"name": "deed.pdf",      "text": "Property deed for 123 Main St..."},
+    {"name": "appraisal.pdf", "text": "Appraised value: $1,200,000..."}
+  ]
+}`} />
+    </>
+  );
+}
+
+function ApiMarket() {
+  return (
+    <>
+      <H2>GET /api/agents/market/listings</H2>
+      <P>All tokenized RWA listings. Query param: <IC>limit</IC> (default 100, max 200).</P>
+      <Code title="response" lang="json" body={`{
+  "listings": [{
+    "token_address": "0xabc...",
+    "token_name":    "Main Street Property Token",
+    "token_symbol":  "MSPT",
+    "asset_type":    "real_estate",
+    "price_usd":     1.00,
+    "apy_bps":       650,
+    "owner":         "0xdef..."
+  }]
+}`} />
+      <Divider label="BUY" />
+      <H2>POST /api/agents/market/buy</H2>
+      <P>Atlas logs an RWA purchase on-chain via <IC>AgentExecutor</IC>.</P>
+      <Code title="request" lang="json" body={`{
+  "buyer_address":   "0xabc...",
+  "token_address":   "0xdef...",
+  "token_symbol":    "MSPT",
+  "token_name":      "Main Street Property Token",
+  "amount_usd":      5000.0,
+  "price_per_token": 1.00,
+  "apy_bps":         650
+}`} />
+      <Code title="response" lang="json" body={`{
+  "success":    true,
+  "onChainTx":  "0xabc...",
+  "tokens":     5000.0,
+  "reasoning":  "Atlas market purchase: 5,000.00 MSPT at $1.0000/token."
+}`} />
+      <Divider label="SELL" />
+      <H2>POST /api/agents/market/sell</H2>
+      <Code title="request" lang="json" body={`{
+  "seller_address":  "0xabc...",
+  "token_address":   "0xdef...",
+  "token_symbol":    "MSPT",
+  "token_name":      "Main Street Property Token",
+  "amount_tokens":   1000.0,
+  "price_per_token": 1.05,
+  "apy_bps":         650
+}`} />
+      <Code title="response" lang="json" body={`{"success":true,"onChainTx":"0xabc...","usd_value":1050.0,"reasoning":"Atlas market sell: 1,000.00 MSPT at $1.0500/token."}`} />
+    </>
+  );
+}
+
+function ApiVault() {
+  return (
+    <>
+      <H2>GET /api/agents/vault/status/{"{user_address}"}</H2>
+      <P>User vault balance, agent allowance, and caps. Query params: <IC>token</IC>, <IC>agent</IC>.</P>
+      <Code title="response" lang="json" body={`{
+  "available":     true,
+  "vault":         "0xC6c08d...",
+  "balance":       "1000000000000000000",
+  "allowance":     "100000000000000000",
+  "expiry":        1780000000,
+  "approvedAgent": true,
+  "limits": {
+    "perTxCap":             "115792...",
+    "perAgentDailyCap":     "115792...",
+    "perUserPercentCapBps": 1000
+  }
+}`} />
+      <Divider label="CONSENT" />
+      <H2>POST /api/agents/vault/consent</H2>
+      <P>Generates EIP-712 typed data for the user to sign in their wallet. The returned <IC>typedData</IC> is passed to <IC>signTypedData</IC> in the frontend.</P>
+      <Code title="request" lang="json" body={`{
+  "user_address": "0xabc...",
+  "token":        "0xcE265E...",
+  "amount_wei":   1000000000000000000,
+  "expiry":       1780000000,
+  "agent_address": null
+}`} />
+      <Code title="response (pass typedData to wallet)" lang="json" body={`{
+  "typedData": {
+    "domain":  {"name":"HybridVault","version":"1","chainId":5003,"verifyingContract":"0xC6c08d..."},
+    "types":   {"AgentConsent":[{"name":"user","type":"address"},{"name":"agent","type":"address"},{"name":"token","type":"address"},{"name":"amount","type":"uint256"},{"name":"expiry","type":"uint256"},{"name":"nonce","type":"uint256"}]},
+    "message": {"user":"0xabc...","agent":"0x...","token":"0xcE...","amount":"1000000000000000000","expiry":1780000000,"nonce":0}
+  },
+  "agent": "0x...", "vault": "0xC6c08d...", "nonce": 0
+}`} />
+      <Divider label="RELAY" />
+      <H2>POST /api/agents/vault/relay-allowance</H2>
+      <P>Sends the user's EIP-712 signature to HybridVault to set the agent allowance on-chain.</P>
+      <Code title="request" lang="json" body={`{
+  "user_address": "0xabc...",
+  "token":        "0xcE265E...",
+  "amount_wei":   1000000000000000000,
+  "expiry":       1780000000,
+  "nonce":        0,
+  "signature":    "0x...",
+  "agent_address": null
+}`} />
+      <Code title="response" lang="json" body={`{"onChainTx":"0xabc...","agent":"0x..."}`} />
+      <Divider label="EXECUTE" />
+      <H2>POST /api/agents/vault/execute</H2>
+      <Callout type="warn">Only active when <IC>AUTONOMOUS_EXECUTION_ENABLED=true</IC> in Railway env. Disabled by default.</Callout>
+      <Code title="request" lang="json" body={`{"user_address":"0xabc...","token":"0xcE265E...","to":"0xdest...","amount_wei":100000000000000000,"data_hex":"0x"}`} />
+      <Code title="response" lang="json" body={`{"onChainTx":"0xabc..."}`} />
+    </>
+  );
+}
+
+function ApiStats() {
+  return (
+    <>
+      <H2>GET /api/agents/stats</H2>
+      <P>Combined stats from indexer DB + live chain counters.</P>
+      <Code title="response" lang="json" body={`{
+  "assetCount":      12,
+  "agentRuns":       847,
+  "totalValueUSD":   4250000.0,
+  "assetCountChain": 12,
+  "actionCountChain":847
+}`} />
+      <Divider label="ACTIONS" />
+      <H2>GET /api/agents/stats/actions</H2>
+      <P>Recent agent actions from the indexer. Query params: <IC>limit</IC> (default 20, max 100), <IC>agent</IC> (filter by name).</P>
+      <Code title="response" lang="json" body={`{
+  "actions": [{
+    "agent_name":  "atlas",
+    "action_type": "portfolio_plan",
+    "reasoning":   "Conservative allocation for risk-averse investor...",
+    "tx_hash":     "0xabc...",
+    "timestamp":   1748000000
+  }]
+}`} />
+      <Divider label="ASSETS" />
+      <H2>GET /api/agents/stats/assets</H2>
+      <P>Tokenized asset list. Query params: <IC>limit</IC> (default 50, max 200), <IC>owner</IC> (filter by wallet).</P>
+      <Divider label="WEBSOCKET" />
+      <H2>WS /ws</H2>
+      <P>Live heartbeat every 5 seconds. Public — no API key needed.</P>
+      <Code title="message format" lang="json" body={`{
+  "type":  "heartbeat",
+  "block": 18234521,
+  "agents": {
+    "atlas":  {"online":true,"reputation":3.75,"erc8004_id":44},
+    "nexus":  {"online":true,"reputation":3.75,"erc8004_id":41},
+    "shield": {"online":true,"reputation":3.75,"erc8004_id":42},
+    "yield":  {"online":true,"reputation":3.75,"erc8004_id":43}
+  },
+  "ts": 1748000000.123
+}`} />
+      <Code title="connect" lang="javascript" body={`const ws = new WebSocket("wss://your-railway-app.railway.app/ws");
+ws.onmessage = (e) => console.log(JSON.parse(e.data));`} />
+    </>
+  );
+}
+
 // ── Content router ──────────────────────────────────────────────
 function PageContent({ id }: { id: string }) {
   if (id === "getting-started") return <GettingStarted />;
@@ -828,6 +1181,13 @@ function PageContent({ id }: { id: string }) {
   if (id === "gtm")             return <GTM />;
   if (["atlas-doc","nexus-doc","shield-doc","yield-doc","orchestration"].includes(id))
     return <AgentDoc id={id} />;
+  if (id === "api-auth")      return <ApiAuth />;
+  if (id === "api-chat")      return <ApiChat />;
+  if (id === "api-portfolio") return <ApiPortfolio />;
+  if (id === "api-tokenize")  return <ApiTokenize />;
+  if (id === "api-market")    return <ApiMarket />;
+  if (id === "api-vault")     return <ApiVault />;
+  if (id === "api-stats")     return <ApiStats />;
   return null;
 }
 
@@ -849,6 +1209,13 @@ const META: Record<string, { title: string; subtitle: string; tag: string }> = {
   "tokenomics":      { title:"$RWAI Tokenomics",      subtitle:"100M fixed supply. Governance + fee capture.",      tag:"TOKENOMICS" },
   "revenue":         { title:"Revenue Model",         subtitle:"Three on-chain fee streams. All governance-capped.", tag:"BUSINESS" },
   "gtm":             { title:"Go-to-Market",          subtitle:"Four phases. One compounding on-chain moat.",       tag:"BUSINESS" },
+  "api-auth":      { title:"Auth & Rate Limits",   subtitle:"API key authentication and per-IP rate limiting.",   tag:"API REFERENCE" },
+  "api-chat":      { title:"Chat & Status",         subtitle:"Send messages to agents, read live reputation.",     tag:"API REFERENCE" },
+  "api-portfolio": { title:"Portfolio API",         subtitle:"Plan, rebalance, and read on-chain portfolio.",      tag:"API REFERENCE" },
+  "api-tokenize":  { title:"Tokenize & Extract",    subtitle:"Nexus tokenization, Shield compliance, file extract.",tag:"API REFERENCE" },
+  "api-market":    { title:"Market API",            subtitle:"Listings, buy and sell RWA tokens on-chain.",        tag:"API REFERENCE" },
+  "api-vault":     { title:"Vault API",             subtitle:"HybridVault status, EIP-712 consent, relay, execute.",tag:"API REFERENCE" },
+  "api-stats":     { title:"Stats & WebSocket",     subtitle:"Indexer stats, action history, live WS heartbeat.",  tag:"API REFERENCE" },
 };
 
 export default function DocsPage() {
@@ -914,7 +1281,7 @@ export default function DocsPage() {
           {[
             { label:"Mantlescan Explorer", href:"https://sepolia.mantlescan.xyz" },
             { label:"GitHub Repository",   href:"https://github.com/ntfound-dev/RWAI" },
-            { label:"API Reference",       href:"http://localhost:8001/docs" },
+            { label:"FastAPI Swagger",      href:"http://localhost:8001/docs" },
           ].map(l=>(
             <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{
               display:"flex", alignItems:"center", gap:6,
