@@ -1,12 +1,16 @@
 import re
 import json
 import time
-from fastapi import APIRouter, HTTPException
+import asyncio
+import logging
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
-from ...mantle.executor import log_tokenization, log_compliance_review
+from ...mantle.executor import log_tokenization, log_compliance_review, publish_yield_snapshot, record_yield_on_executor
 from ...mantle.db import record_user_tokenization
+
+_log = logging.getLogger("rwai.tokenize")
 
 router = APIRouter()
 
@@ -61,10 +65,38 @@ def _parse_json(text: str) -> dict:
     return {"raw": text, "error": "Could not parse structured output"}
 
 
+async def _notify_yield(token_name: str, token_symbol: str, apy_bps: int, token_address: str) -> None:
+    """Background: Yield monitors the newly tokenized asset and publishes a snapshot."""
+    try:
+        prompt = (
+            f"A new RWA token has just been deployed on Mantle: {token_name} ({token_symbol}) "
+            f"at address {token_address} with an initial yield of {apy_bps}bps. "
+            f"Incorporate this asset into your current yield monitoring. "
+            f"Fetch updated data for USDY, mETH, MI4, fBTC, mUSD, and this new asset, "
+            f"note any drift signals, and respond ONLY with the JSON format defined in your skill."
+        )
+        reply, _, _ = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
+        start = reply.find("{"); end = reply.rfind("}") + 1
+        result = json.loads(reply[start:end]) if start >= 0 and end > start else {}
+        yields_bps = {
+            a["symbol"]: int(a["apyBps"])
+            for a in result.get("assets", [])
+            if "symbol" in a and "apyBps" in a
+        }
+        note = result.get("agentNote", f"Yield update triggered by Nexus tokenization of {token_symbol}")
+        if yields_bps:
+            tx1 = publish_yield_snapshot(yields_bps, note)
+            tx2 = record_yield_on_executor(yields_bps, note)
+            _log.info("Yield notified of new token %s — oracle=%s executor=%s", token_symbol, tx1, tx2)
+    except Exception as exc:
+        _log.warning("Yield notification failed for %s: %s", token_symbol, exc)
+
+
 @router.post("/tokenize")
-async def tokenize(req: TokenizeRequest):
+async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
     """Nexus analyzes a document and returns token parameters.
-    If token_address is non-zero, also logs the tokenization on AgentExecutor.
+    If token_address is non-zero, also logs the tokenization on AgentExecutor
+    and notifies Yield to start monitoring the new asset.
     """
     if not req.document_text or not req.document_text.strip():
         raise HTTPException(400, "document_text is required")
@@ -88,19 +120,29 @@ async def tokenize(req: TokenizeRequest):
             result["onChainTx"] = tx
 
         # Record user tokenization with full nexus metadata so portfolio can display it
+        token_name   = result.get("suggestedTokenName") or result.get("tokenName", "")
+        token_symbol = result.get("suggestedSymbol") or result.get("symbol", "")
+        apy_bps      = result.get("annualYieldBps", 0)
+
         if req.owner_address:
             record_user_tokenization(
                 owner=req.owner_address,
                 token_address=req.token_address,
                 asset_type=req.asset_type or result.get("assetType", "real_estate"),
                 tx_hash=tx or "",
-                token_name=result.get("suggestedTokenName") or result.get("tokenName", ""),
-                token_symbol=result.get("suggestedSymbol") or result.get("symbol", ""),
-                apy_bps=result.get("annualYieldBps", 0),
+                token_name=token_name,
+                token_symbol=token_symbol,
+                apy_bps=apy_bps,
                 value_usd=result.get("estimatedValueUSD", 0),
                 price_usd=result.get("pricePerTokenUSD", 0),
                 supply=result.get("suggestedSupply", 0),
                 compliance_score=0,
+            )
+
+        # Notify Yield agent in background — new asset enters market monitoring
+        if token_symbol:
+            background_tasks.add_task(
+                _notify_yield, token_name, token_symbol, apy_bps, req.token_address
             )
 
     return result
