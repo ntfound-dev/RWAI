@@ -1,11 +1,15 @@
 import json
+import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
 from ...mantle.executor import execute_allocation, execute_rebalance
-from ...mantle.contracts import get_portfolio_vault
-from ...mantle.client import get_w3
+from ...mantle.contracts import get_portfolio_vault, get_yield_oracle
+from ...mantle.client import get_w3, get_addresses
+from web3 import Web3
+
+_log = logging.getLogger("rwai.portfolio")
 
 router = APIRouter()
 
@@ -47,16 +51,44 @@ def _parse_json(text: str) -> dict:
     return {"raw": text}
 
 
+def _live_yields() -> str:
+    """Read latest APYs from YieldOracle on-chain. Returns a formatted string for Atlas context."""
+    try:
+        oracle = get_yield_oracle()
+        w3 = get_w3()
+        if not oracle or not w3:
+            return ""
+        lines = []
+        for sym, addr in ASSET_ADDRESSES.items():
+            cs = Web3.to_checksum_address(addr)
+            result = oracle.functions.getLatestYield(cs).call()
+            bps = result[0]  # (apyBps, timestamp, agentNote)
+            if bps > 0:
+                lines.append(f"{sym}: {bps/100:.2f}% APY ({bps}bps)")
+        return "\n".join(lines) if lines else ""
+    except Exception as exc:
+        _log.debug("Live yield fetch failed: %s", exc)
+        return ""
+
+
 @router.post("/portfolio/plan")
 async def portfolio_plan(body: PlanRequest):
-    """Atlas builds a portfolio strategy. If user_address provided, writes allocation to AgentExecutor."""
+    """Atlas builds a portfolio strategy using live Yield oracle data.
+    If user_address provided, writes allocation to AgentExecutor.
+    """
+    live = _live_yields()
+    yield_context = (
+        f"\nCurrent live yields from Yield oracle on Mantle:\n{live}\n"
+        if live else
+        "\nUse your default APY estimates for USDY, mETH, mUSD, fBTC.\n"
+    )
     prompt = f"""Build a portfolio strategy for this investor:
 - Goal: {body.goal}
 - Time horizon: {body.horizon}
 - Market drop reaction: {body.risk_answer}
 - Investment amount: ${body.amount}
 - Assets to avoid: {body.avoid or 'none'}
-
+{yield_context}
 Respond ONLY with valid JSON containing: allocations (list of {{asset, bps}}), riskScore (1-10), strategyType, reasoning."""
 
     try:
