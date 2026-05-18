@@ -49,6 +49,7 @@ export default function TokenizePage() {
   const [documentText, setDocumentText] = useState("");
   const [error, setError] = useState("");
   const [agentLog, setAgentLog] = useState<string[]>([]);
+  const [jurisdiction, setJurisdiction] = useState("US-NY");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const addLog = (msg: string) => setAgentLog(prev => [...prev, msg]);
@@ -79,18 +80,20 @@ export default function TokenizePage() {
       addLog("nexus → analysis complete. Delegating to shield…");
 
       setStep("compliance");
-      addLog("shield.kyc_check() → scanning ownership records…");
+      addLog(`shield.kyc_check() → scanning ownership records… jurisdiction: ${jurisdiction}`);
+      addLog("shield.wallet_screen() → OFAC/EU sanctions check…");
       const shield = await agentApi<Record<string, unknown>>("/compliance", {
         method: "POST",
         body: JSON.stringify({
           asset_id: 0,
           document_text: docs,
-          jurisdiction: "US-NY",
+          jurisdiction,
+          owner_address: address ?? null,
         }),
       });
       const normalizedShield = normalizeShield(shield);
       setShieldResult(normalizedShield);
-      addLog(`shield → score ${normalizedShield.score}/100 · ${normalizedShield.cleared ? "CLEARED" : "BLOCKED"}. Ready for review.`);
+      addLog(`shield.risk_score() → ${normalizedShield.score}/100 · ${normalizedShield.cleared ? "CLEARED ✓" : "BLOCKED ✗"}. Ready for review.`);
 
       setStep("review");
     } catch (err) {
@@ -199,6 +202,23 @@ export default function TokenizePage() {
                 ))}
               </div>
             )}
+            {/* Jurisdiction selector */}
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+              <span className="mono-sm" style={{ color:"var(--fg-2)" }}>Jurisdiction:</span>
+              <select
+                value={jurisdiction}
+                onChange={e => setJurisdiction(e.target.value)}
+                style={{ fontFamily:"var(--font-mono)", fontSize:11, background:"var(--bg-1)", border:"1px solid var(--line)", color:"var(--fg-0)", padding:"4px 8px", borderRadius:2 }}
+              >
+                <option value="US-NY">US-NY (Reg D)</option>
+                <option value="US-CA">US-CA (Reg D)</option>
+                <option value="EU-DE">EU-DE (MiFID II)</option>
+                <option value="EU-FR">EU-FR (MiFID II)</option>
+                <option value="SG">Singapore (MAS)</option>
+                <option value="AE-ADGM">UAE-ADGM (FSRA)</option>
+                <option value="UK">UK (FCA)</option>
+              </select>
+            </div>
             <button
               className="btn btn-primary"
               onClick={files.length === 0 ? () => fileRef.current?.click() : runAnalysis}

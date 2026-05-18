@@ -47,6 +47,7 @@ class ComplianceRequest(BaseModel):
     asset_id: int
     document_text: str
     jurisdiction: Optional[str] = None
+    owner_address: Optional[str] = None  # wallet to screen against sanctions lists
 
 
 def _parse_json(text: str) -> dict:
@@ -112,18 +113,28 @@ async def compliance(req: ComplianceRequest):
         raise HTTPException(400, "document_text is required")
     doc = _sanitize_doc(req.document_text)
     jurisdiction = (req.jurisdiction or "unknown")[:64]
+    wallet_line = (
+        f"\nOwner wallet for sanctions screening: {req.owner_address}"
+        if req.owner_address else ""
+    )
     prompt = (
         f"Review this asset (ID: {req.asset_id}) for compliance. "
-        f"Jurisdiction: {jurisdiction}.\n\n"
+        f"Jurisdiction: {jurisdiction}.{wallet_line}\n\n"
+        f"Score using your 4-category breakdown:\n"
+        f"- Document completeness (30%): Are all required documents present?\n"
+        f"- Ownership clarity (25%): Is title clear, no disputes or encumbrances?\n"
+        f"- Jurisdictional compliance (25%): Which regulation applies (Reg D, MiFID II, etc.)? Is the exemption valid?\n"
+        f"- Sanctions screening (20%): Are any parties or the owner wallet flagged on OFAC/EU lists?\n\n"
+        f"Apply the 70/100 threshold: score < 70 → cleared: false, BLOCK deployment.\n\n"
         f"{doc}\n\nRespond ONLY with the JSON format defined in your skill."
     )
     reply, model, fallback = await agent_complete("shield", [ChatMessage(role="user", body=prompt)])
     result = _parse_json(reply)
     result.update({"modelUsed": model, "fallback": fallback})
 
-    # Write compliance score to AgentExecutor
-    score = result.get("complianceScore", result.get("score", 75))
-    reasoning = result.get("reasoning", result.get("summary", reply[:500]))
+    # Default score to 0 (not 75) so a parse failure never masks a BLOCK
+    score = result.get("score", result.get("complianceScore", 0))
+    reasoning = result.get("notes", result.get("reasoning", result.get("summary", reply[:500])))
     tx = log_compliance_review(req.asset_id, int(score), reasoning)
     if tx:
         result["onChainTx"] = tx
