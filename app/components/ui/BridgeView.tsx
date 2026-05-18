@@ -126,7 +126,7 @@ function SessionTimer() {
 }
 
 // ── Telemetry log entry ───────────────────────────────────────────
-interface TeleEntry { kind: "INPUT" | "RESPONSE"; text: string; time: string; }
+interface TeleEntry { kind: "INPUT" | "RESPONSE" | "BLOCKED"; text: string; time: string; }
 
 // ── Main BridgeView ───────────────────────────────────────────────
 interface BridgeViewProps {
@@ -200,7 +200,18 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
     setChatLog(prev => [...prev, { role: "user", text, time: t }]);
     setTeleLog(prev => [...prev, { kind: "INPUT", text: text.slice(0, 60), time: t }]);
     onMessage?.("user", text);
-    setJState("thinking"); setTextInput("");
+    setTextInput("");
+
+    if (/\b(private[_\s.]?key|AGENT_PRIVATE_KEY|mnemonic|seed[_\s.]?phrase|secret[_\s.]?key)\b/i.test(text)) {
+      const refusal = "I cannot share private keys, mnemonics, or backend credentials — those stay in the server environment and are never exposed through this interface.";
+      setChatLog(prev => [...prev, { role: "atlas", text: refusal, time: now(), isNew: true }]);
+      setTeleLog(prev => [...prev, { kind: "BLOCKED", text: "sensitive data request", time: now() }]);
+      onMessage?.("atlas", refusal);
+      speak(refusal);
+      return;
+    }
+
+    setJState("thinking");
     const next = [...history, { role: "user", body: text }];
     setHistory(next);
     try {
@@ -272,7 +283,7 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
             background: "transparent", border: "1px solid rgba(255,255,255,0.15)",
             color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-mono)", fontSize: 9,
             padding: "4px 12px", cursor: "pointer", letterSpacing: "0.1em",
-          }}>↙ EXIT BRIDGE</button>
+          }}>↙ EXIT JARVIS</button>
         </div>
       </div>
 

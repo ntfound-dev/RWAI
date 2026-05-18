@@ -177,11 +177,15 @@ function MiniSphere({ state }: { state: JState }) {
   return <canvas ref={ref} width={260} height={260} style={{display:"block",width:"100%",height:"auto"}}/>;
 }
 
+const SENSITIVE_RE = /\b(private[_\s.]?key|AGENT_PRIVATE_KEY|mnemonic|seed[_\s.]?phrase|secret[_\s.]?key|priv[_\s.]?key)\b/i;
+const SENSITIVE_REFUSAL = "I cannot share private keys, mnemonics, or backend credentials — those stay in the server environment and are never exposed through this interface.";
+
 // ── Main panel ────────────────────────────────────────────────────
 export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPanelProps) {
   const { address, isConnected } = useAccount();
   const [jState, setJState]   = useState<JState>("idle");
   const [interim, setInterim] = useState("");
+  const [textInput, setTextInput] = useState("");
   const [chatLog, setChatLog] = useState<ChatMsg[]>([]);
   const [modelUsed, setModelUsed] = useState("");
   const [history, setHistory] = useState<{ role: string; body: string }[]>([]);
@@ -268,6 +272,15 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   const sendToAtlas = useCallback(async (text: string) => {
     setChatLog(prev => [...prev, { role:"user", text, time: now() }]);
     onMessage?.("user", text);
+    setTextInput("");
+
+    if (SENSITIVE_RE.test(text)) {
+      setChatLog(prev => [...prev, { role:"atlas", text: SENSITIVE_REFUSAL, time: now(), isNew: true }]);
+      onMessage?.("atlas", SENSITIVE_REFUSAL);
+      speak(SENSITIVE_REFUSAL);
+      return;
+    }
+
     setJState("thinking");
     const next = [...history, { role:"user", body:text }];
     setHistory(next);
@@ -394,34 +407,59 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
         <div ref={chatEndRef}/>
       </div>
 
-      {/* Controls — voice only */}
-      <div style={{ flexShrink:0, padding:"10px 12px 12px", borderTop:`1px solid ${c.p}18`, display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-        <button onClick={toggleListen} disabled={busy} style={{
-          width:44, height:44, borderRadius:"50%",
-          border:`1.5px solid ${jState==="listening"?c.p:`${c.p}35`}`,
-          background: jState==="listening"?`${c.p}15`:"transparent",
-          color: jState==="listening"?c.p:`${c.p}50`,
-          cursor: busy?"not-allowed":"pointer",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow: jState==="listening"?`0 0 20px ${c.p}60`:"none",
-          transition:"all 0.2s",
-        }}>
-          {busy?(
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="9" strokeDasharray="56" strokeLinecap="round">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>
-              </circle>
-            </svg>
-          ):(
-            <svg width="15" height="15" viewBox="0 0 24 24" fill={jState==="listening"?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <rect x="9" y="2" width="6" height="11" rx="3"/>
-              <path d="M5 10a7 7 0 0 0 14 0"/>
-              <line x1="12" y1="19" x2="12" y2="22"/>
-              <line x1="8" y1="22" x2="16" y2="22"/>
-            </svg>
-          )}
-        </button>
-        <div style={{ fontSize:7, color:"rgba(255,255,255,0.2)", letterSpacing:"0.06em" }}>
+      {/* Controls — mic + text input + SEND */}
+      <div style={{ flexShrink:0, padding:"8px 10px 10px", borderTop:`1px solid ${c.p}18`, display:"flex", flexDirection:"column", gap:6 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"36px 1fr auto", gap:5, alignItems:"center", border:`1px solid ${c.p}25`, background:`${c.p}05`, padding:"3px 3px 3px 0" }}>
+          <button onClick={toggleListen} disabled={busy} style={{
+            width:36, height:36, borderRadius:0,
+            border:"none", borderRight:`1px solid ${c.p}20`,
+            background: jState==="listening"?`${c.p}15`:"transparent",
+            color: jState==="listening"?c.p:`${c.p}50`,
+            cursor: busy?"not-allowed":"pointer",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            boxShadow: jState==="listening"?`0 0 16px ${c.p}50`:"none",
+            transition:"all 0.2s",
+          }}>
+            {busy?(
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" strokeDasharray="56" strokeLinecap="round">
+                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>
+                </circle>
+              </svg>
+            ):(
+              <svg width="13" height="13" viewBox="0 0 24 24" fill={jState==="listening"?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="9" y="2" width="6" height="11" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8" y1="22" x2="16" y2="22"/>
+              </svg>
+            )}
+          </button>
+          <input
+            value={textInput}
+            onChange={e => setTextInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            disabled={busy}
+            placeholder="Ask JARVIS — Atlas will execute…"
+            style={{
+              background:"transparent", border:"none", outline:"none",
+              color:"rgba(255,255,255,0.75)", fontFamily:"var(--font-mono)", fontSize:10,
+              padding:"6px 8px",
+            }}
+          />
+          <button
+            onClick={() => !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            disabled={busy || !textInput.trim()}
+            style={{
+              background:"transparent", border:`1px solid ${c.p}30`, color:c.p,
+              fontFamily:"var(--font-mono)", fontSize:8, padding:"5px 10px",
+              cursor: busy||!textInput.trim()?"not-allowed":"pointer",
+              marginRight:3, letterSpacing:"0.1em",
+              opacity: textInput.trim() ? 1 : 0.4, transition:"opacity 0.2s",
+            }}
+          >SEND ↗</button>
+        </div>
+        <div style={{ fontSize:7, color:"rgba(255,255,255,0.18)", letterSpacing:"0.06em", textAlign:"center" }}>
           {isConnected ? `${address?.slice(0,6)}…${address?.slice(-4)} · MANTLE SEPOLIA` : "WALLET NOT CONNECTED"}
         </div>
       </div>

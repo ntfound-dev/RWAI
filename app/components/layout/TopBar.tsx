@@ -41,23 +41,26 @@ export function TopBar() {
       </nav>
 
       <div className="topbar-right" style={{ display:"flex", alignItems:"center", gap:8 }}>
-        {/* SPLIT / BRIDGE / JARVIS mode toggle — only on /chat */}
+        {/* SPLIT / JARVIS mode toggle — only on /chat */}
         {onChat && (
           <div style={{ display:"flex", border:"1px solid var(--line-strong)", borderRadius:2, overflow:"hidden" }}>
-            {(["split","bridge","jarvis"] as ChatMode[]).map(m => (
+            {([
+              { key: "split",  label: "SPLIT",  action: () => setMode("split") },
+              { key: "bridge", label: "JARVIS", action: () => openBridge() },
+            ] as { key: ChatMode; label: string; action: () => void }[]).map(({ key, label, action }, i) => (
               <button
-                key={m}
-                onClick={() => m === "bridge" ? openBridge() : setMode(m)}
+                key={key}
+                onClick={action}
                 style={{
-                  background: mode === m ? "rgba(0,229,160,0.12)" : "transparent",
+                  background: mode === key ? "rgba(0,229,160,0.12)" : "transparent",
                   border: "none",
-                  borderRight: m !== "jarvis" ? "1px solid var(--line-strong)" : "none",
-                  color: mode === m ? "var(--accent)" : "var(--fg-3)",
+                  borderRight: i === 0 ? "1px solid var(--line-strong)" : "none",
+                  color: mode === key ? "var(--accent)" : "var(--fg-3)",
                   fontFamily:"var(--font-mono)", fontSize:9, letterSpacing:"0.12em",
                   padding:"5px 10px", cursor:"pointer", textTransform:"uppercase",
                   transition:"all 0.15s",
                 }}
-              >{m}</button>
+              >{label}</button>
             ))}
           </div>
         )}
