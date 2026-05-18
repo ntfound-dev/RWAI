@@ -20,7 +20,15 @@ interface PortfolioOnChain {
 const ASSET_COL: Record<string, string> = {
   USDY: "#00e5a0", MI4: "#a855f7", mETH: "#00d4ff", fBTC: "#fbbf24", mUSD: "#34d399",
 };
-const YIELD_SYMBOLS = ["USDY", "MI4", "mETH", "fBTC"];
+const YIELD_SYMBOLS = ["USDY", "mETH", "fBTC", "mUSD"];
+
+// address (lowercase) → symbol — for mapping PortfolioVault address[] → apyMap keys
+const ADDR_TO_SYM: Record<string, string> = {
+  "0xce265e23aac349cef9fa3cc058062a44080f2289": "USDY",
+  "0xd57f88b64611dbf74f87fc40f2f1010320483584": "mETH",
+  "0xbed7ad48984fbb3984f5af83e176fb9f40db37cc": "fBTC",
+  "0xdf079db274faeffefd10a4a0e5c12f65e1570cd35": "mUSD",
+};
 
 // ── Types ─────────────────────────────────────────────────────────
 type JState = "idle" | "listening" | "thinking" | "speaking" | "executing";
@@ -177,7 +185,9 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   // ── Derived values ────────────────────────────────────────────────
   const portfolioAssets   = portfolio?.assets ?? [];
   const portfolioAllocBps = portfolio?.allocations ?? [];
-  const blendedApy = portfolioAssets.reduce((s, sym, i) => {
+  // PortfolioVault stores addresses; map to symbols for apyMap lookup
+  const blendedApy = portfolioAssets.reduce((s, addr, i) => {
+    const sym = ADDR_TO_SYM[addr.toLowerCase()] ?? addr;
     const pct = (portfolioAllocBps[i] ?? 0) / 10000;
     return s + pct * (apyMap[sym] ?? 0);
   }, 0);
@@ -186,9 +196,9 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   const agentsOnline = heartbeat ? Object.values(heartbeat.agents).filter(a => a.online).length : 4;
   const maxYieldApy  = Math.max(...YIELD_SYMBOLS.map(s => apyMap[s] ?? 0), 1);
 
-  // ── Plan card APYs from oracle (fall back to known values while loading) ──
+  // ── Plan card APYs from oracle (MI4 is synthetic — computed inside useYieldOracle) ──
   const u = apyMap["USDY"] ?? 4.20;
-  const m = apyMap["MI4"]  ?? 5.81;
+  const m = apyMap["MI4"]  ?? 5.81; // hook computes MI4 as a blend of real assets
   const e = apyMap["mETH"] ?? 6.12;
   const fmtPct = (v: number) => `${v.toFixed(2)}%`;
   const planCards = [
