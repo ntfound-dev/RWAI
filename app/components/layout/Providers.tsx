@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, type State } from "wagmi";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "@/lib/wagmi";
@@ -20,12 +19,22 @@ function JarvisViewGate() {
   return <JarvisView />;
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+// Singleton QueryClient — created once per app lifetime, not per render.
+// staleTime 30s: avoids hammering RPC on every focus/tab-switch.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+    },
+  },
+});
 
+export function Providers({ children, initialState }: { children: React.ReactNode; initialState?: State }) {
   return (
     <ErrorBoundary>
-      <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
+      {/* initialState: cookie-parsed on server — rehydrates wallet before first paint */}
+      <WagmiProvider config={wagmiConfig} initialState={initialState}>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider
             theme={darkTheme({

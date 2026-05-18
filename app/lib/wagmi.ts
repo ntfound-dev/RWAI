@@ -1,10 +1,12 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { http, fallback } from "wagmi";
+import { http, fallback, createStorage, cookieStorage } from "wagmi";
 import { mantleL1Source, mantleMainnet, mantleTestnet } from "@/lib/mantle";
 
 export { mantleL1Source, mantleMainnet, mantleTestnet };
 
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "rwai-demo";
+// Requires a real project ID from https://cloud.walletconnect.com for production.
+// Without it, WalletConnect QR / mobile wallets won't work.
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 const sepoliaRpc = process.env.NEXT_PUBLIC_SEPOLIA_RPC || "https://rpc.sepolia.org";
 const mantleMainnetRpc = process.env.NEXT_PUBLIC_MANTLE_MAINNET_RPC || "https://rpc.mantle.xyz";
 
@@ -22,5 +24,8 @@ export const wagmiConfig = getDefaultConfig({
     [mantleMainnet.id]: http(mantleMainnetRpc),
     [mantleL1Source.id]: http(sepoliaRpc),
   },
+  // cookieStorage: SSR-safe, survives page refresh via Set-Cookie header.
+  // Enables wagmi to rehydrate the connected wallet before first paint.
+  storage: createStorage({ storage: cookieStorage }),
   ssr: true,
 });
