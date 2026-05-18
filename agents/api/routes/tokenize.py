@@ -35,6 +35,20 @@ def _sanitize_doc(text: str) -> str:
     return _INJECT_RE.sub("[content filtered]", text)
 
 
+class TokenizeRequest(BaseModel):
+    document_text: str
+    asset_type: Optional[str] = None
+    asset_id: int = 0                     # existing assetId if known (0 = new)
+    token_address: str = "0x" + "0" * 40  # address after deploy (or zero)
+    owner_address: Optional[str] = None   # wallet that owns the token
+
+
+class ComplianceRequest(BaseModel):
+    asset_id: int
+    document_text: str
+    jurisdiction: Optional[str] = None
+
+
 def _parse_json(text: str) -> dict:
     try:
         start = text.find("{")
