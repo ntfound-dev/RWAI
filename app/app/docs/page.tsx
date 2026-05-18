@@ -419,7 +419,8 @@ function AgentFlowDiagram({ agent }: { agent: "nexus"|"shield"|"yield"|"atlas" }
   const f = flows[agent];
   const W = 680, cx = W / 2;
   const boxW = 160, boxH = 52, gap = 14;
-  const cols = agent === "atlas" ? 3 : (f.steps.length <= 5 ? f.steps.length : 3);
+  const maxCols = Math.floor((W + gap) / (boxW + gap)); // 3 — keeps all boxes within viewBox
+  const cols = Math.min(f.steps.length, maxCols);
   const rows = Math.ceil(f.steps.length / cols);
 
   return (
