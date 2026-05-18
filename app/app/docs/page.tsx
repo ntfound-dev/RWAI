@@ -27,6 +27,7 @@ const SIDEBAR = [
       { id: "nexus-doc",  label: "Nexus" },
       { id: "shield-doc", label: "Shield" },
       { id: "yield-doc",  label: "Yield" },
+      { id: "jarvis-doc", label: "J.A.R.V.I.S." },
       { id: "orchestration", label: "Orchestration" },
     ],
   },
@@ -764,6 +765,42 @@ Atlas : "Here's my recommended allocation:
         </>
       ),
     },
+    "jarvis-doc": {
+      color: "#00d4ff", num: "—", role: "Atlas voice & command interface — J.A.R.V.I.S.",
+      body: (
+        <>
+          <BizStrip items={[
+            { label:"INTERFACE",      value:"Voice + Text" },
+            { label:"BACKED BY",      value:"Atlas + 3 agents" },
+            { label:"DATA",           value:"100% live on-chain" },
+            { label:"SECURITY",       value:"Sensitive data filter" },
+          ]} />
+          <P><strong>J.A.R.V.I.S.</strong> (Just A Rather Very Intelligent System) is the full-screen AI interface for Atlas. It is not a separate agent — it is the UX layer that gives Atlas a face, a voice, and a command line. Open it from the top bar on any page.</P>
+          <P>Every number shown in JARVIS is live: L2 MNT balance from the connected wallet, APYs from <IC>YieldOracle.sol</IC>, agent status from the WebSocket heartbeat, and portfolio allocations from <IC>PortfolioVault.getPortfolio()</IC>.</P>
+          <Divider label="WHAT JARVIS SHOWS" />
+          <Table headers={["Panel", "Data source", "Updates"]} rows={[
+            ["L2 MNT balance",      "wagmi useBalance · Mantle Sepolia",     "Real-time"],
+            ["Portfolio allocations","PortfolioVault.getPortfolio() on-chain", "On connect"],
+            ["Blended APY",         "allocations × YieldOracle APYs",         "With oracle"],
+            ["Yield Intelligence",  "YieldOracle.getLatestSnapshot()",         "Real-time"],
+            ["Agent mesh status",   "WebSocket heartbeat (5s interval)",       "Every 5s"],
+            ["Block number",        "WebSocket heartbeat from Mantle node",    "Every 5s"],
+            ["Plan card APYs",      "Computed from oracle × allocation weights","Real-time"],
+          ]} />
+          <Divider label="SECURITY" />
+          <P>JARVIS includes a client-side sensitive data filter. Any request containing <IC>private_key</IC>, <IC>AGENT_PRIVATE_KEY</IC>, <IC>mnemonic</IC>, or <IC>seed_phrase</IC> is intercepted before it reaches Atlas and returns a fixed refusal. Backend credentials are never exposed through this interface.</P>
+          <Divider label="HOW TO USE" />
+          <Table headers={["Action", "How"]} rows={[
+            ["Open JARVIS",          "Click JARVIS pill (top bar, any page) or SPLIT→JARVIS toggle on /chat"],
+            ["Ask a question",       "Type in the input box and press SEND ↗ or Enter"],
+            ["Voice command",        "Click the mic button — Chrome/Edge only (Web Speech API)"],
+            ["Quick commands",       "Click the preset chips: Show allocations · Stress-test · Execute · Explain CVaR"],
+            ["Build portfolio",      'Say "Build me a conservative portfolio" — Atlas delegates to Yield + Shield'],
+            ["Close",                "Click ↙ EXIT JARVIS or press the JARVIS pill again"],
+          ]} />
+        </>
+      ),
+    },
     "orchestration": {
       color: "#a855f7", num: "—", role: "Multi-agent coordination flow",
       body: (
@@ -1422,7 +1459,7 @@ function PageContent({ id }: { id: string }) {
   if (id === "tokenomics")      return <Tokenomics />;
   if (id === "revenue")         return <Revenue />;
   if (id === "gtm")             return <GTM />;
-  if (["atlas-doc","nexus-doc","shield-doc","yield-doc","orchestration"].includes(id))
+  if (["atlas-doc","nexus-doc","shield-doc","yield-doc","jarvis-doc","orchestration"].includes(id))
     return <AgentDoc id={id} />;
   if (id === "api-auth")      return <ApiAuth />;
   if (id === "api-chat")      return <ApiChat />;
@@ -1445,6 +1482,7 @@ const META: Record<string, { title: string; subtitle: string; tag: string }> = {
   "nexus-doc":       { title:"Nexus",                 subtitle:"Tokenizes real-world assets from documents.",       tag:"AGENT · ERC-8004 #41" },
   "shield-doc":      { title:"Shield",                subtitle:"AI compliance — KYC/AML, sanctions, risk score.",  tag:"AGENT · ERC-8004 #42" },
   "yield-doc":       { title:"Yield",                 subtitle:"Monitors APY via Pyth, writes to YieldOracle.",    tag:"AGENT · ERC-8004 #43" },
+  "jarvis-doc":      { title:"J.A.R.V.I.S.",          subtitle:"Atlas voice & command interface — all data live.",  tag:"INTERFACE" },
   "orchestration":   { title:"Orchestration",         subtitle:"How Atlas coordinates the multi-agent system.",     tag:"PROTOCOL" },
   "erc8004":         { title:"ERC-8004 Identity",     subtitle:"Mantle's standard for on-chain AI agent identity.", tag:"PROTOCOL" },
   "contracts":       { title:"Contract Addresses",    subtitle:"All 8 contracts deployed on Mantle Sepolia.",       tag:"PROTOCOL" },
