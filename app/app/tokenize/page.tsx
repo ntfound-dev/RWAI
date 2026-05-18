@@ -29,6 +29,7 @@ interface ShieldResult {
 }
 
 const STEPS: Step[] = ["upload", "analyze", "compliance", "review", "deploy", "live"];
+
 const STEP_LABELS: Record<Step, string> = {
   upload:     "Upload",
   analyze:    "Analyze",
@@ -224,10 +225,6 @@ export default function TokenizePage() {
               onClick={files.length === 0 ? () => fileRef.current?.click() : runAnalysis}
             >
               {files.length === 0 ? "Upload files to continue" : `Analyze ${files.length} document${files.length > 1 ? "s" : ""} →`}
-            </button>
-            {/* Demo button */}
-            <button className="btn btn-ghost" style={{ marginLeft:8 }} onClick={() => { setFiles([new File([""], "manhattan-deed.pdf")]); setTimeout(runAnalysis, 100); }}>
-              Demo with sample asset
             </button>
             {error && (
               <div style={{ marginTop:16, padding:"12px 16px", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:2, fontSize:13, color:"var(--warn)" }}>
