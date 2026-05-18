@@ -4,14 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AgentMonogram, AGENTS } from "@/components/agents/AgentMonogram";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
-
-const TICKER_STATIC = [
-  ["USDY", "4.20%", "+0.02", "var(--accent)"],
-  ["MI4",  "5.81%", "+0.14", "var(--accent)"],
-  ["mETH", "6.12%", "-0.03", "var(--warn)"],
-  ["MNT",  "$0.74", "+1.2%", "var(--accent)"],
-  ["fBTC", "4.95%", "+0.08", "var(--accent)"],
-];
+import { useYieldOracle } from "@/hooks/useYieldOracle";
 
 const TRACE_STEPS = [
   { agent: "atlas",  action: "plan_strategy",    detail: "risk=conservative, horizon=24mo" },
@@ -45,6 +38,7 @@ export default function LandingPage() {
   const [chainStats, setChainStats] = useState<ChainStats | null>(null);
   const [recentTx, setRecentTx]   = useState<string>("");
   const { data: agentStatus } = useAgentStatus();
+  const { apyMap } = useYieldOracle();
 
   useEffect(() => {
     fetch("/api/agents/stats", { cache: "no-store" })
@@ -58,8 +52,13 @@ export default function LandingPage() {
       .catch(() => {});
   }, []);
 
+  const fmtApy = (sym: string) => apyMap[sym] != null ? `${apyMap[sym].toFixed(2)}%` : "…";
   const TICKER_DATA = [
-    ...TICKER_STATIC,
+    ["USDY", fmtApy("USDY"), "YieldOracle", "var(--accent)"],
+    ["MI4",  fmtApy("MI4"),  "YieldOracle", "var(--accent)"],
+    ["mETH", fmtApy("mETH"), "YieldOracle", "var(--warn)"],
+    ["fBTC", fmtApy("fBTC"), "YieldOracle", "var(--accent)"],
+    ["mUSD", fmtApy("mUSD"), "YieldOracle", "var(--accent)"],
     ["NEXUS·rep",  agentStatus?.nexus  ? agentStatus.nexus.reputation.toFixed(2)  : "…", `score ${agentStatus?.nexus?.localScore  ?? "…"}/100`, "var(--nexus)"],
     ["SHIELD·rep", agentStatus?.shield ? agentStatus.shield.reputation.toFixed(2) : "…", `score ${agentStatus?.shield?.localScore ?? "…"}/100`, "var(--shield)"],
     ["YIELD·rep",  agentStatus?.yield  ? agentStatus.yield.reputation.toFixed(2)  : "…", `score ${agentStatus?.yield?.localScore  ?? "…"}/100`, "var(--yield)"],

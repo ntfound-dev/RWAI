@@ -6,6 +6,7 @@ import { MeshBackground } from "@/components/ui/MeshBackground";
 import { agentApi, type AgentChatResponse } from "@/lib/agent-api";
 import { JarvisPanel } from "@/components/ui/JarvisPanel";
 import { useAgentSocket } from "@/hooks/useAgentSocket";
+import { useYieldOracle } from "@/hooks/useYieldOracle";
 
 // ── Transcript data ───────────────────────────────────────────────
 type MsgKind = "text" | "reasoning" | "tool" | "plan-options";
@@ -19,33 +20,41 @@ interface Msg {
   plans?: Plan[];
 }
 
-const TRANSCRIPT: Msg[] = [
-  { role: "atlas", kind: "text", body: "I'm Atlas. I orchestrate the other three agents to plan and run your portfolio. Tell me what you want to do — or pick a starter below." },
-  { role: "user",  kind: "text", body: "I have $10k. Build me a few strategy options to compare." },
-  { role: "atlas", kind: "reasoning", steps: [
-    "Parsing intent: amount=10000 USD, multiple-options requested",
-    "Delegating yield_diff() → Yield agent",
-    "Delegating risk_scan() → Shield agent",
-    "Generating 3 allocation candidates across risk tiers",
-  ]},
-  { role: "yield", kind: "tool", tool: "yield_feed", args: "sources=3", result: { USDY: "4.20%", MI4: "5.81%", mETH: "6.12%" }, latency: "0.42s" },
-  { role: "shield", kind: "tool", tool: "risk_scan",  args: "assets=[USDY,MI4,mETH]", result: { USDY: "low", MI4: "low-mid", mETH: "mid" }, latency: "0.61s" },
-  { role: "atlas", kind: "text", body: "I prepared 3 plans across risk tiers. Pick one — I'll handle execution end-to-end. You only approve once." },
-  { role: "atlas", kind: "plan-options", plans: [
-    { id: "cons", name: "Conservative", confidence: 94, recommended: true,  expected: "4.78%", cvar: "1.84%", tag: "matches your past behavior",
-      allocation: [{ sym: "USDY", pct: 60, apy: "4.20%", risk: "low",     reason: "Treasury-backed stability anchor" },
-                   { sym: "MI4",  pct: 30, apy: "5.81%", risk: "low-mid", reason: "Diversified Mantle blue-chips" },
-                   { sym: "mETH", pct: 10, apy: "6.12%", risk: "mid",     reason: "Modest upside via liquid-staked ETH" }]},
-    { id: "bal",  name: "Balanced",     confidence: 88, recommended: false, expected: "5.41%", cvar: "3.20%", tag: "modest upside",
-      allocation: [{ sym: "USDY", pct: 35, apy: "4.20%", risk: "low",     reason: "Stability buffer" },
-                   { sym: "MI4",  pct: 40, apy: "5.81%", risk: "low-mid", reason: "Core exposure" },
-                   { sym: "mETH", pct: 25, apy: "6.12%", risk: "mid",     reason: "Yield kicker" }]},
-    { id: "aggr", name: "Aggressive",   confidence: 82, recommended: false, expected: "5.92%", cvar: "5.40%", tag: "higher CVaR",
-      allocation: [{ sym: "USDY", pct: 15, apy: "4.20%", risk: "low",     reason: "Minimum buffer" },
-                   { sym: "MI4",  pct: 35, apy: "5.81%", risk: "low-mid", reason: "Diversified core" },
-                   { sym: "mETH", pct: 50, apy: "6.12%", risk: "mid",     reason: "Maximum yield seek" }]},
-  ]},
-];
+function buildTranscript(apy: Record<string, number>): Msg[] {
+  const u = apy["USDY"] ?? 4.20;
+  const m = apy["MI4"]  ?? 5.81;
+  const e = apy["mETH"] ?? 6.12;
+  const fmt = (v: number) => `${v.toFixed(2)}%`;
+  const blend = (wu: number, wm: number, we: number) =>
+    fmt(wu/100*u + wm/100*m + we/100*e);
+  return [
+    { role: "atlas", kind: "text", body: "I'm Atlas. I orchestrate the other three agents to plan and run your portfolio. Tell me what you want to do — or pick a starter below." },
+    { role: "user",  kind: "text", body: "I have $10k. Build me a few strategy options to compare." },
+    { role: "atlas", kind: "reasoning", steps: [
+      "Parsing intent: amount=10000 USD, multiple-options requested",
+      "Delegating yield_diff() → Yield agent",
+      "Delegating risk_scan() → Shield agent",
+      "Generating 3 allocation candidates across risk tiers",
+    ]},
+    { role: "yield",  kind: "tool", tool: "yield_feed", args: "sources=YieldOracle on-chain", result: { USDY: fmt(u), MI4: fmt(m), mETH: fmt(e) }, latency: "0.42s" },
+    { role: "shield", kind: "tool", tool: "risk_scan",  args: "assets=[USDY,MI4,mETH]", result: { USDY: "low", MI4: "low-mid", mETH: "mid" }, latency: "0.61s" },
+    { role: "atlas", kind: "text", body: "I prepared 3 plans across risk tiers. Pick one — I'll handle execution end-to-end. You only approve once." },
+    { role: "atlas", kind: "plan-options", plans: [
+      { id: "cons", name: "Conservative", confidence: 94, recommended: true,  expected: blend(60,30,10), cvar: "1.84%", tag: "matches your past behavior",
+        allocation: [{ sym: "USDY", pct: 60, apy: fmt(u), risk: "low",     reason: "Treasury-backed stability anchor" },
+                     { sym: "MI4",  pct: 30, apy: fmt(m), risk: "low-mid", reason: "Diversified Mantle blue-chips" },
+                     { sym: "mETH", pct: 10, apy: fmt(e), risk: "mid",     reason: "Modest upside via liquid-staked ETH" }]},
+      { id: "bal",  name: "Balanced",     confidence: 88, recommended: false, expected: blend(35,40,25), cvar: "3.20%", tag: "modest upside",
+        allocation: [{ sym: "USDY", pct: 35, apy: fmt(u), risk: "low",     reason: "Stability buffer" },
+                     { sym: "MI4",  pct: 40, apy: fmt(m), risk: "low-mid", reason: "Core exposure" },
+                     { sym: "mETH", pct: 25, apy: fmt(e), risk: "mid",     reason: "Yield kicker" }]},
+      { id: "aggr", name: "Aggressive",   confidence: 82, recommended: false, expected: blend(15,35,50), cvar: "5.40%", tag: "higher CVaR",
+        allocation: [{ sym: "USDY", pct: 15, apy: fmt(u), risk: "low",     reason: "Minimum buffer" },
+                     { sym: "MI4",  pct: 35, apy: fmt(m), risk: "low-mid", reason: "Diversified core" },
+                     { sym: "mETH", pct: 50, apy: fmt(e), risk: "mid",     reason: "Maximum yield seek" }]},
+    ]},
+  ];
+}
 
 const BEATS = [600, 900, 1400, 1100, 1300, 900, 0];
 
@@ -496,6 +505,9 @@ export default function ChatPage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { connected: wsConnected, heartbeat } = useAgentSocket();
+  const { apyMap } = useYieldOracle();
+  // Conservative blended APY: 60% USDY + 30% MI4 + 10% mETH (default plan)
+  const blendedApy = 0.6*(apyMap["USDY"]??0) + 0.3*(apyMap["MI4"]??0) + 0.1*(apyMap["mETH"]??0);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -504,10 +516,11 @@ export default function ChatPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  const transcript = buildTranscript(apyMap);
   const activeSession = sessions.find(s => s.id === activeId) ?? null;
   const messages = activeSession
     ? activeSession.messages
-    : [...TRANSCRIPT.slice(0, visibleCount), ...extraMessages];
+    : [...transcript.slice(0, visibleCount), ...extraMessages];
 
   useEffect(() => {
     const stored = loadSessions();
@@ -522,7 +535,7 @@ export default function ChatPage() {
     const tick = () => {
       i++;
       setVisibleCount(i);
-      if (i < TRANSCRIPT.length) setTimeout(tick, BEATS[i - 1] ?? 800);
+      if (i < transcript.length) setTimeout(tick, BEATS[i - 1] ?? 800);
     };
     setTimeout(tick, 200);
   };
@@ -823,7 +836,7 @@ export default function ChatPage() {
         const stats = [
           { label:"WSS",          val: wsConnected ? "● LIVE" : "○ …", accent: wsConnected },
           { label:"BLOCK",        val: heartbeat?.block ? heartbeat.block.toLocaleString() : "—", accent:false },
-          { label:"APY",          val:"4.88%",     accent:true  },
+          { label:"APY", val: blendedApy > 0 ? `${blendedApy.toFixed(2)}%` : "—", accent:true },
           { label:"AGENTS",       val: heartbeat ? `${Object.values(heartbeat.agents).filter(a => a.online).length}/4` : "4/4", accent:false },
           { label:"GAS",          val:"~$0.001",   accent:false },
           { label:"STATUS",       val:"ENGAGED",   accent:true  },
