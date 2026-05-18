@@ -1,9 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useBalance } from "wagmi";
+import { formatEther } from "viem";
 import { agentApi } from "@/lib/agent-api";
 import { useChatMode } from "@/lib/chat-mode-context";
+import { useYieldOracle } from "@/hooks/useYieldOracle";
+import { useAgentSocket } from "@/hooks/useAgentSocket";
+import { mantleTestnet } from "@/lib/mantle";
+
+interface PortfolioOnChain {
+  hasPortfolio: boolean;
+  assets?: string[];
+  allocations?: number[]; // bps
+  riskScore?: number;
+  strategyType?: string;
+}
+
+const ASSET_COL: Record<string, string> = {
+  USDY: "#00e5a0", MI4: "#a855f7", mETH: "#00d4ff", fBTC: "#fbbf24", mUSD: "#34d399",
+};
+const YIELD_SYMBOLS = ["USDY", "MI4", "mETH", "fBTC"];
 
 // ── Types ─────────────────────────────────────────────────────────
 type JState = "idle" | "listening" | "thinking" | "speaking" | "executing";
@@ -128,15 +145,18 @@ function SessionTimer() {
 // ── Telemetry log entry ───────────────────────────────────────────
 interface TeleEntry { kind: "INPUT" | "RESPONSE" | "BLOCKED"; text: string; time: string; }
 
-// ── Main BridgeView ───────────────────────────────────────────────
-interface BridgeViewProps {
+// ── Main JarvisView ───────────────────────────────────────────────
+interface JarvisViewProps {
   messages?: { role: string; body: string }[];
   onMessage?: (role: "user" | "atlas", text: string) => void;
 }
 
-export function BridgeView({ messages: chatContext = [], onMessage }: BridgeViewProps) {
+export function JarvisView({ messages: chatContext = [], onMessage }: JarvisViewProps) {
   const { closeBridge } = useChatMode();
   const { address, isConnected } = useAccount();
+  const { apyMap, hasData: oracleHasData } = useYieldOracle();
+  const { connected: wsConnected, heartbeat } = useAgentSocket();
+  const l2Balance = useBalance({ address, chainId: mantleTestnet.id });
 
   const [jState, setJState]   = useState<JState>("idle");
   const [chatLog, setChatLog] = useState<ChatMsg[]>([]);
@@ -144,6 +164,26 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
   const [textInput, setTextInput] = useState("");
   const [history, setHistory] = useState<{ role: string; body: string }[]>([]);
   const [interim, setInterim] = useState("");
+  const [portfolio, setPortfolio] = useState<PortfolioOnChain | null>(null);
+
+  // ── Fetch on-chain portfolio when wallet connects ─────────────────
+  useEffect(() => {
+    if (!address) return;
+    agentApi<PortfolioOnChain>(`/portfolio/${address}`)
+      .then(d => setPortfolio(d.hasPortfolio ? d : null))
+      .catch(() => {});
+  }, [address]);
+
+  // ── Derived values ────────────────────────────────────────────────
+  const portfolioAssets   = portfolio?.assets ?? [];
+  const portfolioAllocBps = portfolio?.allocations ?? [];
+  const blendedApy = portfolioAssets.reduce((s, sym, i) => {
+    const pct = (portfolioAllocBps[i] ?? 0) / 10000;
+    return s + pct * (apyMap[sym] ?? 0);
+  }, 0);
+  const l2Mnt = l2Balance.data ? Number(formatEther(l2Balance.data.value)) : null;
+  const agentsOnline = heartbeat ? Object.values(heartbeat.agents).filter(a => a.online).length : 4;
+  const maxYieldApy  = Math.max(...YIELD_SYMBOLS.map(s => apyMap[s] ?? 0), 1);
 
   const recRef   = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -310,21 +350,33 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
             <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.1em", marginBottom: 8 }}>
               PORTFOLIO · {isConnected ? addrShort : "NOT CONNECTED"}
             </div>
-            <div style={{ fontSize: 28, color: "#fff", fontFamily: "var(--font-display)", marginBottom: 4 }}>$10,000</div>
-            <div style={{ fontSize: 9, color: "#00e5a0", marginBottom: 10 }}>+$148 · LAST 7D · APY <span style={{ color: "#fbbf24" }}>4.88%</span></div>
-            {[
-              { sym: "USDY", pct: 60, color: "#00e5a0" },
-              { sym: "MI4",  pct: 30, color: "#a855f7" },
-              { sym: "mETH", pct: 10, color: "#00d4ff" },
-            ].map(a => (
-              <div key={a.sym} style={{ display: "grid", gridTemplateColumns: "40px 1fr 30px", gap: 6, alignItems: "center", marginBottom: 5 }}>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{a.sym}</span>
-                <div style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
-                  <div style={{ width: `${a.pct}%`, height: "100%", background: a.color }} />
+            <div style={{ fontSize: 28, color: "#fff", fontFamily: "var(--font-display)", marginBottom: 4 }}>
+              {l2Mnt != null ? `${l2Mnt.toFixed(4)} MNT` : "— MNT"}
+            </div>
+            <div style={{ fontSize: 9, color: "#00e5a0", marginBottom: 10 }}>
+              L2 BALANCE · APY{" "}
+              <span style={{ color: "#fbbf24" }}>
+                {blendedApy > 0 ? `${blendedApy.toFixed(2)}%` : oracleHasData ? "—" : "loading…"}
+              </span>
+            </div>
+            {portfolioAssets.length > 0
+              ? portfolioAssets.map((sym, i) => {
+                  const pct = Math.round((portfolioAllocBps[i] ?? 0) / 100);
+                  const col = ASSET_COL[sym] ?? "#888";
+                  return (
+                    <div key={sym} style={{ display: "grid", gridTemplateColumns: "40px 1fr 30px", gap: 6, alignItems: "center", marginBottom: 5 }}>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{sym}</span>
+                      <div style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: col }} />
+                      </div>
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{pct}%</span>
+                    </div>
+                  );
+                })
+              : <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", letterSpacing: "0.06em" }}>
+                  {isConnected ? "NO PORTFOLIO — use Portfolio page" : "CONNECT WALLET"}
                 </div>
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{a.pct}%</span>
-              </div>
-            ))}
+            }
           </div>
           {/* Telemetry */}
           <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -425,45 +477,58 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
           {/* Agent mesh */}
           <div style={{ padding: "12px 14px", borderBottom: `1px solid ${c.p}14` }}>
             <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.1em", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
-              <span>AGENT MESH</span><span style={{ color: "#00e5a0" }}>4 / 4</span>
+              <span>AGENT MESH</span><span style={{ color: agentsOnline === 4 ? "#00e5a0" : "#fbbf24" }}>{agentsOnline} / 4</span>
             </div>
-            {[
-              { id: "A", name: "ATLAS",  status: "ENGAGED",  rep: 93, col: "#00d4ff" },
-              { id: "J", name: "JARVIS", status: "STANDBY",  rep: 42, col: "#a855f7" },
-              { id: "S", name: "SHIELD", status: "MONITOR",  rep: 100, col: "#00e5a0" },
-              { id: "N", name: "NEXUS",  status: "SYNCED",   rep: 188, col: "#fbbf24" },
-            ].map(a => (
-              <div key={a.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 2, border: `1px solid ${a.col}60`, background: `${a.col}10`, display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: 12, color: a.col }}>{a.id}</div>
-                <div>
-                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.7)", letterSpacing: "0.06em" }}>{a.name}</div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 1 }}>
-                    <span style={{ fontSize: 7, color: a.col }}>{a.status}</span>
-                    <span style={{ fontSize: 7, color: "rgba(255,255,255,0.2)" }}>{a.rep}</span>
+            {([
+              { id: "A", hbKey: "atlas",  name: "ATLAS",  col: "#00d4ff" },
+              { id: "J", hbKey: null,     name: "JARVIS", col: "#a855f7", fixedStatus: "ACTIVE" },
+              { id: "S", hbKey: "shield", name: "SHIELD", col: "#00e5a0" },
+              { id: "N", hbKey: "nexus",  name: "NEXUS",  col: "#fbbf24" },
+            ] as { id: string; hbKey: string | null; name: string; col: string; fixedStatus?: string }[]).map(a => {
+              const hb = a.hbKey && heartbeat ? heartbeat.agents[a.hbKey] : null;
+              const online  = a.fixedStatus ? true : (hb?.online ?? false);
+              const status  = a.fixedStatus ?? (hb ? (hb.online ? "ONLINE" : "OFFLINE") : "—");
+              const rep     = hb ? hb.reputation : (a.fixedStatus ? "—" : "—");
+              return (
+                <div key={a.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 2, border: `1px solid ${a.col}${online ? "60" : "20"}`, background: `${a.col}${online ? "10" : "04"}`, display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: 12, color: online ? a.col : `${a.col}40` }}>{a.id}</div>
+                  <div>
+                    <div style={{ fontSize: 9, color: online ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)", letterSpacing: "0.06em" }}>{a.name}</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 1 }}>
+                      <span style={{ fontSize: 7, color: online ? a.col : "rgba(255,255,255,0.2)" }}>{status}</span>
+                      <span style={{ fontSize: 7, color: "rgba(255,255,255,0.2)" }}>{rep}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {/* Yield intelligence */}
           <div style={{ padding: "10px 14px", flex: 1, overflow: "hidden" }}>
             <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.1em", marginBottom: 10 }}>YIELD INTELLIGENCE</div>
-            {[
-              { sym: "USDY", apy: "4.28%", w: 68, col: "#00e5a0" },
-              { sym: "MI4",  apy: "5.81%", w: 92, col: "#a855f7" },
-              { sym: "mETH", apy: "6.12%", w: 100, col: "#00d4ff" },
-              { sym: "fBTC", apy: "3.98%", w: 63, col: "#fbbf24" },
-            ].map(a => (
-              <div key={a.sym} style={{ display: "grid", gridTemplateColumns: "36px 1fr 36px", gap: 6, alignItems: "center", marginBottom: 7 }}>
-                <span style={{ fontSize: 8, color: "rgba(255,255,255,0.5)" }}>{a.sym}</span>
-                <div style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                  <div style={{ width: `${a.w}%`, height: "100%", background: a.col }} />
+            {YIELD_SYMBOLS.map(sym => {
+              const apy = apyMap[sym];
+              const col = ASSET_COL[sym] ?? "#888";
+              const w   = apy != null ? Math.round((apy / maxYieldApy) * 100) : 0;
+              return (
+                <div key={sym} style={{ display: "grid", gridTemplateColumns: "36px 1fr 44px", gap: 6, alignItems: "center", marginBottom: 7 }}>
+                  <span style={{ fontSize: 8, color: "rgba(255,255,255,0.5)" }}>{sym}</span>
+                  <div style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                    <div style={{ width: `${w}%`, height: "100%", background: apy != null ? col : "rgba(255,255,255,0.1)", transition: "width 0.6s" }} />
+                  </div>
+                  <span style={{ fontSize: 8, color: apy != null ? col : "rgba(255,255,255,0.2)", textAlign: "right" }}>
+                    {apy != null ? `${apy.toFixed(2)}%` : "—"}
+                  </span>
                 </div>
-                <span style={{ fontSize: 8, color: a.col, textAlign: "right" }}>{a.apy}</span>
-              </div>
-            ))}
+              );
+            })}
             <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-              {[["CVAR", "1.84"], ["VOL", "3.20"], ["MAX DD", "4.10"], ["SHARPE", "2.41"]].map(([k, v]) => (
+              {([
+                ["RISK",    portfolio?.riskScore != null ? `${portfolio.riskScore}/10` : "—"],
+                ["ASSETS",  portfolioAssets.length > 0 ? String(portfolioAssets.length) : "—"],
+                ["ORACLE",  oracleHasData ? "LIVE" : "—"],
+                ["NET",     wsConnected ? "LIVE" : "OFF"],
+              ] as [string, string][]).map(([k, v]) => (
                 <div key={k} style={{ padding: "5px 8px", border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
                   <div style={{ fontSize: 7, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em" }}>{k}</div>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 1 }}>{v}</div>
@@ -476,13 +541,28 @@ export function BridgeView({ messages: chatContext = [], onMessage }: BridgeView
 
       {/* ── Row 4: objectives bar ── */}
       <div style={{ borderTop: `1px solid ${c.p}18`, display: "grid", gridTemplateColumns: "repeat(5,1fr)", background: `${c.p}04` }}>
-        {[
-          { label: "PRIMARY OBJECTIVE", val: "$10,000 CONSERVE + 4.88%" },
-          { label: "STATUS", val: "● ENGAGED · CONSERVATIVE", accent: true },
-          { label: "BLOCK", val: "38,600,472 · GAS 0.012 GWEI" },
-          { label: "AGENTS ONLINE", val: "4 / 4" },
-          { label: "ERC-8004", val: "ATLAS · ID #44 · MANTLE" },
-        ].map(obj => (
+        {([
+          {
+            label: "PRIMARY OBJECTIVE",
+            val: portfolioAssets.length > 0
+              ? `${portfolio?.strategyType?.toUpperCase() ?? "ATLAS"} · APY ${blendedApy > 0 ? blendedApy.toFixed(2) + "%" : "—"}`
+              : "NO PORTFOLIO YET",
+          },
+          {
+            label: "STATUS",
+            val: `● ${wsConnected ? "CONNECTED" : "RECONNECTING"} · ${portfolio?.strategyType?.toUpperCase() ?? "STANDBY"}`,
+            accent: true,
+          },
+          {
+            label: "BLOCK",
+            val: heartbeat?.block ? `${heartbeat.block.toLocaleString()} · GAS 0.012 GWEI` : "syncing…",
+          },
+          { label: "AGENTS ONLINE", val: `${agentsOnline} / 4` },
+          {
+            label: "ERC-8004",
+            val: heartbeat ? `ATLAS · ID #${heartbeat.agents["atlas"]?.erc8004_id ?? "—"} · MANTLE` : "—",
+          },
+        ] as { label: string; val: string; accent?: boolean }[]).map(obj => (
           <div key={obj.label} style={{ padding: "8px 14px", borderRight: `1px solid ${c.p}10` }}>
             <div style={{ fontSize: 7, color: "rgba(255,255,255,0.25)", letterSpacing: "0.08em", marginBottom: 3 }}>{obj.label}</div>
             <div style={{ fontSize: 9, color: obj.accent ? "#00e5a0" : "rgba(255,255,255,0.6)", letterSpacing: "0.05em" }}>{obj.val}</div>

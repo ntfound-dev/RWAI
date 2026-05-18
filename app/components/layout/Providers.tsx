@@ -11,13 +11,13 @@ import { TopBar } from "@/components/layout/TopBar";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { MeshBackground } from "@/components/ui/MeshBackground";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
-import { BridgeView } from "@/components/ui/BridgeView";
+import { JarvisView } from "@/components/ui/JarvisView";
 import { GlobalJarvisPanel } from "@/components/ui/GlobalJarvisPanel";
 
-function BridgeViewGate() {
+function JarvisViewGate() {
   const { showBridge } = useChatMode();
   if (!showBridge) return null;
-  return <BridgeView />;
+  return <JarvisView />;
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -46,7 +46,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 {children}
               </main>
               <StatusBar />
-              <BridgeViewGate />
+              <JarvisViewGate />
               <GlobalJarvisPanel />
             </ChatModeProvider>
           </RainbowKitProvider>
