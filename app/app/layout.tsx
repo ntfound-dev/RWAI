@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { cookieToInitialState } from "wagmi";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
@@ -32,10 +32,10 @@ const _suppressExtensionErrors = `
 `;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Parse wagmi cookie on the server so WagmiProvider can rehydrate the connected
-  // wallet before first paint — prevents the disconnect flash on refresh.
-  const cookieStore = await cookies();
-  const initialState = cookieToInitialState(wagmiSSRConfig, cookieStore.toString());
+  // Use raw Cookie header so wagmi's parseCookies gets the properly formatted string.
+  // cookies().toString() in Next.js 16 returns a different format that breaks JSON.parse.
+  const cookieHeader = (await headers()).get("cookie") ?? "";
+  const initialState = cookieToInitialState(wagmiSSRConfig, cookieHeader);
 
   return (
     <html lang="en" translate="no">
