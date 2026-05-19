@@ -156,7 +156,7 @@ app.add_middleware(
 
 # ── API Key auth middleware ────────────────────────────────────────
 _API_KEY = os.getenv("BACKEND_API_KEY", "")
-_PUBLIC_PATHS = {"/health", "/ws"}
+_PUBLIC_PATHS = {"/health", "/ws", "/docs", "/redoc", "/openapi.json"}
 
 @app.middleware("http")
 async def require_api_key(request: Request, call_next):
