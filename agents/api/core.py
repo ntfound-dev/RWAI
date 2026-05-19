@@ -144,13 +144,26 @@ async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tupl
     except Exception as e:
         log.debug("OpenClaw unavailable: %s", e)
 
-    # 2. Groq — free, cloud, fast (primary cloud fallback)
+    # 2. Groq primary model
     try:
         r = await call_groq(skill, prompt)
         if r and len(r.strip()) > 10:
             return r.strip(), GROQ_MODEL, False
     except Exception as e:
         log.info("Groq unavailable: %s", e)
+
+    # 2b. Groq fallback model — llama-3.1-8b-instant has 500K TPD vs 100K for 70b
+    _groq_fallback = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    if _groq_fallback != GROQ_MODEL:
+        try:
+            orig_model = os.environ.get("OPENAI_COMPAT_MODEL", "")
+            os.environ["OPENAI_COMPAT_MODEL"] = _groq_fallback
+            r = await call_groq(skill, prompt)
+            os.environ["OPENAI_COMPAT_MODEL"] = orig_model or GROQ_MODEL
+            if r and len(r.strip()) > 10:
+                return r.strip(), _groq_fallback, True
+        except Exception as e:
+            log.info("Groq fallback unavailable: %s", e)
 
     # 3. Claude — reliable but paid
     try:
