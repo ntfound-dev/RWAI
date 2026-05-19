@@ -171,20 +171,19 @@ async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
         token_symbol = result.get("suggestedSymbol") or result.get("symbol", "")
         apy_bps      = result.get("annualYieldBps", 0)
 
-        if req.owner_address:
-            record_user_tokenization(
-                owner=req.owner_address,
-                token_address=req.token_address,
-                asset_type=req.asset_type or result.get("assetType", "real_estate"),
-                tx_hash=tx or "",
-                token_name=token_name,
-                token_symbol=token_symbol,
-                apy_bps=apy_bps,
-                value_usd=result.get("estimatedValueUSD", 0),
-                price_usd=result.get("pricePerTokenUSD", 0),
-                supply=result.get("suggestedSupply", 0),
-                compliance_score=0,
-            )
+        record_user_tokenization(
+            owner=req.owner_address or "unknown",
+            token_address=req.token_address,
+            asset_type=req.asset_type or result.get("assetType", "real_estate"),
+            tx_hash=tx or "",
+            token_name=token_name,
+            token_symbol=token_symbol,
+            apy_bps=apy_bps,
+            value_usd=result.get("estimatedValueUSD", 0),
+            price_usd=result.get("pricePerTokenUSD", 0),
+            supply=result.get("suggestedSupply", 0),
+            compliance_score=0,
+        )
 
         # Notify Yield agent in background — new asset enters market monitoring
         if token_symbol:
