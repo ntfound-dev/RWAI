@@ -522,9 +522,9 @@ function Tokenize() {
           ["①", "Upload PDF / DOCX", "—", "No"],
           ["②", "Asset analysis — name, supply, APY, price/token", "Nexus", "No"],
           ["③", "Compliance review — score ≥ 70 to proceed", "Shield", "ComplianceLog.sol"],
-          ["④", "User reviews both results side-by-side", "—", "No"],
+          ["④", "Document pinned to IPFS via Pinata — permanent proof", "Nexus", "IPFS CID stored"],
           ["⑤", "Deploy — ERC-20 created, tokenization logged", "Nexus", "AgentExecutor.sol + RWAiRegistry.sol"],
-          ["⑥", "Asset live in Market + Portfolio", "—", "No"],
+          ["⑥", "Asset live in Market with 📄 IPFS proof link", "—", "No"],
         ]}
       />
       <H2>Nexus Output Schema</H2>
@@ -538,7 +538,10 @@ function Tokenize() {
   "annualYieldBps":    519,      // 5.19% APY
   "missingDocuments":  [],
   "concerns":          [],
-  "summary":           "Class-A NYC office. Clean title. Strong yield."
+  "summary":           "Class-A NYC office. Clean title. Strong yield.",
+  "ipfsCid":           "QmXyz...abc",
+  "ipfsUrl":           "https://gateway.pinata.cloud/ipfs/QmXyz...abc",
+  "onChainTx":         "0xabc...def"
 }`} />
     </>
   );
@@ -553,8 +556,8 @@ function Market() {
         { label:"SETTLEMENT",         value:"Instant on Mantle" },
         { label:"AUDIT TRAIL",        value:"Every trade on-chain" },
       ]} />
-      <P>The RWA Market lists every asset tokenized through Nexus. Anyone can buy fractions — or the original owner can sell their position. Every trade is logged on-chain by Atlas.</P>
-      <Callout type="tip">Traditional RWA markets require accredited investor status ($1M+ net worth) and $50,000+ minimum tickets. RWAi opens the same assets to anyone with $1 and a wallet — fractional ownership with no minimums.</Callout>
+      <P>The RWA Market lists every asset tokenized through Nexus. Each listing includes a <strong>📄 IPFS ↗</strong> link to the original document — pinned permanently to IPFS at tokenization time. Anyone can buy fractions, or the original owner can sell their position. Every trade is logged on-chain by Atlas.</P>
+      <Callout type="tip">Traditional RWA markets require accredited investor status ($1M+ net worth) and $50,000+ minimum tickets. RWAi opens the same assets to anyone with $1 and a wallet — fractional ownership with no minimums. Every listing is verifiable: document on IPFS, compliance score on-chain, token on Mantle.</Callout>
       <H2>Buy Flow</H2>
       <Code title="POST /api/agents/market/buy" lang="json" body={`// Request
 {
@@ -687,6 +690,7 @@ Atlas : "Here's my recommended allocation:
           <Table headers={["Method", "Contract"]} rows={[
             [<IC>logTokenization()</IC>, "AgentExecutor.sol"],
             [<IC>registerAsset()</IC>, "RWAiRegistry.sol"],
+            [<IC>pin document</IC>, "IPFS via Pinata"],
           ]} />
           <Code title="example Nexus output" lang="json" body={`{
   "suggestedTokenName": "RWAi Bali Land",
@@ -695,7 +699,9 @@ Atlas : "Here's my recommended allocation:
   "suggestedSupply":    1000000,
   "pricePerTokenUSD":   0.315,
   "annualYieldBps":     200,
-  "concerns":           []
+  "concerns":           [],
+  "ipfsCid":            "QmXyz...abc",
+  "ipfsUrl":            "https://gateway.pinata.cloud/ipfs/QmXyz...abc"
 }`} />
         </>
       ),
