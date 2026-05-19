@@ -12,7 +12,9 @@
     "PortfolioVault": "0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4",
     "HybridVault": "0x8e9c0ebC81F3db508BFff45f3eE9a10115b604fe",
     "AssetToken": "0x80E0e5f6488FA2726c042a204344281974f72609",
-    "HybridVaultOld": "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D"
+    "HybridVaultOld": "0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D",
+    "RWAiToken": "0xa947B1e71E91078c12cf4bAde3A771892772d659",
+    "ProtocolTreasury": "0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679"
   },
   "erc8004": {
     "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
@@ -41,5 +43,16 @@
       "fBTC": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
     }
   },
-  "deployedAtBlock": 38500000
+  "deployedAtBlock": 38500000,
+  "treasury": {
+    "rwaiToken": "0xa947B1e71E91078c12cf4bAde3A771892772d659",
+    "treasury": "0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679",
+    "agentWallet": "0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7",
+    "demoBal": "10000000",
+    "feeBps": {
+      "tokenization": 50,
+      "market": 15,
+      "aumPerYear": 30
+    }
+  }
 }

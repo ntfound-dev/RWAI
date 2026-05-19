@@ -6,7 +6,7 @@ POST /api/agents/market/sell      — Atlas logs sell on-chain (RWA → USDY)
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from ...mantle.db import get_listings
-from ...mantle.executor import log_market_purchase, log_market_sell
+from ...mantle.executor import log_market_purchase, log_market_sell, collect_market_fee
 from ..core import agent_complete, ChatMessage
 
 router = APIRouter()
@@ -48,9 +48,11 @@ async def buy(req: BuyRequest):
         pass
 
     tx = log_market_purchase(req.buyer_address, req.token_address, amount_wei, reasoning)
+    fee_tx = collect_market_fee(req.amount_usd)
     return {
         "success": bool(tx),
         "onChainTx": tx or "",
+        "feeTx": fee_tx or "",
         "tokens": tokens,
         "reasoning": reasoning,
     }
@@ -86,9 +88,11 @@ async def sell(req: SellRequest):
         pass
 
     tx = log_market_sell(req.seller_address, req.token_address, amount_wei, reasoning)
+    fee_tx = collect_market_fee(usd_value)
     return {
         "success": bool(tx),
         "onChainTx": tx or "",
+        "feeTx": fee_tx or "",
         "usd_value": usd_value,
         "reasoning": reasoning,
     }

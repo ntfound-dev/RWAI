@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
-from ...mantle.executor import log_tokenization, log_compliance_review, publish_yield_snapshot, record_yield_on_executor
+from ...mantle.executor import log_tokenization, log_compliance_review, publish_yield_snapshot, record_yield_on_executor, collect_tokenization_fee
 from ...mantle.db import record_user_tokenization
 from ...mantle.pinata import pin_asset_document, ipfs_url
 
@@ -202,6 +202,11 @@ async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
             compliance_score=req.compliance_score,
             ipfs_cid=cid or "",
         )
+
+        # Collect tokenization fee on ProtocolTreasury (0.5% of asset value)
+        fee_tx = collect_tokenization_fee(result.get("estimatedValueUSD", 0))
+        if fee_tx:
+            result["feeTx"] = fee_tx
 
         # Notify Yield agent in background — new asset enters market monitoring
         if token_symbol:

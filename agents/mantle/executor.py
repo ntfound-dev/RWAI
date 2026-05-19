@@ -6,7 +6,7 @@ Gracefully no-ops if chain not connected or contracts not deployed.
 import os
 from typing import Optional
 from .client import get_w3, get_addresses, get_agent_ids
-from .contracts import get_yield_oracle, get_agent_executor, get_hybrid_vault
+from .contracts import get_yield_oracle, get_agent_executor, get_hybrid_vault, get_protocol_treasury
 try:
     from web3 import Web3
 except Exception:
@@ -424,4 +424,63 @@ def execute_on_behalf(user: str, token: str, to: str, amount: int, data: bytes =
         return _send(w3, account, fn)
     except Exception as e:
         print(f"[mantle.executor] executeOnBehalf failed: {e}")
+        return None
+
+
+# ── Protocol Treasury fee collection ──────────────────────────────────────────
+
+import logging as _log_fee
+_fee_log = _log_fee.getLogger("rwai.fees")
+
+def collect_tokenization_fee(asset_value_usd: float) -> Optional[str]:
+    """
+    Log tokenization fee (0.5% of asset value) to ProtocolTreasury.
+    Uses 1e18 per USD unit as RWAI denomination for demo purposes.
+    """
+    w3, account = _get_account()
+    treasury = get_protocol_treasury()
+    if not w3 or not account or not treasury:
+        return None
+    try:
+        # Denominate in 1e18 units (1 RWAI per USD for demo)
+        asset_value_wei = int(asset_value_usd * 1e18)
+        if asset_value_wei == 0:
+            return None
+        fn = treasury.functions.collectTokenizationFee(
+            asset_value_wei,
+            False,
+            account.address,
+        )
+        tx = _send(w3, account, fn)
+        if tx:
+            _fee_log.info("Tokenization fee collected — asset $%.0f → tx %s", asset_value_usd, tx)
+        return tx
+    except Exception as exc:
+        _fee_log.warning("collectTokenizationFee failed: %s", exc)
+        return None
+
+
+def collect_market_fee(trade_value_usd: float) -> Optional[str]:
+    """
+    Log market trade fee (0.15% of trade value) to ProtocolTreasury.
+    Uses 1e18 per USD unit as RWAI denomination for demo purposes.
+    """
+    w3, account = _get_account()
+    treasury = get_protocol_treasury()
+    if not w3 or not account or not treasury:
+        return None
+    try:
+        trade_value_wei = int(trade_value_usd * 1e18)
+        if trade_value_wei == 0:
+            return None
+        fn = treasury.functions.collectMarketFee(
+            trade_value_wei,
+            account.address,
+        )
+        tx = _send(w3, account, fn)
+        if tx:
+            _fee_log.info("Market fee collected — trade $%.2f → tx %s", trade_value_usd, tx)
+        return tx
+    except Exception as exc:
+        _fee_log.warning("collectMarketFee failed: %s", exc)
         return None

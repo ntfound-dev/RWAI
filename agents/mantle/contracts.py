@@ -412,3 +412,58 @@ def get_agent_reputation():
 
 def get_portfolio_vault():
     return _contract("PortfolioVault", PORTFOLIO_VAULT_ABI)
+
+
+PROTOCOL_TREASURY_ABI = [
+    {
+        "inputs": [
+            {"name": "tradeValueRwai", "type": "uint256"},
+            {"name": "payer",          "type": "address"},
+        ],
+        "name": "collectMarketFee",
+        "outputs": [{"name": "feeAmount", "type": "uint256"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"name": "assetValueRwai", "type": "uint256"},
+            {"name": "payInRwai",      "type": "bool"},
+            {"name": "payer",          "type": "address"},
+        ],
+        "name": "collectTokenizationFee",
+        "outputs": [{"name": "feeAmount", "type": "uint256"}],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "totalCollected",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "feeParams",
+        "outputs": [
+            {"name": "tokenize",     "type": "uint256"},
+            {"name": "tokenizeRwai", "type": "uint256"},
+            {"name": "aumPerYear",   "type": "uint256"},
+            {"name": "market",       "type": "uint256"},
+        ],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "treasuryBalance",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
+
+def get_protocol_treasury():
+    return _contract("ProtocolTreasury", PROTOCOL_TREASURY_ABI)
