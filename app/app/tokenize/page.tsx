@@ -94,9 +94,16 @@ export default function TokenizePage() {
       });
       const normalizedShield = normalizeShield(shield);
       setShieldResult(normalizedShield);
-      addLog(`shield.risk_score() → ${normalizedShield.score}/100 · ${normalizedShield.cleared ? "CLEARED ✓" : "BLOCKED ✗"}. Ready for review.`);
+      addLog(`shield.risk_score() → ${normalizedShield.score}/100 · ${normalizedShield.cleared ? "CLEARED ✓ — auto-deploying…" : "BLOCKED ✗. Ready for review."}`);
 
       setStep("review");
+
+      if (normalizedShield.cleared) {
+        // Brief pause so user sees the CLEARED score before deploy starts
+        await sleep(1500);
+        await deployToken(docs, normalizedNexus, normalizedShield);
+        return;
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Tokenization backend unavailable.";
       setError(message);
@@ -107,8 +114,15 @@ export default function TokenizePage() {
     }
   };
 
-  const deployToken = async () => {
-    if (!nexusResult || !shieldResult) return;
+  const deployToken = async (
+    overrideDoc?: string,
+    overrideNexus?: NexusResult,
+    overrideShield?: ShieldResult,
+  ) => {
+    const nx = overrideNexus ?? nexusResult;
+    const sh = overrideShield ?? shieldResult;
+    const doc = overrideDoc ?? documentText;
+    if (!nx || !sh) return;
     setLoading(true);
     setError("");
     setStep("deploy");
@@ -121,8 +135,8 @@ export default function TokenizePage() {
       const result = await agentApi<{ onChainTx?: string }>("/tokenize", {
         method: "POST",
         body: JSON.stringify({
-          document_text: documentText || nexusResult.summary,
-          asset_type: nexusResult.assetType,
+          document_text: doc || nx.summary,
+          asset_type: nx.assetType,
           asset_id: 0,
           token_address: tokenAddress,
           owner_address: address ?? "",
