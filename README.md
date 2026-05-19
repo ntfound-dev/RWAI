@@ -1,7 +1,7 @@
 # RWAi — Sovereign AI Agents for Real World Assets on Mantle
 
 > **Track:** AI & RWA Track · Turing Test Hackathon  
-> **One-liner:** The first RWA platform where 4 ERC-8004 sovereign AI agents tokenize assets, manage portfolios, and answer to no one — every decision benchmarked on Mantle forever.
+> **One-liner:** The first RWA platform where 4 ERC-8004 sovereign AI agents tokenize assets, pin documents to IPFS, manage portfolios, and answer to no one — every decision benchmarked on Mantle forever.
 
 ---
 
@@ -33,7 +33,8 @@ Asset Owner                          Investor
 [SHIELD validates compliance]  [YIELD prices the assets]
      │                                   │
      ▼                                   ▼
-[ERC-20 deployed on Mantle]    [Allocation executed on Mantle]
+[Document pinned to IPFS]      [Allocation executed on Mantle]
+[ERC-20 deployed on Mantle]            │
      │                                   │
      └──────────────┬────────────────────┘
                     ▼
@@ -42,11 +43,11 @@ Asset Owner                          Investor
         Permanently benchmarked on Mantle.
 ```
 
-**For asset owners:** Upload a PDF deed or income statement → Nexus extracts asset metadata, Yield prices it, Shield scores compliance → ERC-20 token deployed on Mantle in minutes. Cost: gas only.
+**For asset owners:** Upload a PDF deed or income statement → Nexus extracts asset metadata, Shield scores compliance → document is pinned to IPFS (permanent, verifiable) → ERC-20 token deployed on Mantle in minutes. Cost: gas only.
 
 **For investors:** Talk to Atlas (text or voice) → Atlas coordinates Nexus + Shield + Yield → recommends a strategy across real Mantle RWAs → executes allocation → writes reasoning on-chain with its ERC-8004 identity as proof.
 
-**For everyone:** Every AI decision is logged immutably in `AgentExecutor.sol`. Every agent action is signed by its ERC-8004 identity NFT. Reputation score (0–100) gates autonomy level. This is the first verifiable AI performance benchmark on Mantle.
+**For everyone:** Every AI decision is logged immutably in `AgentExecutor.sol`. Every asset document is pinned to IPFS via Pinata — the CID is stored per listing, making every market card independently verifiable from document to blockchain. Every agent action is signed by its ERC-8004 identity NFT.
 
 ---
 
@@ -58,7 +59,22 @@ The three defining criteria of this hackathon — built into RWAi's core:
 |---|---|
 | **On-chain benchmarking of AI** | `AgentExecutor.sol` logs every agent decision on Mantle — queryable, permanent, the first RWA AI benchmark on-chain |
 | **ERC-8004 agent identity** | 4 agents registered (nexus=41, shield=42, yield=43, atlas=44), reputation gating live, reputation mirrors to ERC-8004 on-chain |
-| **Radical transparency** | Atlas voice interface — watch the agent hear your command, reason, execute, and write proof to Mantle in real time |
+| **Radical transparency** | Full proof chain: document on IPFS → compliance on `ComplianceLog.sol` → token on Mantle → AI reasoning on `AgentExecutor.sol` — every step independently verifiable |
+
+---
+
+## Verifiable RWA — The Proof Chain
+
+This is what separates RWAi from every "AI + RWA" demo: **every asset has a complete, independently verifiable proof chain.**
+
+| Layer | What's stored | Where | Verifiable by |
+|-------|--------------|-------|---------------|
+| Original document | Full text excerpt + asset metadata | **IPFS via Pinata** | Anyone with the CID |
+| Compliance decision | Score, jurisdiction, notes, blockers | `ComplianceLog.sol` + `AgentExecutor.sol` | Mantle explorer |
+| Token | ERC-20 contract | Mantle Sepolia | Mantlescan |
+| AI reasoning | Agent ID, action type, decision text | `AgentExecutor.sol` | Mantlescan |
+
+Market cards show a **📄 IPFS ↗** link — click it, read the original document, verify the compliance score yourself. No trust required.
 
 ---
 
@@ -114,9 +130,10 @@ graph TB
 User uploads PDF/DOCX
   → Nexus: extract value · supply · APY · symbol · concerns
   → Shield: auto-delegated compliance review (4-category score)
+  → Document metadata pinned to IPFS via Pinata → CID stored in listing
   → AgentExecutor.logTokenization() + RWAiRegistry.registerAsset()
   → [background] Yield notified: new asset enters monitoring immediately
-  → Token live in Market
+  → Token live in Market with "📄 IPFS ↗" proof link
 ```
 
 ### Shield #42 — Compliance
@@ -159,7 +176,7 @@ User message (text or voice)
 
 | Agent | ERC-8004 ID | Role | Primary On-Chain Action |
 |-------|------------|------|------------------------|
-| **Nexus** | 41 | Tokenizes RWAs from documents — PDF/DOCX → valuation → ERC-20 | `AgentExecutor.logTokenization()` + `RWAiRegistry.registerAsset()` |
+| **Nexus** | 41 | Tokenizes RWAs from documents — PDF/DOCX → valuation → IPFS → ERC-20 | `AgentExecutor.logTokenization()` + `RWAiRegistry.registerAsset()` |
 | **Shield** | 42 | AI compliance — 4-category scoring, OFAC sanctions screen, 70/100 threshold | `AgentExecutor.logComplianceReview()` + `ComplianceLog.sol` |
 | **Yield** | 43 | 6h scheduler — fetches APYs, writes to YieldOracle, detects >100bps drift | `YieldOracle.updateYields()` + `AgentExecutor.recordYieldSnapshot()` |
 | **Atlas** | 44 | Intent detection → delegates to Nexus/Shield/Yield → builds strategy | `AgentExecutor.executeAllocation()` / `executeRebalance()` |
@@ -252,6 +269,7 @@ Browser (Next.js 14)
 FastAPI Backend (agents/)
   │  OpenClaw/CMDOP → Groq → Claude (4-level fallback)
   │  Every decision logged on-chain before response returned
+  │  Documents pinned to IPFS via Pinata on tokenization
   │
   ▼
 Mantle Sepolia (chainId 5003)
@@ -263,6 +281,10 @@ Mantle Sepolia (chainId 5003)
   ├── AssetToken.sol             — ERC-20 fractional RWA token
   ├── PortfolioVault.sol         — strategy (bps) + execution
   └── HybridVault.sol            — user deposits + EIP-712 agent consent
+
+IPFS (Pinata)
+  └── Asset documents pinned at tokenization — CID stored per listing
+      gateway.pinata.cloud/ipfs/<CID> — public, permanent, verifiable
 
 ERC-8004 (Mantle Sepolia — official pre-deployed)
   Identity:   0x8004A818BFB912233c491871b3d84c89A494BD9e
@@ -309,7 +331,8 @@ rwai/
 ├── agents/                 # FastAPI backend · Railway
 │   ├── api/routes/         # chat, tokenize, compliance, yield, portfolio, market
 │   ├── api/app.py          # CORS, auth, rate-limit, yield scheduler, WebSocket
-│   ├── mantle/             # Web3, executor, reputation, Pyth, JSON db
+│   ├── mantle/             # Web3, executor, reputation, Pyth, JSON db, Pinata
+│   │   └── pinata.py       # IPFS pinning via Pinata API
 │   └── skills/             # nexus.md, shield.md, yield.md, atlas.md (ERC-8004 skills)
 └── app/                    # Next.js 14 frontend · Vercel
     ├── app/                # /, /hub, /chat, /tokenize, /market, /portfolio, /bridge, /docs
@@ -328,6 +351,7 @@ rwai/
 | Backend API | https://rwai-production.up.railway.app |
 | Swagger UI | https://rwai-production.up.railway.app/docs |
 | Mantle Explorer | https://sepolia.mantlescan.xyz |
+| IPFS Gateway | https://gateway.pinata.cloud/ipfs/ |
 | Agent Wallet | [0x834De...Ac7](https://sepolia.mantlescan.xyz/address/0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7) |
 | AgentExecutor | [0x9a822B...501](https://sepolia.mantlescan.xyz/address/0x9a822B9A50D090CfcCa1e6474efCd653112d8501) |
 | Demo Video | *(YouTube/Loom URL — add before submit)* |
@@ -465,7 +489,7 @@ make install
 
 # Configure environment
 cp contracts/.env.example contracts/.env   # add PRIVATE_KEY
-cp agents/.env.example agents/.env         # add GROQ_API_KEY + AGENT_PRIVATE_KEY
+cp agents/.env.example agents/.env         # add GROQ_API_KEY + AGENT_PRIVATE_KEY + PINATA_JWT
 
 # Deploy contracts + register agents
 make production-testnet
@@ -483,13 +507,13 @@ make dev
 | Method | Path | Agent | Description |
 |--------|------|-------|-------------|
 | POST | `/api/agents/chat` | any | Conversational interface — text or voice transcript |
-| POST | `/api/agents/tokenize` | Nexus | PDF/DOCX → token params + on-chain log |
+| POST | `/api/agents/tokenize` | Nexus | PDF/DOCX → token params + IPFS pin + on-chain log |
 | POST | `/api/agents/compliance` | Shield | KYC/AML review → on-chain compliance record |
 | GET | `/api/agents/yield` | Yield | Live APY snapshot → writes to YieldOracle |
 | GET | `/api/agents/yield/prices` | Yield | Pyth price feed → writes USD prices on-chain |
 | POST | `/api/agents/portfolio/plan` | Atlas | Strategy → writes allocation on-chain |
 | POST | `/api/agents/portfolio/rebalance` | Atlas | Rebalance → writes rebalance on-chain |
-| GET | `/api/agents/market/listings` | — | All user-tokenized RWA listings |
+| GET | `/api/agents/market/listings` | — | All user-tokenized RWA listings (with IPFS CIDs) |
 | POST | `/api/agents/market/buy` | Atlas | Log purchase on-chain with AI reasoning |
 | POST | `/api/agents/market/sell` | Atlas | Log sell on-chain (RWA → USDY) with AI reasoning |
 | GET | `/api/agents/status` | — | Live ERC-8004 reputation scores for all agents |
@@ -514,9 +538,14 @@ Swagger UI: http://localhost:8001/docs
 - [x] Nexus→Yield notification: newly tokenized assets enter monitoring immediately
 - [x] Shield 4-category scoring (doc completeness · ownership · jurisdiction · sanctions) — blocks at <70/100
 
+**Decentralized Storage**
+- [x] Asset documents pinned to IPFS via Pinata on every tokenization
+- [x] IPFS CID stored per listing — market cards link to original document
+- [x] Full verifiability: document (IPFS) → compliance (on-chain) → token (on-chain) → AI reasoning (on-chain)
+
 **Frontend Features**
-- [x] Full tokenize flow: PDF → AI analysis → ERC-20 on Mantle + compliance auto-delegated
-- [x] RWA Market: list, buy, sell with Atlas AI reasoning on-chain
+- [x] Full tokenize flow: PDF → AI analysis → Shield auto-review → ERC-20 on Mantle + IPFS pin
+- [x] RWA Market: list with IPFS proof link, buy/sell with Atlas AI reasoning on-chain
 - [x] Portfolio management: Atlas builds strategy, live APYs from YieldOracle on all pages
 - [x] J.A.R.V.I.S. — full-screen AI interface: voice + text, live oracle data, sensitive data filter
 - [x] All APY data live from YieldOracle.sol (homepage, chat, portfolio, JARVIS)
@@ -524,6 +553,7 @@ Swagger UI: http://localhost:8001/docs
 **Infrastructure**
 - [x] 46 contract tests passing (Hardhat)
 - [x] Rate limiting, CORS lockdown, API key auth on Railway backend
+- [x] Persistent market DB on Railway Volume — listings survive redeploys
 - [x] Live frontend on Vercel — https://rwai-theta.vercel.app
 - [x] Agent backend deployed on Railway — https://rwai-production.up.railway.app
 - [ ] Demo video (3–4 min) — voice command → Atlas executes → on-chain proof shown
@@ -534,14 +564,14 @@ Swagger UI: http://localhost:8001/docs
 
 **General (60%)**
 - *AI × RWA depth*: AI is the execution layer. Atlas signs transactions. Every tokenization, compliance review, allocation, and rebalance is an AI agent action with ERC-8004 identity and permanent on-chain proof.
-- *Technical completeness*: 8 contracts, 4 agents with real inter-agent delegation, full tokenize + market + portfolio + JARVIS flows — end-to-end, deployed and live.
+- *Technical completeness*: 8 contracts, 4 agents with real inter-agent delegation, IPFS document storage, full tokenize + market + portfolio + JARVIS flows — end-to-end, deployed and live.
 - *Mantle integration*: ERC-8004 identity + reputation live on Mantle pre-deployed contracts. YieldOracle with Pyth prices. HybridVault with EIP-712 consent. AgentExecutor as the immutable benchmark. 4 mock RWA tokens.
-- *Compliance awareness*: Shield's 4-category scoring blocks non-compliant assets before ERC-20 deployment. Every decision is permanent in ComplianceLog.sol.
+- *Compliance awareness*: Shield's 4-category scoring blocks non-compliant assets before ERC-20 deployment. Every decision is permanent in ComplianceLog.sol. Documents preserved forever on IPFS.
 
 **Track-specific (40%) — Path A + B**
-- *Infrastructure (Path A)*: Complete tokenization pipeline — document in, Shield auto-reviews, Yield auto-prices, ERC-20 out, all logged on-chain.
+- *Infrastructure (Path A)*: Complete tokenization pipeline — document in, IPFS pin, Shield auto-reviews, Yield auto-prices, ERC-20 out, all logged on-chain with IPFS CID.
 - *Application (Path B)*: J.A.R.V.I.S. gives retail investors a voice interface to Atlas. Speak intent → Atlas delegates to agents → executes on Mantle → on-chain proof returned in seconds.
 
 ---
 
-*RWAi · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004 · FastAPI · OpenClaw · Next.js 14 · Mantle Network*
+*RWAi · Solidity 0.8.24 · OpenZeppelin v5 · ERC-8004 · FastAPI · OpenClaw · Pinata IPFS · Next.js 14 · Mantle Network*
