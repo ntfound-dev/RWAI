@@ -20,9 +20,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing agentId." }, { status: 400 });
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    const apiKey = process.env.BACKEND_API_KEY;
+    if (apiKey) headers["x-internal-api-key"] = apiKey;
+
     const backend = await fetch(`${backendUrl}/api/agents/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers,
       body: JSON.stringify({
         agent_id: agentId,
         messages: body.messages ?? [],
