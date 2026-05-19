@@ -39,15 +39,9 @@ async def extract_text(files: List[UploadFile] = File(...)):
         if not ext:
             raise HTTPException(400, f"Unsupported file type: {f.filename}. Allowed: {', '.join(_ALLOWED_EXT)}")
 
-        # Read in chunks — reject oversized files without loading all into memory
-        chunks: list[bytes] = []
-        total = 0
-        async for chunk in f:
-            total += len(chunk)
-            if total > _MAX_FILE_BYTES:
-                raise HTTPException(413, f"{f.filename} exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit")
-            chunks.append(chunk)
-        data = b"".join(chunks)
+        data = await f.read()
+        if len(data) > _MAX_FILE_BYTES:
+            raise HTTPException(413, f"{f.filename} exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit")
 
         text = ""
         try:
