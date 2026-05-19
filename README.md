@@ -348,7 +348,6 @@ rwai/
 | Resource | Link |
 |----------|------|
 | Frontend | https://rwai-theta.vercel.app |
-| Backend API | https://rwai-production.up.railway.app |
 | Swagger UI | https://rwai-production.up.railway.app/docs |
 | Mantle Explorer | https://sepolia.mantlescan.xyz |
 | Agent Wallet | [0x834De...Ac7](https://sepolia.mantlescan.xyz/address/0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7) |
