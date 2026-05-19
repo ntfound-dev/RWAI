@@ -152,8 +152,8 @@ async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tupl
     except Exception as e:
         log.info("Groq unavailable: %s", e)
 
-    # 2b. Groq fallback model — llama-3.1-8b-instant has 500K TPD vs 100K for 70b
-    _groq_fallback = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    # 2b. Groq fallback model — llama-4-scout smarter than 8b, still free tier
+    _groq_fallback = os.getenv("GROQ_FALLBACK_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
     if _groq_fallback != GROQ_MODEL:
         try:
             orig_model = os.environ.get("OPENAI_COMPAT_MODEL", "")
