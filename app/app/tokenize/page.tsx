@@ -99,8 +99,9 @@ export default function TokenizePage() {
       setStep("review");
 
       if (normalizedShield.cleared) {
-        // Brief pause so user sees the CLEARED score before deploy starts
-        await sleep(1500);
+        // Show deploy animation immediately, then run the deploy
+        setStep("deploy");
+        setLoading(true);
         await deployToken(docs, normalizedNexus, normalizedShield);
         return;
       }
