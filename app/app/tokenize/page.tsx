@@ -141,6 +141,7 @@ export default function TokenizePage() {
           asset_id: 0,
           token_address: tokenAddress,
           owner_address: address ?? "",
+          compliance_score: sh.score,
         }),
       });
       const tx = result.onChainTx ?? "";

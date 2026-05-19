@@ -74,14 +74,17 @@ export default function MarketPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const listingKey = (l: Listing) => `${l.token_symbol}-${l.ts}`;
+
   const executeBuy = async (listing: Listing) => {
     if (!address || !isConnected) return;
-    const key = listing.token_address;
+    const usd = parseFloat(buyAmount);
+    if (!usd || usd <= 0) return;
+    const key = listingKey(listing);
     setBuyStatus(s => ({ ...s, [key]: "Atlas is pricing your order…" }));
     setBuyError(s => ({ ...s, [key]: "" }));
     setBuyTx(s => ({ ...s, [key]: "" }));
     try {
-      const usd = parseFloat(buyAmount) || 0;
       const d = await agentApi<{ success: boolean; onChainTx: string; tokens: number; reasoning: string }>("/market/buy", {
         method: "POST",
         body: JSON.stringify({
@@ -108,12 +111,13 @@ export default function MarketPage() {
 
   const executeSell = async (listing: Listing) => {
     if (!address || !isConnected) return;
-    const key = listing.token_address;
+    const tokens = parseFloat(sellAmount);
+    if (!tokens || tokens <= 0) return;
+    const key = listingKey(listing);
     setSellStatus(s => ({ ...s, [key]: "Atlas is processing your sell order…" }));
     setSellError(s => ({ ...s, [key]: "" }));
     setSellTx(s => ({ ...s, [key]: "" }));
     try {
-      const tokens = parseFloat(sellAmount) || 0;
       const d = await agentApi<{ success: boolean; onChainTx: string; usd_value: number; reasoning: string }>("/market/sell", {
         method: "POST",
         body: JSON.stringify({
@@ -229,8 +233,8 @@ export default function MarketPage() {
       ) : (
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(380px,1fr))", gap:16 }}>
           {listings.map(listing => {
-            const key = listing.token_address;
-            const isOwner = listing.owner?.toLowerCase() === address?.toLowerCase();
+            const key = listingKey(listing);
+            const isOwner = listing.owner?.toLowerCase() === address?.toLowerCase() && listing.owner !== "unknown";
             const color = TYPE_COLOR[listing.asset_type] ?? "var(--fg-2)";
             const symbol = listing.token_symbol || "RWA";
             const name = listing.token_name || listing.asset_type?.replace(/_/g," ") || "Real World Asset";
@@ -335,7 +339,7 @@ export default function MarketPage() {
                           </div>
                         ) : (
                           <div style={{ display:"flex", gap:8 }}>
-                            <button className="btn btn-primary" style={{ flex:1, fontSize:11, background:"var(--warn)", borderColor:"var(--warn)" }} onClick={() => executeSell(listing)}>
+                            <button className="btn btn-primary" style={{ flex:1, fontSize:11, background:"var(--warn)", borderColor:"var(--warn)" }} onClick={() => executeSell(listing)} disabled={!(parseFloat(sellAmount) > 0)}>
                               Confirm sell →
                             </button>
                             <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setSelling(null)}>Cancel</button>
@@ -427,6 +431,7 @@ export default function MarketPage() {
                               className="btn btn-primary"
                               style={{ flex:1, fontSize:11 }}
                               onClick={() => executeBuy(listing)}
+                              disabled={!(parseFloat(buyAmount) > 0)}
                             >
                               Confirm purchase →
                             </button>

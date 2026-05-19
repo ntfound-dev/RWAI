@@ -45,6 +45,7 @@ class TokenizeRequest(BaseModel):
     asset_id: int = 0                     # existing assetId if known (0 = new)
     token_address: str = "0x" + "0" * 40  # address after deploy (or zero)
     owner_address: Optional[str] = None   # wallet that owns the token
+    compliance_score: int = 0             # Shield score from prior /compliance call
 
 
 class ComplianceRequest(BaseModel):
@@ -182,7 +183,7 @@ async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
             value_usd=result.get("estimatedValueUSD", 0),
             price_usd=result.get("pricePerTokenUSD", 0),
             supply=result.get("suggestedSupply", 0),
-            compliance_score=0,
+            compliance_score=req.compliance_score,
         )
 
         # Notify Yield agent in background — new asset enters market monitoring

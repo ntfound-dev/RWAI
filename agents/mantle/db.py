@@ -221,7 +221,17 @@ def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx
             "supply":          int(supply or 0),
             "_source":         "user",
         }
-        data["user_tokenizations"].append(entry)
+        # Upsert by symbol+owner — prevent duplicate cards for same asset
+        existing = data["user_tokenizations"]
+        dedup_key = (token_symbol.upper(), owner.lower()) if token_symbol else None
+        if dedup_key:
+            for i, rec in enumerate(existing):
+                if (rec.get("token_symbol","").upper(), rec.get("owner","").lower()) == dedup_key:
+                    entry["ts"] = rec.get("ts", entry["ts"])  # preserve original listing date
+                    existing[i] = entry
+                    _save(data)
+                    return
+        existing.append(entry)
         _save(data)
 
 
