@@ -65,6 +65,29 @@ def _parse_json(text: str) -> dict:
     return {"raw": text, "error": "Could not parse structured output"}
 
 
+def _extract_compliance_score(text: str) -> dict | None:
+    """
+    Fallback: extract a compliance score from Shield's free-text reply.
+    Sums category scores found in patterns like 'scores 30/30' or 'Score: 87'.
+    """
+    import re
+    # Try explicit "total score is N" or "score: N"
+    total_pat = re.search(r"(?:total\s+)?score[:\s]+(\d{1,3})", text, re.IGNORECASE)
+    if total_pat:
+        score = int(total_pat.group(1))
+        cleared = score >= 70
+        return {"score": score, "cleared": cleared, "notes": text[:600]}
+
+    # Sum category scores written as "X/30", "X/25", "X/20"
+    cats = re.findall(r"scores?\s+(\d{1,2})/(?:30|25|20)", text, re.IGNORECASE)
+    if cats:
+        score = sum(int(v) for v in cats)
+        cleared = score >= 70
+        return {"score": score, "cleared": cleared, "notes": text[:600]}
+
+    return None
+
+
 async def _notify_yield(token_name: str, token_symbol: str, apy_bps: int, token_address: str) -> None:
     """Background: Yield monitors the newly tokenized asset and publishes a snapshot."""
     try:
@@ -168,10 +191,17 @@ async def compliance(req: ComplianceRequest):
         f"- Jurisdictional compliance (25%): Which regulation applies (Reg D, MiFID II, etc.)? Is the exemption valid?\n"
         f"- Sanctions screening (20%): Are any parties or the owner wallet flagged on OFAC/EU lists?\n\n"
         f"Apply the 70/100 threshold: score < 70 → cleared: false, BLOCK deployment.\n\n"
-        f"{doc}\n\nRespond ONLY with the JSON format defined in your skill."
+        f"{doc}\n\n"
+        f"You MUST reply with ONLY a JSON object — no prose, no explanation outside the JSON. "
+        f'Example: {{"score":87,"cleared":true,"jurisdiction":"US-NY","regulation":"Reg D 506(b)","notes":"...","blockers":[],"warnings":[]}}'
     )
     reply, model, fallback = await agent_complete("shield", [ChatMessage(role="user", body=prompt)])
     result = _parse_json(reply)
+    # If JSON parse failed, try to extract score from free-text reply
+    if "error" in result:
+        extracted = _extract_compliance_score(reply)
+        if extracted:
+            result = extracted
     result.update({"modelUsed": model, "fallback": fallback})
 
     # Default score to 0 (not 75) so a parse failure never masks a BLOCK
