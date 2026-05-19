@@ -68,21 +68,45 @@ def _parse_json(text: str) -> dict:
 def _extract_compliance_score(text: str) -> dict | None:
     """
     Fallback: extract a compliance score from Shield's free-text reply.
-    Sums category scores found in patterns like 'scores 30/30' or 'Score: 87'.
+    Handles patterns like:
+      "Score: 30+25+25+20 = 100; cleared: true"
+      "total score is 87"
+      "scores 30/30 ... scores 25/25 ..."
     """
     import re
-    # Try explicit "total score is N" or "score: N"
-    total_pat = re.search(r"(?:total\s+)?score[:\s]+(\d{1,3})", text, re.IGNORECASE)
-    if total_pat:
-        score = int(total_pat.group(1))
-        cleared = score >= 70
+
+    # 1. "cleared: true/false" — extract boolean first
+    cleared_match = re.search(r"cleared[:\s]+(\w+)", text, re.IGNORECASE)
+    cleared_hint = None
+    if cleared_match:
+        cleared_hint = cleared_match.group(1).lower() in ("true", "yes", "cleared")
+
+    # 2. "= 100" after a score expression like "30+25+25+20 = 100"
+    eq_pat = re.search(r"score[^=\n]{0,60}=\s*(\d{2,3})", text, re.IGNORECASE)
+    if eq_pat:
+        score = int(eq_pat.group(1))
+        cleared = cleared_hint if cleared_hint is not None else score >= 70
         return {"score": score, "cleared": cleared, "notes": text[:600]}
 
-    # Sum category scores written as "X/30", "X/25", "X/20"
-    cats = re.findall(r"scores?\s+(\d{1,2})/(?:30|25|20)", text, re.IGNORECASE)
-    if cats:
+    # 3. "total score is N" or "score: N" (standalone number, not an expression)
+    total_pat = re.search(r"(?:total\s+)?score[:\s]+(\d{2,3})(?!\s*[+\-])", text, re.IGNORECASE)
+    if total_pat:
+        score = int(total_pat.group(1))
+        cleared = cleared_hint if cleared_hint is not None else score >= 70
+        return {"score": score, "cleared": cleared, "notes": text[:600]}
+
+    # 4. Sum category percentages: "completeness: 30%" "clarity: 25%" etc.
+    cats = re.findall(r"(?:completeness|clarity|compliance|screening)[^\n]{0,40}?(\d{1,2})%", text, re.IGNORECASE)
+    if len(cats) >= 2:
         score = sum(int(v) for v in cats)
-        cleared = score >= 70
+        cleared = cleared_hint if cleared_hint is not None else score >= 70
+        return {"score": score, "cleared": cleared, "notes": text[:600]}
+
+    # 5. Sum scores written as "X/30", "X/25", "X/20"
+    cats2 = re.findall(r"(\d{1,2})/(?:30|25|20)\b", text)
+    if cats2:
+        score = sum(int(v) for v in cats2)
+        cleared = cleared_hint if cleared_hint is not None else score >= 70
         return {"score": score, "cleared": cleared, "notes": text[:600]}
 
     return None

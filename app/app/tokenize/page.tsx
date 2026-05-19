@@ -333,9 +333,23 @@ export default function TokenizePage() {
               </div>
             )}
             <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-              <button className="btn btn-primary" onClick={deployToken} disabled={!shieldResult.cleared || loading}>
-                {shieldResult.cleared ? "Deploy ERC-20 on Mantle →" : "Compliance score too low"}
-              </button>
+              {shieldResult.cleared ? (
+                <button className="btn btn-primary" onClick={() => deployToken()} disabled={loading}>
+                  Deploy ERC-20 on Mantle →
+                </button>
+              ) : (
+                <button className="btn" onClick={() => {
+                  setStep("upload");
+                  setFiles([]);
+                  setNexusResult(null);
+                  setShieldResult(null);
+                  setDocumentText("");
+                  setError("");
+                  setAgentLog([]);
+                }} style={{ borderColor:"var(--warn)", color:"var(--warn)" }}>
+                  ✗ Blocked — upload better documents →
+                </button>
+              )}
               <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
                 ⛽ Gas ≈ $0.001 · Mantle L2
               </span>
