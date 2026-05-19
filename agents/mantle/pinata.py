@@ -10,7 +10,8 @@ _log = logging.getLogger("rwai.pinata")
 
 _JWT = os.getenv("PINATA_JWT", "")
 _PIN_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS"
-_GATEWAY = "https://gateway.pinata.cloud/ipfs"
+# Pinata deprecated the public gateway — use dedicated gateway if set, else ipfs.io
+_GATEWAY = os.getenv("PINATA_GATEWAY", "https://ipfs.io/ipfs").rstrip("/")
 
 
 def pin_asset_document(

@@ -284,7 +284,7 @@ Mantle Sepolia (chainId 5003)
 
 IPFS (Pinata)
   └── Asset documents pinned at tokenization — CID stored per listing
-      gateway.pinata.cloud/ipfs/<CID> — public, permanent, verifiable
+      ipfs.io/ipfs/<CID> — public, permanent, verifiable
 
 ERC-8004 (Mantle Sepolia — official pre-deployed)
   Identity:   0x8004A818BFB912233c491871b3d84c89A494BD9e
@@ -351,7 +351,7 @@ rwai/
 | Backend API | https://rwai-production.up.railway.app |
 | Swagger UI | https://rwai-production.up.railway.app/docs |
 | Mantle Explorer | https://sepolia.mantlescan.xyz |
-| IPFS Gateway | https://gateway.pinata.cloud/ipfs/ |
+| IPFS Gateway | https://ipfs.io/ipfs/ |
 | Agent Wallet | [0x834De...Ac7](https://sepolia.mantlescan.xyz/address/0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7) |
 | AgentExecutor | [0x9a822B...501](https://sepolia.mantlescan.xyz/address/0x9a822B9A50D090CfcCa1e6474efCd653112d8501) |
 | Demo Video | *(YouTube/Loom URL — add before submit)* |

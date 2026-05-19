@@ -300,7 +300,7 @@ export default function MarketPage() {
                     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                       {listing.ipfs_cid && (
                         <a
-                          href={`https://gateway.pinata.cloud/ipfs/${listing.ipfs_cid}`}
+                          href={`https://ipfs.io/ipfs/${listing.ipfs_cid}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mono-sm"
