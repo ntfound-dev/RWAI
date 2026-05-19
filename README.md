@@ -351,7 +351,6 @@ rwai/
 | Backend API | https://rwai-production.up.railway.app |
 | Swagger UI | https://rwai-production.up.railway.app/docs |
 | Mantle Explorer | https://sepolia.mantlescan.xyz |
-| IPFS Gateway | https://cloudflare-ipfs.com/ipfs/ |
 | Agent Wallet | [0x834De...Ac7](https://sepolia.mantlescan.xyz/address/0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7) |
 | AgentExecutor | [0x9a822B...501](https://sepolia.mantlescan.xyz/address/0x9a822B9A50D090CfcCa1e6474efCd653112d8501) |
 | Demo Video | *(YouTube/Loom URL — add before submit)* |
