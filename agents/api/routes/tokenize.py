@@ -9,6 +9,7 @@ from typing import Optional
 from ..core import agent_complete, ChatMessage
 from ...mantle.executor import log_tokenization, log_compliance_review, publish_yield_snapshot, record_yield_on_executor
 from ...mantle.db import record_user_tokenization
+from ...mantle.pinata import pin_asset_document, ipfs_url
 
 _log = logging.getLogger("rwai.tokenize")
 
@@ -171,11 +172,26 @@ async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
         token_name   = result.get("suggestedTokenName") or result.get("tokenName", "")
         token_symbol = result.get("suggestedSymbol") or result.get("symbol", "")
         apy_bps      = result.get("annualYieldBps", 0)
+        asset_type   = req.asset_type or result.get("assetType", "real_estate")
+
+        # Pin document metadata to IPFS via Pinata
+        cid = pin_asset_document(
+            token_symbol=token_symbol,
+            token_name=token_name,
+            asset_type=asset_type,
+            document_text=doc,
+            compliance_score=req.compliance_score,
+            apy_bps=apy_bps,
+            value_usd=result.get("estimatedValueUSD", 0),
+        )
+        if cid:
+            result["ipfsCid"]  = cid
+            result["ipfsUrl"]  = ipfs_url(cid)
 
         record_user_tokenization(
             owner=req.owner_address or "unknown",
             token_address=req.token_address,
-            asset_type=req.asset_type or result.get("assetType", "real_estate"),
+            asset_type=asset_type,
             tx_hash=tx or "",
             token_name=token_name,
             token_symbol=token_symbol,
@@ -184,6 +200,7 @@ async def tokenize(req: TokenizeRequest, background_tasks: BackgroundTasks):
             price_usd=result.get("pricePerTokenUSD", 0),
             supply=result.get("suggestedSupply", 0),
             compliance_score=req.compliance_score,
+            ipfs_cid=cid or "",
         )
 
         # Notify Yield agent in background — new asset enters market monitoring

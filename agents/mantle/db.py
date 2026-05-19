@@ -201,7 +201,8 @@ def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx
                               token_name: str = "", token_symbol: str = "",
                               apy_bps: int = 0, value_usd: float = 0,
                               compliance_score: int = 0,
-                              price_usd: float = 0, supply: int = 0) -> None:
+                              price_usd: float = 0, supply: int = 0,
+                              ipfs_cid: str = "") -> None:
     with _lock:
         data = _load()
         entry = {
@@ -220,6 +221,7 @@ def record_user_tokenization(owner: str, token_address: str, asset_type: str, tx
             "value_usd":       float(value_usd or 0),
             "price_usd":       float(price_usd or 0),
             "supply":          int(supply or 0),
+            "ipfs_cid":        ipfs_cid,
             "_source":         "user",
         }
         # Upsert by symbol+owner — prevent duplicate cards for same asset

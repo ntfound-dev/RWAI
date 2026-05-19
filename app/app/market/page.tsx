@@ -21,6 +21,7 @@ interface Listing {
   value_usd: number;
   price_usd: number;
   supply: number;
+  ipfs_cid?: string;
   _source: string;
 }
 
@@ -296,7 +297,20 @@ export default function MarketPage() {
                 <div style={{ padding:"10px 16px", borderBottom:"1px solid var(--line)", background:"var(--bg-1)" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                     <span className="mono-sm">Compliance</span>
-                    <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Listed {date}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      {listing.ipfs_cid && (
+                        <a
+                          href={`https://gateway.pinata.cloud/ipfs/${listing.ipfs_cid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mono-sm"
+                          style={{ color:"var(--accent)", fontSize:9 }}
+                        >
+                          📄 IPFS ↗
+                        </a>
+                      )}
+                      <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Listed {date}</span>
+                    </div>
                   </div>
                   <ScoreBar score={listing.compliance_score} />
                 </div>
