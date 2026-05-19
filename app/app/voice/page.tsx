@@ -94,17 +94,18 @@ export default function VoicePage() {
     try {
       const data = await agentApi<any>("/chat", {
         method: "POST",
-        body: JSON.stringify({ agent_id: "atlas", messages: next }),
+        body: JSON.stringify({ agent_id: "atlas", messages: next, wallet_address: address || null }),
       });
       const reply: string = data.reply || data.message || "Understood.";
       const model: string = data.model_used || data.modelUsed || "";
       setHistory(h => [...h, { role: "atlas", body: reply }]);
       setDisplayed(reply);
       setModelUsed(model);
-      if (data.onChainTx) {
-        pushAction("EXECUTE", reply, data.onChainTx);
+      const tx = data.on_chain_tx || data.onChainTx || "";
+      if (tx) {
+        pushAction("EXECUTE", reply, tx);
         setOrbState("executing");
-        setTimeout(() => speak(reply), 600);
+        setTimeout(() => { speak(reply); setTimeout(() => setOrbState("idle"), 3000); }, 600);
       } else {
         pushAction("RESPONSE", reply);
         speak(reply);

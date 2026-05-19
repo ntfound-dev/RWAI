@@ -1,6 +1,8 @@
+import re
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from ..core import agent_complete, ChatMessage, ChatResponse
 
 router = APIRouter()
@@ -12,10 +14,15 @@ VALID_AGENTS = {"nexus", "shield", "yield", "atlas"}
 _YIELD_KW    = {"yield", "apy", "market", "return", "drift", "interest", "rate", "meth", "usdy", "mi4", "fbtc"}
 _SHIELD_KW   = {"compliance", "kyc", "kyc", "regulation", "jurisdiction", "legal", "sanction", "reg d", "mifid", "cleared", "blocked"}
 _NEXUS_KW    = {"tokenize", "tokenization", "token", "valuate", "valuation", "appraisal", "deed", "asset", "erc20", "deploy"}
+_EXECUTE_KW  = {"execute", "executes", "invest", "investing", "allocate", "allocation", "buy", "purchase", "deploy capital", "put it in", "go ahead", "do it", "confirm"}
+
+# Mantle assets available for Atlas allocation
+_ASSET_KW = {"usdy": "USDY", "meth": "mETH", "fbtc": "fBTC", "musd": "mUSD", "mi4": "USDY"}
 
 class ChatRequest(BaseModel):
     agent_id: str
     messages: list[ChatMessage]
+    wallet_address: Optional[str] = None
 
 
 async def _atlas_with_delegation(messages: list[ChatMessage]) -> tuple[str, str, bool]:
@@ -72,6 +79,46 @@ async def _atlas_with_delegation(messages: list[ChatMessage]) -> tuple[str, str,
     return await agent_complete("atlas", messages)
 
 
+def _detect_execution(messages: list[ChatMessage], wallet: Optional[str]) -> Optional[str]:
+    """
+    If the user's last message is an execution command, call execute_allocation on-chain.
+    Returns tx hash or None.
+    """
+    if not messages:
+        return None
+    last = messages[-1].body.lower()
+    words = set(re.sub(r"[,.\-!?]", " ", last).split())
+    if not (words & _EXECUTE_KW):
+        return None
+
+    # Parse USD amount — "$1000", "1000 dollars", "1k dollars"
+    m = re.search(r"\$?([\d,]+(?:\.\d+)?)\s*(k)?\s*(?:dollars?|usd)?", last, re.IGNORECASE)
+    if not m:
+        return None
+    amount_usd = float(m.group(1).replace(",", ""))
+    if m.group(2):
+        amount_usd *= 1000
+    if amount_usd <= 0:
+        return None
+
+    # Detect mentioned assets; default to USDY
+    assets = [v for k, v in _ASSET_KW.items() if k in last] or ["USDY"]
+    assets = list(dict.fromkeys(assets))  # deduplicate, preserve order
+    per_asset = amount_usd / len(assets)
+    amounts_wei = [int(per_asset * 1e18)] * len(assets)
+
+    try:
+        from ...mantle.executor import execute_allocation, get_agent_wallet_address
+        user = wallet or get_agent_wallet_address() or "0x" + "0" * 40
+        tx = execute_allocation(user, assets, amounts_wei, f"Atlas voice allocation: ${amount_usd:,.0f} into {', '.join(assets)}")
+        if tx:
+            _log.info("Atlas executed allocation on-chain: %s (assets=%s amount=$%s)", tx, assets, amount_usd)
+        return tx
+    except Exception as exc:
+        _log.warning("Atlas on-chain execution failed: %s", exc)
+        return None
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     if req.agent_id not in VALID_AGENTS:
@@ -79,7 +126,9 @@ async def chat(req: ChatRequest):
 
     if req.agent_id == "atlas":
         reply, model, fallback = await _atlas_with_delegation(req.messages)
+        tx = _detect_execution(req.messages, req.wallet_address)
     else:
         reply, model, fallback = await agent_complete(req.agent_id, req.messages)
+        tx = None
 
-    return ChatResponse(reply=reply, model_used=model, fallback=fallback)
+    return ChatResponse(reply=reply, model_used=model, fallback=fallback, on_chain_tx=tx or "")

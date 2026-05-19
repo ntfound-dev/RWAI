@@ -39,6 +39,7 @@ class ChatResponse(BaseModel):
     reply: str
     model_used: str
     fallback: bool = False
+    on_chain_tx: str = ""
 
 
 async def call_groq(system: str, user: str) -> str:
