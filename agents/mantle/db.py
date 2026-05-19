@@ -9,7 +9,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path(os.getenv("RWAI_DB_PATH", str(Path(__file__).parent.parent / "rwai_index.json")))
+_DEFAULT_DB = "/data/rwai_index.json" if os.path.isdir("/data") else str(Path(__file__).parent.parent / "rwai_index.json")
+DB_PATH = Path(os.getenv("RWAI_DB_PATH", _DEFAULT_DB))
 
 _lock = threading.Lock()
 
