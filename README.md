@@ -305,7 +305,7 @@ ERC-8004 (Mantle Sepolia — official pre-deployed)
 | PortfolioVault | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` |
 | HybridVault | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` |
 | AssetToken (template) | `0x80E0e5f6488FA2726c042a204344281974f72609` |
-| RWAiToken () | `0xa947B1e71E91078c12cf4bAde3A771892772d659` |
+| RWAiToken ($RWAI) | `0xa947B1e71E91078c12cf4bAde3A771892772d659` |
 | ProtocolTreasury | `0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679` |
 | ERC-8004 Identity | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | ERC-8004 Reputation | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
@@ -360,13 +360,13 @@ rwai/
 
 ## Revenue Model
 
-RWAi captures value at three protocol layers — every fee is on-chain, auditable, and enforced by smart contracts.
+RWAi captures value at three protocol layers — **every fee is live on Mantle Sepolia, collected automatically by `ProtocolTreasury.sol`, verifiable on Mantlescan.**
 
 | Stream | Rate | Mechanism |
 |--------|------|-----------|
-| **Tokenization fee** | 0.5% of stated asset value | Charged at `AgentExecutor.logTokenization()` — paid in MNT or USDY when Nexus deploys an ERC-20 RWA token |
+| **Tokenization fee** | 0.5% of stated asset value | `ProtocolTreasury.collectTokenizationFee()` — called automatically by Nexus on every ERC-20 deploy. **Live on Mantle Sepolia.** |
 | **Protocol fee on AUM** | 0.3% / year | Streamed continuously from `HybridVault` deposits; Atlas-managed positions pay into the protocol treasury |
-| **Market transaction fee** | 0.15% of trade value | Collected on every buy/sell routed through the RWA Market; split 80% treasury / 20% Shield compliance fund |
+| **Market transaction fee** | 0.15% of trade value | `ProtocolTreasury.collectMarketFee()` — called on every buy/sell in the RWA Market. **Live on Mantle Sepolia.** |
 | **Agent API (enterprise)** | $299–$999 / month | Institutions call Atlas, Nexus, Shield, Yield directly via REST — higher consent caps, SLA, dedicated indexer |
 
 **Unit economics at scale (illustrative):**
@@ -374,7 +374,7 @@ RWAi captures value at three protocol layers — every fee is on-chain, auditabl
 - 100 tokenizations × avg $500K asset → $250,000 single quarter
 - Market volume $5M / month → $90,000 / year in transaction fees
 
-All fees flow to `ProtocolTreasury` — governed by $RWAI stakers, not the founding team.
+All fees flow to `ProtocolTreasury` (`0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679`) — every `FeeCollected` event is verifiable on [Mantlescan](https://sepolia.mantlescan.xyz/address/0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679). Governed by $RWAI stakers, not the founding team.
 
 ---
 
@@ -525,11 +525,12 @@ Swagger UI: http://localhost:8001/docs
 ## Hackathon Submission Checklist
 
 **Contracts & Protocol**
-- [x] 8 contracts deployed on Mantle Sepolia (chainId 5003)
+- [x] 10 contracts deployed on Mantle Sepolia (chainId 5003)
 - [x] 4 agents registered on ERC-8004 Identity Registry (nexus=41, shield=42, yield=43, atlas=44)
 - [x] Reputation system live on AgentReputationManager + ERC-8004 mirror
 - [x] On-chain action logging: tokenization, compliance, yield snapshot, allocation, rebalance, buy, sell
 - [x] HybridVault EIP-712 capped consent — Atlas executes within user-signed allowance
+- [x] Revenue model live: ProtocolTreasury collects 0.5% tokenization fee + 0.15% market fee on every transaction
 
 **Agent Intelligence**
 - [x] OpenClaw/CMDOP as primary runtime → Groq → Claude → Ollama (4-level fallback)
