@@ -72,7 +72,7 @@ export default function LandingPage() {
 
   return (
     <div style={{ position:"relative", overflow:"hidden" }}>
-      <div style={{ position:"relative", maxWidth:1480, margin:"0 auto", padding:"32px 32px 24px" }}>
+      <div className="rp-page-wrap" style={{ position:"relative", maxWidth:1480, margin:"0 auto", padding:"32px 32px 24px" }}>
 
         {/* Pre-hero breadcrumb */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
@@ -220,7 +220,7 @@ export default function LandingPage() {
             </div>
             <Link href="/hub"><button className="btn">Inspect agents →</button></Link>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)" }}>
+          <div className="rp-agents-4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)" }}>
             {Object.values(AGENTS).map((a, i) => (
               <Link key={a.id} href="/hub">
                 <div style={{ padding:"24px 22px", borderRight: i < 3 ? "1px solid var(--line)" : "none", background:"var(--bg-1)", cursor:"pointer", transition:"background 200ms" }}
@@ -255,7 +255,7 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="panel" style={{ padding:28 }}>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:0, position:"relative" }}>
+            <div className="rp-pipeline" style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:0, position:"relative" }}>
               {PIPELINE.map(([num, label, agent, fn], i) => (
                 <div key={i} style={{ position:"relative", padding:"0 8px" }}>
                   <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>{num}</div>
@@ -272,7 +272,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section style={{ border:"1px solid var(--line)", background:"var(--bg-1)", padding:"40px 40px", display:"grid", gridTemplateColumns:"1.5fr 1fr", gap:40, alignItems:"center", marginBottom:32 }}>
+        <section className="rp-two-col" style={{ border:"1px solid var(--line)", background:"var(--bg-1)", padding:"40px 40px", display:"grid", gridTemplateColumns:"1.5fr 1fr", gap:40, alignItems:"center", marginBottom:32 }}>
           <div>
             <div className="mono" style={{ color:"var(--accent)", marginBottom:12 }}>§ 03 · ready when you are</div>
             <h2 className="display" style={{ fontSize:64, marginBottom:12 }}>

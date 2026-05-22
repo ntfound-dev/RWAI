@@ -94,7 +94,12 @@ export default function VoicePage() {
       "linda","fiona","tessa","junior","junior","google uk english female",
     ];
 
-    const voices = voicesRef.current;
+    // iOS Safari returns empty voices on first call — refresh lazily each time
+    const voices = synthRef.current?.getVoices()?.length
+      ? synthRef.current.getVoices()
+      : (voicesRef.current.length ? voicesRef.current : []);
+    if (voices.length) voicesRef.current = voices;
+
     let pick: SpeechSynthesisVoice | undefined;
 
     // 1st pass: exact name match
@@ -123,10 +128,10 @@ export default function VoicePage() {
     if (pick) utt.voice = pick;
     utt.lang  = "en-US";
     utt.rate  = 0.92;
-    // Pitch: lower if we're unsure it's a male voice (no name match)
+    // Pitch: confident male → 0.82, unknown → 0.62 (forces deeper tone on any voice including Samantha)
     utt.pitch = pick && MALE_NAMES.some(h => pick!.name.toLowerCase().includes(h.toLowerCase()))
-      ? 0.85   // confident male — slight lower for depth
-      : 0.72;  // unknown/fallback — push pitch down to sound male
+      ? 0.82
+      : 0.62;
 
     utt.onstart = () => setOrbState("speaking");
     utt.onend   = () => { setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };

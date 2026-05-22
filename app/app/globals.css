@@ -838,14 +838,23 @@ html, body {
 .mobile-stack   { display: contents; }
 .mobile-hide    { display: block; }
 
+/* ── Page wrapper ────────────────────────────────────────────────── */
+.rp-page-wrap {
+  box-sizing: border-box;
+  width: 100%;
+}
+
 /* ── Tablet (≤900px): agent cards 4→2, hero stack ───────────────── */
 @media (max-width: 900px) {
+  .rp-page-wrap   { padding: 24px 20px 20px !important; }
   .rp-hero        { grid-template-columns: 1fr !important; gap: 32px !important; }
   .rp-agents-4    { grid-template-columns: repeat(2,1fr) !important; }
+  .rp-agents-4 > a > div,
+  .rp-agents-4 > div { border-right: none !important; border-bottom: 1px solid var(--line) !important; }
   .rp-stats-5     { grid-template-columns: repeat(3,1fr) !important; }
   .rp-stats-5 > div:nth-child(4),
   .rp-stats-5 > div:nth-child(5) { border-right: none !important; }
-  .rp-pipeline    { grid-template-columns: repeat(4,1fr) !important; }
+  .rp-pipeline    { grid-template-columns: repeat(4,1fr) !important; overflow-x: auto; }
   .rp-two-col     { grid-template-columns: 1fr !important; }
   .rp-market-grid { grid-template-columns: repeat(2,1fr) !important; }
   .rp-pad         { padding: 20px 16px !important; }
@@ -854,15 +863,18 @@ html, body {
 
 /* ── Mobile (≤600px): everything stacks ─────────────────────────── */
 @media (max-width: 600px) {
-  .rp-hero        { padding: 24px 16px !important; }
+  .rp-page-wrap   { padding: 16px 14px 16px !important; }
+  .rp-hero        { gap: 24px !important; }
   .rp-agents-4    { grid-template-columns: 1fr !important; }
+  .rp-agents-4 > a > div,
+  .rp-agents-4 > div { border-right: none !important; border-bottom: 1px solid var(--line) !important; }
   .rp-stats-5     { grid-template-columns: repeat(2,1fr) !important; }
   .rp-stats-5 > div { border-right: none !important; border-bottom: 1px solid var(--line) !important; }
   .rp-pipeline    { grid-template-columns: repeat(2,1fr) !important; overflow-x: auto; }
   .rp-two-col     { grid-template-columns: 1fr !important; }
   .rp-market-grid { grid-template-columns: 1fr !important; }
   .rp-table-scroll{ overflow-x: auto !important; }
-  .rp-h1-xl       { font-size: 40px !important; line-height: 1.1 !important; }
+  .rp-h1-xl       { font-size: 38px !important; line-height: 1.1 !important; }
   .rp-hide-mobile { display: none !important; }
   .rp-full-w      { width: 100% !important; max-width: 100% !important; }
   .topbar-right > span { display: none; }
