@@ -578,7 +578,7 @@ Swagger UI: http://localhost:8001/docs
 **General (60%)**
 - *AI × RWA depth*: AI is the execution layer. Atlas signs transactions. Every tokenization, compliance review, allocation, and rebalance is an AI agent action with ERC-8004 identity and permanent on-chain proof.
 - *Technical completeness*: 11 contracts deployed, 4 agents with real inter-agent delegation, IPFS document storage, full tokenize + market + portfolio + JARVIS flows — end-to-end, deployed and live. **186 tests passing, 0 failing.**
-- *Mantle integration*: ERC-8004 identity + reputation live on Mantle pre-deployed contracts. YieldOracle with Pyth prices. HybridVault with EIP-712 consent. AgentExecutor as the immutable benchmark. 4 mock RWA tokens.
+- *Mantle integration*: ERC-8004 identity + reputation live on Mantle pre-deployed contracts. YieldOracle with Pyth prices. HybridVault with EIP-712 consent. AgentExecutor as the immutable benchmark. 4 mock RWA tokens. **Live MNT/USD price via Pyth Hermes.** Agent wallet MNT balance shown in homepage stats.
 - *Compliance awareness*: Shield's 4-category scoring blocks non-compliant assets before ERC-20 deployment. Every decision is permanent in ComplianceLog.sol. Documents preserved forever on IPFS.
 
 **Track-specific (40%) — Path A + B**
