@@ -171,7 +171,7 @@ export default function MarketPage() {
       <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", background:"rgba(0,229,160,0.05)", border:"1px solid rgba(0,229,160,0.25)", borderRadius:2, marginBottom:24 }}>
         <span style={{ fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"var(--accent)", letterSpacing:"0.12em" }}>⛽ GASLESS</span>
         <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>No MNT required. Atlas agent wallet pays gas — you only need to connect to verify ownership.</span>
-        <span className="tag" style={{ marginLeft:"auto", fontSize:9, color:"var(--fg-2)", borderColor:"var(--line)", whiteSpace:"nowrap" }}>EIP-4337 · Agent-Sponsored</span>
+        <span className="tag" style={{ marginLeft:"auto", fontSize:9, color:"var(--fg-2)", borderColor:"var(--line)", whiteSpace:"nowrap" }}>Agent-Sponsored Txs</span>
       </div>
 
       {/* Stats */}
