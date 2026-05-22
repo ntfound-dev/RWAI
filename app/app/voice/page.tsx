@@ -74,15 +74,60 @@ export default function VoicePage() {
     setSpeakWords(words);
     setWordIdx(-1);
     const utt = new SpeechSynthesisUtterance(text);
-    const MALE_HINTS = ["Daniel","Google UK English Male","Google US English","Microsoft David","Microsoft Mark","Alex","en-GB-male"];
-    const SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa"];
-    const pick = voicesRef.current.find(v =>
-      MALE_HINTS.some(h => v.name.includes(h))
-    ) ?? voicesRef.current.find(v =>
-      v.lang.startsWith("en") && !SKIP.some(s => v.name.toLowerCase().includes(s))
-    );
+
+    // Priority order: best known deep male voices first (desktop + mobile)
+    const MALE_NAMES = [
+      "Daniel",            // iOS UK male — best on iPhone/iPad
+      "Aaron",             // iOS US male
+      "Google UK English Male",
+      "Microsoft David",
+      "Microsoft Mark",
+      "Alex",              // macOS
+      "Tom",               // macOS alternate
+      "Fred",              // macOS fallback
+      "Gordon",            // macOS
+      "Google US English", // Android Chrome (often male)
+    ];
+    // Female voices to avoid
+    const FEMALE_NAMES = [
+      "samantha","karen","moira","victoria","zira","susan","hazel",
+      "linda","fiona","tessa","junior","junior","google uk english female",
+    ];
+
+    const voices = voicesRef.current;
+    let pick: SpeechSynthesisVoice | undefined;
+
+    // 1st pass: exact name match
+    for (const hint of MALE_NAMES) {
+      pick = voices.find(v => v.name === hint);
+      if (pick) break;
+    }
+    // 2nd pass: partial name match
+    if (!pick) {
+      pick = voices.find(v =>
+        MALE_NAMES.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
+      );
+    }
+    // 3rd pass: any English voice not in female list, prefer non-default
+    if (!pick) {
+      pick = voices.find(v =>
+        v.lang.startsWith("en") &&
+        !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)) &&
+        !v.default
+      ) ?? voices.find(v =>
+        v.lang.startsWith("en") &&
+        !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f))
+      );
+    }
+
     if (pick) utt.voice = pick;
-    utt.rate = 0.93; utt.pitch = 0.88;
+    utt.lang  = "en-US";
+    utt.rate  = 0.92;
+    // Pitch: lower if we're unsure it's a male voice (no name match)
+    utt.pitch = pick && MALE_NAMES.some(h => pick!.name.toLowerCase().includes(h.toLowerCase()))
+      ? 0.85   // confident male — slight lower for depth
+      : 0.72;  // unknown/fallback — push pitch down to sound male
+
     utt.onstart = () => setOrbState("speaking");
     utt.onend   = () => { setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
     utt.onboundary = (e: SpeechSynthesisEvent) => {

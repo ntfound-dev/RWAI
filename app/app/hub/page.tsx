@@ -65,7 +65,7 @@ export default function HubPage() {
       </div>
 
       {/* Agent cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:32 }}>
+      <div className="rp-agents-4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:32 }}>
         {(Object.values(AGENTS) as typeof AGENTS[AgentId][]).map((a, i) => (
           <div key={a.id}
             onClick={() => setSelected(a.id as AgentId)}
@@ -100,7 +100,7 @@ export default function HubPage() {
       </div>
 
       {/* Detail panel */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
+      <div className="rp-two-col" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
 
         {/* Left: agent details */}
         <div className="panel">

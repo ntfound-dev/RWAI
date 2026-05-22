@@ -175,7 +175,7 @@ export default function MarketPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:32 }}>
+      <div className="rp-agents-4" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0, border:"1px solid var(--line)", marginBottom:32 }}>
         {[
           { label:"Listings",    value: totalListings.toString(),                         sub:"Tokenized RWAs" },
           { label:"Total Value", value: `$${totalValue.toLocaleString()}`,                sub:"Combined asset value" },
@@ -232,7 +232,7 @@ export default function MarketPage() {
           <a href="/tokenize" className="btn btn-primary" style={{ textDecoration:"none" }}>Tokenize an asset →</a>
         </div>
       ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(380px,1fr))", gap:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(min(380px,100%),1fr))", gap:16 }}>
           {listings.map(listing => {
             const key = listingKey(listing);
             const isOwner = listing.owner?.toLowerCase() === address?.toLowerCase() && listing.owner !== "unknown";

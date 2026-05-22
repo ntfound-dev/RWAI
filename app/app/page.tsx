@@ -87,7 +87,7 @@ export default function LandingPage() {
         </div>
 
         {/* HERO */}
-        <section style={{ display:"grid", gridTemplateColumns:"1.15fr 1fr", gap:48, alignItems:"start", marginBottom:56 }}>
+        <section className="rp-hero" style={{ display:"grid", gridTemplateColumns:"1.15fr 1fr", gap:48, alignItems:"start", marginBottom:56 }}>
           <div>
             <div style={{ display:"flex", gap:8, marginBottom:18 }}>
               <span className="tag tag-accent">● Live · Mantle Testnet</span>
@@ -95,7 +95,7 @@ export default function LandingPage() {
               <span className="tag">OpenClaw · Mantle</span>
             </div>
 
-            <h1 className="display" style={{ fontSize:96, color:"var(--fg-0)", marginBottom:18 }}>
+            <h1 className="display rp-h1-xl" style={{ fontSize:96, color:"var(--fg-0)", marginBottom:18 }}>
               Real-world assets,<br/>
               <span style={{ fontStyle:"italic", color:"var(--accent)" }}>orchestrated</span> by<br/>
               four agents in concert.
@@ -114,7 +114,7 @@ export default function LandingPage() {
             </div>
 
             {/* Stats — real on-chain data */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:0, borderTop:"1px solid var(--line)", borderBottom:"1px solid var(--line)" }}>
+            <div className="rp-stats-5" style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:0, borderTop:"1px solid var(--line)", borderBottom:"1px solid var(--line)" }}>
               {([
                 ["Assets tokenized", chainStats ? chainStats.assetCount.toString() : "…", "on Mantle Sepolia"],
                 ["Avg. compliance",  chainStats ? `${chainStats.avgCompliance}/100` : "…/100", "Shield agent"],

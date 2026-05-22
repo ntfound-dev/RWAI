@@ -496,7 +496,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns: showAtlas ? "1fr 380px" : "1fr", gap:24 }}>
+      <div className="rp-two-col" style={{ display:"grid", gridTemplateColumns: showAtlas ? "1fr 380px" : "1fr", gap:24 }}>
         <div>
           {/* Allocation chart */}
           {(() => {
