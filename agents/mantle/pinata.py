@@ -11,7 +11,7 @@ _log = logging.getLogger("rwai.pinata")
 
 _JWT     = os.getenv("PINATA_JWT", "")
 _PIN_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS"
-_GATEWAY = os.getenv("PINATA_GATEWAY", "https://cloudflare-ipfs.com/ipfs").rstrip("/")
+_GATEWAY = os.getenv("PINATA_GATEWAY", "https://gateway.pinata.cloud/ipfs").rstrip("/")
 
 
 def _build_html(

@@ -540,7 +540,7 @@ function Tokenize() {
   "concerns":          [],
   "summary":           "Class-A NYC office. Clean title. Strong yield.",
   "ipfsCid":           "QmXyz...abc",
-  "ipfsUrl":           "https://cloudflare-ipfs.com/ipfs/QmXyz...abc",
+  "ipfsUrl":           "https://gateway.pinata.cloud/ipfs/QmXyz...abc",
   "onChainTx":         "0xabc...def"
 }`} />
     </>
@@ -701,7 +701,7 @@ Atlas : "Here's my recommended allocation:
   "annualYieldBps":     200,
   "concerns":           [],
   "ipfsCid":            "QmXyz...abc",
-  "ipfsUrl":            "https://cloudflare-ipfs.com/ipfs/QmXyz...abc"
+  "ipfsUrl":            "https://gateway.pinata.cloud/ipfs/QmXyz...abc"
 }`} />
         </>
       ),
