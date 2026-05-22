@@ -31,7 +31,7 @@ const PIPELINE = [
 
 type AgentId = "nexus" | "shield" | "yield" | "atlas";
 
-interface ChainStats { assetCount: number; agentRuns: number; agentRuns24h: number; avgCompliance: number; protocolRevenueUsd: number; agentMntBalance: number; }
+interface ChainStats { assetCount: number; agentRuns: number; agentRuns24h: number; avgCompliance: number; protocolRevenueUsd: number; agentMntBalance: number; mntPriceUsd: number; }
 
 export default function LandingPage() {
   const [tracePos, setTracePos] = useState(0);
@@ -120,7 +120,7 @@ export default function LandingPage() {
                 ["Avg. compliance",  chainStats ? `${chainStats.avgCompliance}/100` : "…/100", "Shield agent"],
                 ["Agent runs",       chainStats ? chainStats.agentRuns.toString() : "…", `${chainStats?.agentRuns24h ?? "…"} in 24h`],
                 ["Protocol revenue", chainStats ? `$${chainStats.protocolRevenueUsd.toFixed(2)}` : "…", "ProtocolTreasury · live"],
-                ["Agent MNT", chainStats ? `${chainStats.agentMntBalance.toFixed(2)}` : "…", "gas reserve · native MNT"],
+                ["Agent MNT", chainStats ? `${chainStats.agentMntBalance.toFixed(2)}` : "…", chainStats && chainStats.mntPriceUsd > 0 ? `$${chainStats.mntPriceUsd.toFixed(4)} · Pyth` : "gas reserve · native MNT"],
               ] as [string, string, string][]).map(([label, value, sub], i) => (
                 <div key={i} style={{ padding:"16px 18px 14px", borderRight: i < 4 ? "1px solid var(--line)" : "none" }}>
                   <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
@@ -134,7 +134,7 @@ export default function LandingPage() {
             <div style={{ display:"flex", gap:8, marginTop:16, flexWrap:"wrap" }}>
               {[
                 { label:"Mantle L2",     sub:"gasless · agent-paid",  color:"var(--accent)" },
-                { label:"MNT native",    sub:"agent gas token",       color:"var(--yield)" },
+                { label:"MNT native",    sub: chainStats && chainStats.mntPriceUsd > 0 ? `$${chainStats.mntPriceUsd.toFixed(4)} · Pyth` : "agent gas token", color:"var(--yield)" },
                 { label:"Pyth oracles",  sub:"real-time price feeds", color:"var(--yield)" },
                 { label:"ERC-8004",      sub:"agent identity",    color:"var(--nexus)" },
                 { label:"EIP-712",       sub:"typed consent",     color:"var(--atlas)" },

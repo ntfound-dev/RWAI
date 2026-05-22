@@ -11,6 +11,19 @@ from ...mantle.executor import get_agent_wallet_address
 router = APIRouter()
 
 
+def _mnt_price() -> float:
+    """Fetch MNT/USD price from Pyth Hermes (off-chain pull oracle)."""
+    try:
+        from ...mantle.pyth import fetch_price_updates
+        _, parsed = fetch_price_updates(["MNT"])
+        if parsed:
+            p = parsed[0]["price"]
+            return round(float(p["price"]) * (10 ** p["expo"]), 6)
+    except Exception:
+        pass
+    return 0.0
+
+
 def _chain_stats() -> dict:
     """Real-time reads from chain (fast — just 2 calls)."""
     addrs = get_addresses()
@@ -45,6 +58,8 @@ def _chain_stats() -> dict:
                 result["agentMntBalance"] = round(mnt_wei / 1e18, 4)
         except Exception:
             result["agentMntBalance"] = 0.0
+        # MNT/USD price from Pyth Hermes
+        result["mntPriceUsd"] = _mnt_price()
         return result
     except Exception:
         return {}
@@ -66,6 +81,7 @@ def stats():
         "agentRuns":         live.get("actionCountChain",   db.get("agentRuns",  0)),
         "protocolRevenueUsd": live.get("protocolRevenueUsd", 0.0),
         "agentMntBalance":    live.get("agentMntBalance",    0.0),
+        "mntPriceUsd":        live.get("mntPriceUsd",        0.0),
     }
 
 
