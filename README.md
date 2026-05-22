@@ -92,7 +92,7 @@ graph TB
         NX["Nexus #41 · Tokenization"]
         SH["Shield #42 · Compliance"]
         YL["Yield #43 · Market Monitor"]
-        LLM["LLM Chain: OpenClaw → Groq → Claude"]
+        LLM["LLM Chain: OpenClaw → Groq 70b → Groq 4-scout → Claude"]
         AT -->|delegates| NX
         AT -->|delegates| SH
         AT -->|delegates| YL
@@ -184,7 +184,7 @@ User message (text or voice)
 **Reputation scores (live on Mantle Sepolia):** Nexus: 85 · Shield: 75 · Yield: 75 · Atlas: 75  
 Higher reputation → more autonomous actions permitted. Agents earn reputation through successful on-chain decisions.
 
-**Agent runtime:** OpenClaw/CMDOP primary → Groq (llama-3.3-70b) → Claude fallback. Model-agnostic, 4-level chain.
+**Agent runtime:** OpenClaw/CMDOP → Groq (llama-3.3-70b) → Groq (llama-4-scout-17b, smarter fallback) → Claude → Ollama. Model-agnostic, 5-level chain.
 
 ---
 
@@ -193,13 +193,21 @@ Higher reputation → more autonomous actions permitted. Agents earn reputation 
 **J**ust **A** **R**ather **V**ery **I**ntelligent **S**ystem is RWAi's full-screen AI interface — Atlas's front-end agent. Available on every page via the JARVIS pill in the top bar or the SPLIT/JARVIS toggle on `/chat`.
 
 ```
-User speaks or types
-  └─ JARVIS detects intent (yield? compliance? tokenization?)
-     └─ Routes to Atlas → Atlas delegates to the right sub-agent
+User speaks or types "Atlas, invest $1000 into USDY"
+  └─ JARVIS detects intent → routes to Atlas
+     └─ Atlas delegates to sub-agents (Yield for live APY data, etc.)
         └─ Sub-agent result injected into Atlas's context
            └─ Atlas responds with grounded, live data
-              └─ Execution via HybridVault when user confirms
+              └─ Execution intent detected → executeAllocation() called on-chain
+                 └─ tx hash returned → ON-CHAIN LOG panel shows EXECUTING (amber)
+                    └─ Mantlescan link in HUD — verifiable in real time
 ```
+
+**Atlas Voice Execution** — When the user says *"execute"*, *"invest $X"*, or *"allocate"*, the backend:
+1. Parses the USD amount and target assets from natural language
+2. Calls `AgentExecutor.executeAllocation()` on Mantle Sepolia — **no user signature needed**
+3. Returns `onChainTx` to the frontend — orb turns AMBER (EXECUTING state)
+4. On-chain log panel fills with the transaction hash + Mantlescan link
 
 **What JARVIS shows (all live data):**
 - L2 MNT wallet balance + blended APY from on-chain allocations × YieldOracle
@@ -267,7 +275,7 @@ Browser (Next.js 14)
   │
   ▼
 FastAPI Backend (agents/)
-  │  OpenClaw/CMDOP → Groq → Claude (4-level fallback)
+  │  OpenClaw/CMDOP → Groq (70b) → Groq (4-scout) → Claude → Ollama (5-level fallback)
   │  Every decision logged on-chain before response returned
   │  Documents pinned to IPFS via Pinata on tokenization
   │
@@ -328,7 +336,7 @@ Explorer: https://sepolia.mantlescan.xyz
 
 ```
 rwai/
-├── contracts/              # 8 Solidity contracts · Hardhat · 46 passing tests
+├── contracts/              # 11 Solidity contracts · Hardhat · 186 passing tests
 │   └── deployments.json    # Live Mantle Sepolia addresses
 ├── agents/                 # FastAPI backend · Railway
 │   ├── api/routes/         # chat, tokenize, compliance, yield, portfolio, market
@@ -533,7 +541,7 @@ Swagger UI: http://localhost:8001/docs
 - [x] Revenue model live: ProtocolTreasury collects 0.5% tokenization fee + 0.15% market fee on every transaction
 
 **Agent Intelligence**
-- [x] OpenClaw/CMDOP as primary runtime → Groq → Claude → Ollama (4-level fallback)
+- [x] OpenClaw/CMDOP → Groq (llama-3.3-70b) → Groq (llama-4-scout-17b) → Claude → Ollama (5-level fallback)
 - [x] Atlas real delegation: intent detection routes to Nexus/Shield/Yield + injects result
 - [x] Yield 6h autonomous scheduler + >100bps drift detection → on-chain DRIFT ALERT
 - [x] Nexus→Yield notification: newly tokenized assets enter monitoring immediately
@@ -549,10 +557,12 @@ Swagger UI: http://localhost:8001/docs
 - [x] RWA Market: list with IPFS proof link, buy/sell with Atlas AI reasoning on-chain
 - [x] Portfolio management: Atlas builds strategy, live APYs from YieldOracle on all pages
 - [x] J.A.R.V.I.S. — full-screen AI interface: voice + text, live oracle data, sensitive data filter
+- [x] **Atlas voice execution** — say "invest $X" → `executeAllocation()` fires on Mantle → EXECUTING state + tx hash shown in HUD
+- [x] **Gasless UX** — all on-chain txs agent-sponsored; users need zero MNT gas
 - [x] All APY data live from YieldOracle.sol (homepage, chat, portfolio, JARVIS)
 
 **Infrastructure**
-- [x] 46 contract tests passing (Hardhat)
+- [x] 186 contract tests passing, 0 failing (Hardhat)
 - [x] Rate limiting, CORS lockdown, API key auth on Railway backend
 - [x] Persistent market DB on Railway Volume — listings survive redeploys
 - [x] Live frontend on Vercel — https://rwai-theta.vercel.app
@@ -565,13 +575,13 @@ Swagger UI: http://localhost:8001/docs
 
 **General (60%)**
 - *AI × RWA depth*: AI is the execution layer. Atlas signs transactions. Every tokenization, compliance review, allocation, and rebalance is an AI agent action with ERC-8004 identity and permanent on-chain proof.
-- *Technical completeness*: 8 contracts, 4 agents with real inter-agent delegation, IPFS document storage, full tokenize + market + portfolio + JARVIS flows — end-to-end, deployed and live.
+- *Technical completeness*: 11 contracts deployed, 4 agents with real inter-agent delegation, IPFS document storage, full tokenize + market + portfolio + JARVIS flows — end-to-end, deployed and live. **186 tests passing, 0 failing.**
 - *Mantle integration*: ERC-8004 identity + reputation live on Mantle pre-deployed contracts. YieldOracle with Pyth prices. HybridVault with EIP-712 consent. AgentExecutor as the immutable benchmark. 4 mock RWA tokens.
 - *Compliance awareness*: Shield's 4-category scoring blocks non-compliant assets before ERC-20 deployment. Every decision is permanent in ComplianceLog.sol. Documents preserved forever on IPFS.
 
 **Track-specific (40%) — Path A + B**
 - *Infrastructure (Path A)*: Complete tokenization pipeline — document in, IPFS pin, Shield auto-reviews, Yield auto-prices, ERC-20 out, all logged on-chain with IPFS CID.
-- *Application (Path B)*: J.A.R.V.I.S. gives retail investors a voice interface to Atlas. Speak intent → Atlas delegates to agents → executes on Mantle → on-chain proof returned in seconds.
+- *Application (Path B)*: J.A.R.V.I.S. gives retail investors a voice interface to Atlas. Speak intent → Atlas delegates to agents → executes on Mantle → on-chain proof returned in seconds. **Gasless:** all transactions agent-sponsored, zero MNT required.
 
 ---
 
