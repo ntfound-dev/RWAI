@@ -1,6 +1,6 @@
 # RWAi Smart Contracts
 
-8 production-grade Solidity contracts deployed on **Mantle Sepolia Testnet** (chainId 5003). All AI agent actions are logged permanently on-chain with full reasoning transparency.
+11 production-grade Solidity contracts deployed on **Mantle Sepolia Testnet** (chainId 5003). All AI agent actions are logged permanently on-chain with full reasoning transparency. Protocol revenue is live — `ProtocolTreasury` collecting fees on every tokenization and market trade.
 
 ## Deployed Contracts — Mantle Sepolia (chainId 5003)
 
@@ -14,8 +14,11 @@ Deployed: 2026-05-12 · Deployer: `0x834De729cb9dF77451DBc6bf7FD05F475B011Ac7`
 | **AgentReputationManager** | `0xfFE21EC80012D3Bf00F5eE20a400C94455F32D32` | [view](https://sepolia.mantlescan.xyz/address/0xfFE21EC80012D3Bf00F5eE20a400C94455F32D32) |
 | **AgentExecutor** | `0x9a822B9A50D090CfcCa1e6474efCd653112d8501` | [view](https://sepolia.mantlescan.xyz/address/0x9a822B9A50D090CfcCa1e6474efCd653112d8501) |
 | **PortfolioVault** | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` | [view](https://sepolia.mantlescan.xyz/address/0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4) |
-| **HybridVault** | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` | [view](https://sepolia.mantlescan.xyz/address/0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D) |
+| **HybridVault** | `0x8e9c0ebC81F3db508BFff45f3eE9a10115b604fe` | [view](https://sepolia.mantlescan.xyz/address/0x8e9c0ebC81F3db508BFff45f3eE9a10115b604fe) |
 | **AssetToken** (MANHATTAN-001) | `0x80E0e5f6488FA2726c042a204344281974f72609` | [view](https://sepolia.mantlescan.xyz/address/0x80E0e5f6488FA2726c042a204344281974f72609) |
+| **RWAiToken** | `0xa947B1e71E91078c12cf4bAde3A771892772d659` | [view](https://sepolia.mantlescan.xyz/address/0xa947B1e71E91078c12cf4bAde3A771892772d659) |
+| **ProtocolTreasury** | `0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679` | [view](https://sepolia.mantlescan.xyz/address/0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679) |
+| **RWAiVesting** | *(deployed via deploy script)* | — |
 
 All contracts verified on Mantlescan.
 
@@ -31,6 +34,9 @@ All contracts verified on Mantlescan.
 | **PortfolioVault** | Strategy layer (bps allocations) + execution layer (real amounts) |
 | **HybridVault** | User deposits, capped agent allowance, EIP-712 relayer consent |
 | **AssetToken** | ERC-20 representing a tokenized real-world asset |
+| **RWAiToken** | Protocol governance + staking token; receives 70% of all fee revenue |
+| **ProtocolTreasury** | Collects 0.5% tokenization fee + 0.15% market fee; splits 70/30 to stakers/DAO |
+| **RWAiVesting** | Linear vesting schedules for team and investor RWAI token allocations |
 
 ## Architecture
 
@@ -82,16 +88,20 @@ All agents start at score **75** (Level 3). High-value rebalances (> $10k) are q
 ```
 contracts/
 ├── contracts/
-│   ├── AgentExecutor.sol
-│   ├── AgentReputationManager.sol
-│   ├── AssetToken.sol
-│   ├── ComplianceLog.sol
-│   ├── HybridVault.sol
-│   ├── PortfolioVault.sol
-│   ├── RWAiRegistry.sol
-│   └── YieldOracle.sol
+│   ├── AgentExecutor.sol          — on-chain AI action log
+│   ├── AgentReputationManager.sol — ERC-8004 reputation gating
+│   ├── AssetToken.sol             — ERC-20 fractional RWA token
+│   ├── ComplianceLog.sol          — KYC/AML/sanctions registry
+│   ├── HybridVault.sol            — user deposits + EIP-712 agent consent
+│   ├── PortfolioVault.sol         — strategy bps + execution layer
+│   ├── ProtocolTreasury.sol       — fee collection + 70/30 staker/DAO split
+│   ├── RWAiRegistry.sol           — tokenized asset registry
+│   ├── RWAiToken.sol              — governance + staking token (receives fees)
+│   ├── RWAiVesting.sol            — linear vesting for team/investors
+│   ├── YieldOracle.sol            — live APY + Pyth price feeds
+│   └── mocks/                     — test mock ERC-20s
 ├── scripts/
-│   ├── deploy.ts           # Full 8-contract deploy + wiring
+│   ├── deploy.ts           # Full 11-contract deploy + wiring
 │   └── registerAgents.ts   # ERC-8004 identity registration
 ├── test/
 │   └── RWAi.test.ts        # 46 tests — all passing
@@ -163,6 +173,9 @@ This deploys in order:
 6. PortfolioVault
 7. HybridVault
 8. AssetToken (MANHATTAN-001 demo)
+9. RWAiToken
+10. ProtocolTreasury (wired to RWAiToken for fee distribution)
+11. RWAiVesting
 
 Then automatically wires them together and saves addresses to `deployments.json`.
 
