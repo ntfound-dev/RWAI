@@ -101,24 +101,29 @@ graph TB
         NX & SH & YL & AT --> LLM
     end
 
-    subgraph CH["🔗 Mantle Sepolia · chainId 5003"]
+    subgraph CH["🔗 Mantle Sepolia · chainId 5003 · 11 contracts"]
         AE["AgentExecutor.sol · immutable AI log"]
-        YO["YieldOracle.sol · APY snapshots"]
+        YO["YieldOracle.sol · APY + Pyth prices"]
         CL["ComplianceLog.sol · KYC records"]
         RR["RWAiRegistry.sol · asset registry"]
         HV["HybridVault.sol · EIP-712 consent"]
         AR["AgentReputationManager + ERC-8004"]
+        PT["ProtocolTreasury.sol · live fee revenue"]
+        RT["RWAiToken.sol · governance + staking"]
     end
 
     FE -->|HTTPS REST + WebSocket| BE
     NX -->|logTokenization| AE
     NX -->|registerAsset| RR
+    NX -->|collectTokenizationFee| PT
     SH -->|logComplianceReview| AE & CL
     YL -->|updateYields| YO
     YL -->|recordYieldSnapshot| AE
     AT -->|executeAllocation| AE
     AT -->|agentExecute| HV
+    AT -->|collectMarketFee| PT
     AE --> AR
+    PT -->|70% fees| RT
 ```
 
 ---
@@ -280,7 +285,7 @@ FastAPI Backend (agents/)
   │  Documents pinned to IPFS via Pinata on tokenization
   │
   ▼
-Mantle Sepolia (chainId 5003)
+Mantle Sepolia (chainId 5003) — 11 contracts
   ├── AgentExecutor.sol          — immutable AI action log (the benchmark)
   ├── AgentReputationManager.sol — reputation score + ERC-8004 mirror
   ├── YieldOracle.sol            — Pyth USD prices + APY market snapshots
@@ -288,7 +293,10 @@ Mantle Sepolia (chainId 5003)
   ├── RWAiRegistry.sol           — tokenized asset registry
   ├── AssetToken.sol             — ERC-20 fractional RWA token
   ├── PortfolioVault.sol         — strategy (bps) + execution
-  └── HybridVault.sol            — user deposits + EIP-712 agent consent
+  ├── HybridVault.sol            — user deposits + EIP-712 agent consent
+  ├── RWAiToken.sol              — governance + staking token ($RWAI)
+  ├── ProtocolTreasury.sol       — live fee collection (0.5% tokenize + 0.15% market)
+  └── RWAiVesting.sol            — linear vesting for team/investors
 
 IPFS (Pinata)
   └── Asset documents pinned at tokenization — CID stored per listing
@@ -311,7 +319,7 @@ ERC-8004 (Mantle Sepolia — official pre-deployed)
 | ComplianceLog | `0xCc6296557c05ca02f3258DEd19f4104a9C19a80B` |
 | RWAiRegistry | `0xeE7a50936a25a375143b75b7Ca743B9513368680` |
 | PortfolioVault | `0xf7C43D8fe74712130C0a05D1F58A33515E2C63E4` |
-| HybridVault | `0xC6c08db835636Cf40530dDf90Bf3Bb15bc78190D` |
+| HybridVault | `0x8e9c0ebC81F3db508BFff45f3eE9a10115b604fe` |
 | AssetToken (template) | `0x80E0e5f6488FA2726c042a204344281974f72609` |
 | RWAiToken ($RWAI) | `0xa947B1e71E91078c12cf4bAde3A771892772d659` |
 | ProtocolTreasury | `0x9c3CD9CEef24F07520bD0f86BE5cF87F1Ff9d679` |
