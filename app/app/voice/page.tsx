@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { useBlockNumber } from "wagmi";
+import { mantleTestnet } from "@/lib/wagmi";
 import { agentApi } from "@/lib/agent-api";
 
 type OrbState = "idle" | "listening" | "thinking" | "speaking" | "executing";
@@ -22,12 +24,14 @@ interface Action {
 
 export default function VoicePage() {
   const { address, isConnected } = useAccount();
+  const { data: blockNumber } = useBlockNumber({ chainId: mantleTestnet.id, watch: true });
   const [orbState, setOrbState]   = useState<OrbState>("idle");
   const [displayed, setDisplayed] = useState("Atlas online. Speak your command.");
   const [interim, setInterim]     = useState("");
   const [actions, setActions]     = useState<Action[]>([]);
   const [history, setHistory]     = useState<{ role: string; body: string }[]>([]);
   const [modelUsed, setModelUsed] = useState("");
+  const [atlasScore, setAtlasScore] = useState<number>(75);
 
   const recRef      = useRef<any>(null);
   const interimRef  = useRef("");
@@ -36,6 +40,13 @@ export default function VoicePage() {
   const [speakWords, setSpeakWords] = useState<string[]>([]);
   const [wordIdx, setWordIdx]       = useState(-1);
   const [hasSR, setHasSR]           = useState(true);
+
+  useEffect(() => {
+    fetch("/api/agents/status", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.atlas?.localScore != null) setAtlasScore(d.atlas.localScore); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -356,7 +367,7 @@ export default function VoicePage() {
         </div>
         <div className="atlas-hud-row">
           <span className="atlas-hud-label">REPUTATION</span>
-          <span className="atlas-hud-val" style={{ color: "#34d399" }}>75 / 100</span>
+          <span className="atlas-hud-val" style={{ color: atlasScore >= 70 ? "#34d399" : "#fbbf24" }}>{atlasScore} / 100</span>
         </div>
         <div className="atlas-hud-row">
           <span className="atlas-hud-label">WALLET</span>
@@ -386,7 +397,9 @@ export default function VoicePage() {
         <span className="atlas-sep">·</span>
         <span style={{ color: "#fbbf24" }}>⛽ GASLESS</span>
         <span className="atlas-sep">·</span>
-        <span>{new Date().toISOString().slice(0, 10)}</span>
+        <span>BLOCK {blockNumber ? blockNumber.toLocaleString() : "—"}</span>
+        <span className="atlas-sep">·</span>
+        <span style={{ color:"var(--fg-3)" }}>{new Date().toISOString().slice(0, 10)}</span>
       </div>
     </div>
   );
