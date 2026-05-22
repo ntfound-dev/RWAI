@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 
 describe("HybridVault", function () {
   it("deposit, set allowance, execute on behalf, and withdraw", async function () {
@@ -21,7 +21,15 @@ describe("HybridVault", function () {
     const balance = await vault.balances(user.address, await token.getAddress());
     expect(balance).to.equal(ethers.parseEther("100"));
 
-    const expiry = Math.floor(Date.now() / 1000) + 3600;
+    // Whitelist recipient first: propose → advance 48h timelock → commit
+    await vault.proposeDestination(recipient.address);
+    await network.provider.send("evm_increaseTime", [48 * 3600 + 1]);
+    await network.provider.send("evm_mine");
+    await vault.commitDestination(recipient.address);
+
+    // Set allowance AFTER timelock advance so expiry is relative to current block
+    const block = await ethers.provider.getBlock("latest");
+    const expiry = block!.timestamp + 7 * 24 * 3600;
     await vault.connect(user).setAgentAllowance(agent.address, await token.getAddress(), ethers.parseEther("10"), expiry);
 
     const allowance = await vault.allowances(user.address, agent.address, await token.getAddress());
@@ -61,7 +69,8 @@ describe("HybridVault", function () {
     await vault.connect(user).deposit(await token.getAddress(), ethers.parseEther("50"));
 
     const amount = ethers.parseEther("5");
-    const expiry = Math.floor(Date.now() / 1000) + 3600;
+    const block = await ethers.provider.getBlock("latest");
+    const expiry = block!.timestamp + 7 * 24 * 3600;
     const nonce = await vault.nonces(user.address);
 
     const domain = {
@@ -120,7 +129,8 @@ describe("HybridVault", function () {
     const vault = await Vault.deploy();
     await vault.waitForDeployment();
 
-    const expiry = Math.floor(Date.now() / 1000) + 3600;
+    const block = await ethers.provider.getBlock("latest");
+    const expiry = block!.timestamp + 7 * 24 * 3600;
     await vault.setAgentApproval(agent.address, true);
     await expect(
       vault.connect(user).setAgentAllowance(agent.address, await token.getAddress(), ethers.parseEther("1"), expiry),
