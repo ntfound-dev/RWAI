@@ -384,6 +384,8 @@ export default function VoicePage() {
         <span className="atlas-sep">·</span>
         <span style={{ color: "#34d399" }}>AGENT ONLINE</span>
         <span className="atlas-sep">·</span>
+        <span style={{ color: "#fbbf24" }}>⛽ GASLESS</span>
+        <span className="atlas-sep">·</span>
         <span>{new Date().toISOString().slice(0, 10)}</span>
       </div>
     </div>

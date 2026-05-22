@@ -132,7 +132,7 @@ export default function LandingPage() {
             {/* Ecosystem stack badges */}
             <div style={{ display:"flex", gap:8, marginTop:16, flexWrap:"wrap" }}>
               {[
-                { label:"Mantle L2",     sub:"~$0.001 gas",       color:"var(--accent)" },
+                { label:"Mantle L2",     sub:"gasless · agent-paid",  color:"var(--accent)" },
                 { label:"Pyth oracles",  sub:"real-time price feeds", color:"var(--yield)" },
                 { label:"ERC-8004",      sub:"agent identity",    color:"var(--nexus)" },
                 { label:"EIP-712",       sub:"typed consent",     color:"var(--atlas)" },

@@ -47,8 +47,8 @@ function ScoreBar({ score }: { score: number }) {
 }
 
 const GAS_BADGE = (
-  <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
-    ⛽ ~$0.001 gas · Mantle L2
+  <span className="tag" style={{ fontSize:9, fontWeight:700, color:"var(--accent)", borderColor:"rgba(0,229,160,0.4)", background:"rgba(0,229,160,0.06)" }}>
+    ⛽ GASLESS · Agent-Paid
   </span>
 );
 
@@ -168,10 +168,10 @@ export default function MarketPage() {
       </div>
 
       {/* Gasless banner */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", background:"rgba(0,229,160,0.04)", border:"1px solid rgba(0,229,160,0.2)", borderRadius:2, marginBottom:24 }}>
-        <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--accent)", letterSpacing:"0.08em" }}>⚡ NEAR-ZERO GAS</span>
-        <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>Every trade costs ~$0.001 on Mantle L2 — 1000× cheaper than Ethereum mainnet. Web3 is effectively free here.</span>
-        <a href="https://faucet.sepolia.mantle.xyz" target="_blank" rel="noopener noreferrer" className="mono-sm" style={{ color:"var(--accent)", marginLeft:"auto", whiteSpace:"nowrap" }}>Get testnet MNT ↗</a>
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", background:"rgba(0,229,160,0.05)", border:"1px solid rgba(0,229,160,0.25)", borderRadius:2, marginBottom:24 }}>
+        <span style={{ fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"var(--accent)", letterSpacing:"0.12em" }}>⛽ GASLESS</span>
+        <span className="mono-sm" style={{ color:"var(--fg-2)", textTransform:"none", letterSpacing:0 }}>No MNT required. Atlas agent wallet pays gas — you only need to connect to verify ownership.</span>
+        <span className="tag" style={{ marginLeft:"auto", fontSize:9, color:"var(--fg-2)", borderColor:"var(--line)", whiteSpace:"nowrap" }}>EIP-4337 · Agent-Sponsored</span>
       </div>
 
       {/* Stats */}

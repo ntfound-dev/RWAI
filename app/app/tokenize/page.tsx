@@ -329,9 +329,13 @@ export default function TokenizePage() {
               </div>
             </div>
 
+            <div style={{ padding:"10px 14px", background:"rgba(0,229,160,0.06)", border:"1px solid rgba(0,229,160,0.25)", borderRadius:2, marginBottom:14, fontSize:12, color:"var(--accent)", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:700, letterSpacing:"0.1em" }}>GASLESS</span>
+              <span style={{ color:"var(--fg-1)" }}>— No MNT required. Nexus agent wallet pays gas on your behalf.</span>
+            </div>
             {!isConnected && (
-              <div style={{ padding:"12px 16px", background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.3)", borderRadius:2, marginBottom:16, fontSize:13, color:"var(--warn)" }}>
-                ⚠ Connect wallet to deploy token on Mantle Testnet
+              <div style={{ padding:"10px 14px", background:"rgba(245,158,11,0.06)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:2, marginBottom:14, fontSize:12, color:"var(--warn)" }}>
+                Connect wallet to record ownership — no signing required.
               </div>
             )}
             <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
@@ -352,8 +356,8 @@ export default function TokenizePage() {
                   ✗ Blocked — upload better documents →
                 </button>
               )}
-              <span className="tag" style={{ fontSize:9, color:"var(--accent)", borderColor:"rgba(0,229,160,0.3)" }}>
-                ⛽ Gas ≈ $0.001 · Mantle L2
+              <span className="tag" style={{ fontSize:9, fontWeight:700, color:"var(--accent)", borderColor:"rgba(0,229,160,0.4)", background:"rgba(0,229,160,0.06)" }}>
+                ⛽ GASLESS · Agent-Paid
               </span>
             </div>
             {error && (
