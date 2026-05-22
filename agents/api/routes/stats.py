@@ -21,14 +21,22 @@ def _chain_stats() -> dict:
 
     registry_abi  = [{"inputs":[],"name":"assetCount","outputs":[{"type":"uint256"}],"stateMutability":"view","type":"function"}]
     executor_abi  = [{"inputs":[],"name":"actionCount","outputs":[{"type":"uint256"}],"stateMutability":"view","type":"function"}]
+    treasury_abi  = [{"inputs":[],"name":"totalCollected","outputs":[{"type":"uint256"}],"stateMutability":"view","type":"function"}]
 
     try:
         registry = w3.eth.contract(address=Web3.to_checksum_address(addrs["RWAiRegistry"]),  abi=registry_abi)
         executor = w3.eth.contract(address=Web3.to_checksum_address(addrs["AgentExecutor"]), abi=executor_abi)
-        return {
+        result = {
             "assetCountChain":  registry.functions.assetCount().call(),
             "actionCountChain": executor.functions.actionCount().call(),
+            "protocolRevenueUsd": 0.0,
         }
+        if "ProtocolTreasury" in addrs:
+            treasury = w3.eth.contract(address=Web3.to_checksum_address(addrs["ProtocolTreasury"]), abi=treasury_abi)
+            total_wei = treasury.functions.totalCollected().call()
+            # 1 RWAI = 1 USD for demo denomination
+            result["protocolRevenueUsd"] = round(total_wei / 1e18, 2)
+        return result
     except Exception:
         return {}
 
@@ -45,8 +53,9 @@ def stats():
         **db,
         **live,
         # Use chain counter as authoritative asset/action count
-        "assetCount":  live.get("assetCountChain",  db.get("assetCount", 0)),
-        "agentRuns":   live.get("actionCountChain", db.get("agentRuns",  0)),
+        "assetCount":        live.get("assetCountChain",    db.get("assetCount", 0)),
+        "agentRuns":         live.get("actionCountChain",   db.get("agentRuns",  0)),
+        "protocolRevenueUsd": live.get("protocolRevenueUsd", 0.0),
     }
 
 

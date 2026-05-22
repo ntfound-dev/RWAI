@@ -31,7 +31,7 @@ const PIPELINE = [
 
 type AgentId = "nexus" | "shield" | "yield" | "atlas";
 
-interface ChainStats { assetCount: number; agentRuns: number; agentRuns24h: number; avgCompliance: number; }
+interface ChainStats { assetCount: number; agentRuns: number; agentRuns24h: number; avgCompliance: number; protocolRevenueUsd: number; }
 
 export default function LandingPage() {
   const [tracePos, setTracePos] = useState(0);
@@ -114,16 +114,17 @@ export default function LandingPage() {
             </div>
 
             {/* Stats — real on-chain data */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, borderTop:"1px solid var(--line)", borderBottom:"1px solid var(--line)" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:0, borderTop:"1px solid var(--line)", borderBottom:"1px solid var(--line)" }}>
               {([
                 ["Assets tokenized", chainStats ? chainStats.assetCount.toString() : "…", "on Mantle Sepolia"],
                 ["Avg. compliance",  chainStats ? `${chainStats.avgCompliance}/100` : "…/100", "Shield agent"],
                 ["Agent runs",       chainStats ? chainStats.agentRuns.toString() : "…", `${chainStats?.agentRuns24h ?? "…"} in 24h`],
+                ["Protocol revenue", chainStats ? `$${chainStats.protocolRevenueUsd.toFixed(2)}` : "…", "ProtocolTreasury · live"],
                 ["Agents online",    "4", "ERC-8004 registered"],
               ] as [string, string, string][]).map(([label, value, sub], i) => (
-                <div key={i} style={{ padding:"16px 18px 14px", borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+                <div key={i} style={{ padding:"16px 18px 14px", borderRight: i < 4 ? "1px solid var(--line)" : "none" }}>
                   <div className="mono-sm" style={{ marginBottom:6 }}>{label}</div>
-                  <div className="display" style={{ fontSize:32, color:"var(--fg-0)" }}>{value}</div>
+                  <div className="display" style={{ fontSize:32, color: label === "Protocol revenue" ? "var(--accent)" : "var(--fg-0)" }}>{value}</div>
                   <div className="mono-sm" style={{ color:"var(--accent)", marginTop:4 }}>{sub}</div>
                 </div>
               ))}
