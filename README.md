@@ -533,12 +533,14 @@ Swagger UI: http://localhost:8001/docs
 ## Hackathon Submission Checklist
 
 **Contracts & Protocol**
-- [x] 10 contracts deployed on Mantle Sepolia (chainId 5003)
+- [x] 11 contracts deployed on Mantle Sepolia (chainId 5003)
 - [x] 4 agents registered on ERC-8004 Identity Registry (nexus=41, shield=42, yield=43, atlas=44)
 - [x] Reputation system live on AgentReputationManager + ERC-8004 mirror
 - [x] On-chain action logging: tokenization, compliance, yield snapshot, allocation, rebalance, buy, sell
 - [x] HybridVault EIP-712 capped consent — Atlas executes within user-signed allowance
 - [x] Revenue model live: ProtocolTreasury collects 0.5% tokenization fee + 0.15% market fee on every transaction
+- [x] **Live protocol revenue** — `ProtocolTreasury.totalCollected()` read every request, displayed as 5th stat on homepage
+- [x] **Agent MNT balance** — agent wallet native MNT balance shown in UI (Mantle ecosystem integration)
 
 **Agent Intelligence**
 - [x] OpenClaw/CMDOP → Groq (llama-3.3-70b) → Groq (llama-4-scout-17b) → Claude → Ollama (5-level fallback)
