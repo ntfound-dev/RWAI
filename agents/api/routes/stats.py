@@ -6,6 +6,7 @@ GET /api/agents/stats/assets  — registered assets
 from fastapi import APIRouter, Query
 from ...mantle.db import get_stats, get_recent_actions, get_assets
 from ...mantle.client import get_w3, get_addresses
+from ...mantle.executor import get_agent_wallet_address
 
 router = APIRouter()
 
@@ -36,6 +37,14 @@ def _chain_stats() -> dict:
             total_wei = treasury.functions.totalCollected().call()
             # 1 RWAI = 1 USD for demo denomination
             result["protocolRevenueUsd"] = round(total_wei / 1e18, 2)
+        # Agent wallet native MNT balance (pays gas for all users)
+        try:
+            agent_addr = get_agent_wallet_address()
+            if agent_addr:
+                mnt_wei = w3.eth.get_balance(Web3.to_checksum_address(agent_addr))
+                result["agentMntBalance"] = round(mnt_wei / 1e18, 4)
+        except Exception:
+            result["agentMntBalance"] = 0.0
         return result
     except Exception:
         return {}
@@ -56,6 +65,7 @@ def stats():
         "assetCount":        live.get("assetCountChain",    db.get("assetCount", 0)),
         "agentRuns":         live.get("actionCountChain",   db.get("agentRuns",  0)),
         "protocolRevenueUsd": live.get("protocolRevenueUsd", 0.0),
+        "agentMntBalance":    live.get("agentMntBalance",    0.0),
     }
 
 
