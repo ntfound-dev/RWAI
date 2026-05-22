@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RWAi — Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060810;
+    --bg1: #0c0f1e;
+    --bg2: #121628;
+    --fg: #f0f2ff;
+    --fg1: #8890b8;
+    --fg2: #404878;
+    --accent: #00e5a0;
+    --nexus: #f97316;
+    --shield: #38bdf8;
+    --yield: #fbbf24;
+    --atlas: #a855f7;
+    --line: rgba(255,255,255,0.07);
+    --serif: 'Instrument Serif', Georgia, serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', system-ui, sans-serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  /* ── Deck container ──────────────────────── */
+  #deck {
+    width: 100vw; height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Slides ──────────────────────────────── */
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 72px 96px;
+    opacity: 0;
+    transform: translateX(60px);
+    transition: opacity 0.45s cubic-bezier(.4,0,.2,1), transform 0.45s cubic-bezier(.4,0,.2,1);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+    z-index: 1;
+  }
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-60px);
+    z-index: 0;
+  }
+
+  /* ── Background elements ─────────────────── */
+  .slide-bg {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: -1;
+  }
+  .dot-grid {
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  /* ── Typography ──────────────────────────── */
+  .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg2);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .label::before {
+    content: '';
+    display: inline-block;
+    width: 24px; height: 1px;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: 88px;
+    font-weight: 400;
+    line-height: 1.0;
+    letter-spacing: -1px;
+    color: var(--fg);
+    margin-bottom: 28px;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 64px;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.5px;
+    color: var(--fg);
+    margin-bottom: 24px;
+  }
+  h2 em { font-style: italic; color: var(--accent); }
+  h2 .dim { color: var(--fg1); }
+
+  .sub {
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--fg1);
+    line-height: 1.65;
+    max-width: 620px;
+  }
+
+  /* ── Tag / pill ──────────────────────────── */
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--fg1);
+  }
+  .tag-accent { border-color: rgba(0,229,160,0.3); color: var(--accent); background: rgba(0,229,160,0.06); }
+
+  /* ── Divider ─────────────────────────────── */
+  hr.rule {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 36px 0;
+  }
+
+  /* ── Stat blocks ─────────────────────────── */
+  .stat-row {
+    display: grid;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 40px;
+  }
+  .stat-row.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .stat-row.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .stat-row.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .stat {
+    padding: 24px 28px;
+    border-right: 1px solid var(--line);
+    background: rgba(255,255,255,0.015);
+  }
+  .stat:last-child { border-right: none; }
+  .stat-val {
+    font-family: var(--serif);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1;
+    margin-bottom: 8px;
+    color: var(--fg);
+  }
+  .stat-val.accent { color: var(--accent); }
+  .stat-val.warn   { color: var(--yield); }
+  .stat-val.red    { color: #f87171; }
+  .stat-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg2);
+    margin-bottom: 6px;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--fg2);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+
+  /* ── Agent cards ─────────────────────────── */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 36px;
+  }
+  .agent-card {
+    padding: 24px 22px;
+    border-right: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-card:last-child { border-right: none; }
+  .agent-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .agent-card.nexus::before  { background: var(--nexus); }
+  .agent-card.shield::before { background: var(--shield); }
+  .agent-card.yield::before  { background: var(--yield); }
+  .agent-card.atlas::before  { background: var(--atlas); }
+
+  .agent-id {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--fg2);
+    margin-bottom: 14px;
+  }
+  .agent-name {
+    font-family: var(--serif);
+    font-size: 28px;
+    margin-bottom: 4px;
+  }
+  .agent-role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+  .agent-card.nexus  .agent-role { color: var(--nexus); }
+  .agent-card.shield .agent-role { color: var(--shield); }
+  .agent-card.yield  .agent-role { color: var(--yield); }
+  .agent-card.atlas  .agent-role { color: var(--atlas); }
+  .agent-desc { font-size: 12px; color: var(--fg1); line-height: 1.6; }
+
+  /* ── Pipeline steps ──────────────────────── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 36px;
+  }
+  .pipe-step {
+    flex: 1;
+    padding: 18px 14px;
+    border-right: 1px solid var(--line);
+    position: relative;
+  }
+  .pipe-step:last-child { border-right: none; }
+  .pipe-num {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--fg2);
+    margin-bottom: 10px;
+  }
+  .pipe-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .pipe-agent {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    margin-top: 8px;
+    padding: 2px 6px;
+    display: inline-block;
+    border-radius: 2px;
+  }
+  .pa-nexus  { color: var(--nexus);  background: rgba(249,115,22,0.1);  border: 1px solid rgba(249,115,22,0.2); }
+  .pa-shield { color: var(--shield); background: rgba(56,189,248,0.1);  border: 1px solid rgba(56,189,248,0.2); }
+  .pa-yield  { color: var(--yield);  background: rgba(251,191,36,0.1);  border: 1px solid rgba(251,191,36,0.2); }
+  .pa-atlas  { color: var(--atlas);  background: rgba(168,85,247,0.1);  border: 1px solid rgba(168,85,247,0.2); }
+
+  /* ── Stack badges ────────────────────────── */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 36px;
+  }
+  .stack-item {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 16px 18px;
+    background: rgba(255,255,255,0.015);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .stack-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .stack-title { font-size: 13px; font-weight: 500; color: var(--fg); margin-bottom: 3px; }
+  .stack-desc  { font-size: 11px; color: var(--fg1); line-height: 1.5; }
+
+  /* ── Revenue model ───────────────────────── */
+  .rev-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 22px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.015);
+    margin-bottom: 12px;
+  }
+  .rev-pct {
+    font-family: var(--serif);
+    font-size: 38px;
+    color: var(--accent);
+    min-width: 100px;
+  }
+  .rev-label { font-size: 14px; font-weight: 500; color: var(--fg); }
+  .rev-desc  { font-size: 12px; color: var(--fg1); margin-top: 2px; }
+  .rev-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.3);
+    background: rgba(0,229,160,0.06);
+  }
+
+  /* ── Traction numbers ────────────────────── */
+  .traction-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 36px;
+  }
+  .traction-item {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 22px 26px;
+    background: rgba(255,255,255,0.015);
+    position: relative;
+    overflow: hidden;
+  }
+  .traction-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0.3;
+  }
+  .traction-num {
+    font-family: var(--serif);
+    font-size: 52px;
+    color: var(--fg);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .traction-num em { color: var(--accent); font-style: normal; }
+  .traction-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--fg2); }
+
+  /* ── Cover layout ────────────────────────── */
+  #slide-1 { justify-content: space-between; padding-top: 80px; padding-bottom: 64px; }
+  #slide-1 .cover-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  #slide-1 .brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em; color: var(--accent); display: flex; align-items: center; gap: 10px; }
+  #slide-1 .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  #slide-1 .slide-num { font-family: var(--mono); font-size: 11px; color: var(--fg2); }
+
+  /* ── NAV ─────────────────────────────────── */
+  #nav {
+    position: fixed;
+    bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 100;
+    background: rgba(6,8,16,0.85);
+    border: 1px solid var(--line);
+    border-radius: 32px;
+    padding: 10px 22px;
+    backdrop-filter: blur(16px);
+  }
+  #nav button {
+    background: none; border: none; cursor: pointer;
+    color: var(--fg1); font-size: 16px; padding: 0 4px;
+    transition: color 0.2s;
+  }
+  #nav button:hover { color: var(--fg); }
+  #nav button:disabled { opacity: 0.2; cursor: default; }
+  #counter {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg2);
+    letter-spacing: 0.12em;
+    min-width: 40px;
+    text-align: center;
+  }
+  #dots {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--fg2);
+    transition: background 0.3s, transform 0.3s;
+    cursor: pointer;
+  }
+  .dot.on {
+    background: var(--accent);
+    transform: scale(1.4);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  /* ── Fullscreen hint ─────────────────────── */
+  #hint {
+    position: fixed; bottom: 80px; right: 32px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    color: var(--fg2); opacity: 0.6;
+  }
+
+  /* ── Print / PDF ─────────────────────────── */
+  @media print {
+    html, body { overflow: visible; height: auto; }
+    #deck { height: auto; overflow: visible; }
+    .slide {
+      position: relative; opacity: 1 !important; transform: none !important;
+      display: flex !important; height: 100vh; page-break-after: always;
+      pointer-events: all;
+    }
+    #nav, #hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- ═══════════════ SLIDE 1 — COVER ═══════════════ -->
+  <div class="slide active" id="slide-1">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:600px;height:600px;background:rgba(0,229,160,0.06);top:-100px;left:-100px;"></div>
+      <div class="glow" style="width:400px;height:400px;background:rgba(168,85,247,0.05);bottom:0;right:0;"></div>
+    </div>
+
+    <div class="cover-top">
+      <div class="brand">
+        <div class="brand-dot"></div>
+        RWAi
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="tag tag-accent">● Live · Mantle Sepolia</span>
+        <span class="tag">ERC-8004 · AI Agent Identity</span>
+      </div>
+    </div>
+
+    <div style="max-width:900px;">
+      <div class="label">01 / cover · AI & RWA Track</div>
+      <h1>Real-world assets,<br><em>orchestrated</em><br>by four agents.</h1>
+      <p class="sub">Tokenize property, treasuries, and commodities through an autonomous AI pipeline. Every decision, every signature, every tool call — verifiable on-chain.</p>
+
+      <div style="display:flex;gap:10px;margin-top:32px;flex-wrap:wrap;">
+        <span class="tag tag-accent">Mantle L2</span>
+        <span class="tag">AgentExecutor on-chain</span>
+        <span class="tag">HybridVault · EIP-712</span>
+        <span class="tag">Pyth price feeds</span>
+        <span class="tag">Atlas voice interface</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:40px;">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--fg2);">DoraHacks · Turing Test Hackathon · 2026</div>
+      <div style="display:flex;gap:20px;">
+        <div style="text-align:right;">
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--fg2);margin-bottom:3px;">CONTRACTS DEPLOYED</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);">11 on Mantle Sepolia</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--fg2);margin-bottom:3px;">REVENUE MODEL</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--accent);">Live · ProtocolTreasury</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 2 — THE PROBLEM ═══════════════ -->
+  <div class="slide" id="slide-2">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:500px;height:500px;background:rgba(248,113,113,0.05);top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+    </div>
+
+    <div class="label">02 / the problem</div>
+    <h2>Tokenizing real assets<br>is <em style="color:#f87171;">broken.</em></h2>
+    <p class="sub">A $500 trillion market — almost none of it on-chain. The reason is friction: six-figure legal fees, zero transparency, and minimum tickets that lock out 99% of investors.</p>
+
+    <div class="stat-row cols-4" style="margin-top:44px;">
+      <div class="stat">
+        <div class="stat-lbl">Illiquid market</div>
+        <div class="stat-val warn">$500T+</div>
+        <div class="stat-sub">in real-world assets trapped off-chain and inaccessible to retail investors</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Cost to tokenize</div>
+        <div class="stat-val red">$100K+</div>
+        <div class="stat-sub">in lawyers, developers, and compliance consultants per single asset</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Transparency</div>
+        <div class="stat-val red">0%</div>
+        <div class="stat-sub">investors cannot independently verify asset quality, compliance, or yield</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Minimum ticket</div>
+        <div class="stat-val red">$50K+</div>
+        <div class="stat-sub">excludes 99% of global investors before they even begin</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 3 — THE SOLUTION ═══════════════ -->
+  <div class="slide" id="slide-3">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:600px;height:600px;background:rgba(0,229,160,0.05);top:50%;left:50%;transform:translate(-50%,-60%);"></div>
+    </div>
+
+    <div class="label">03 / the solution</div>
+    <h2>Four autonomous agents.<br><em>One transparent pipeline.</em></h2>
+    <p class="sub">RWAi replaces the $100K middleman stack with four specialized AI agents — each with an on-chain identity (ERC-8004), each logging every decision to a smart contract. Tokenize any asset in minutes, not months.</p>
+
+    <div class="agent-grid">
+      <div class="agent-card nexus">
+        <div class="agent-id">ERC-8004 · ID 41</div>
+        <div class="agent-name">Nexus</div>
+        <div class="agent-role">Tokenization Engine</div>
+        <div class="agent-desc">Ingests documents, valuates assets, deploys ERC-20 tokens. Replaces lawyers and developers.</div>
+      </div>
+      <div class="agent-card shield">
+        <div class="agent-id">ERC-8004 · ID 42</div>
+        <div class="agent-name">Shield</div>
+        <div class="agent-role">Compliance Agent</div>
+        <div class="agent-desc">KYC, jurisdiction checks, risk scoring. Logged on-chain. Replaces compliance consultants.</div>
+      </div>
+      <div class="agent-card yield">
+        <div class="agent-id">ERC-8004 · ID 43</div>
+        <div class="agent-name">Yield</div>
+        <div class="agent-role">Market Intelligence</div>
+        <div class="agent-desc">Live APY feeds, portfolio rebalancing, Pyth price integration. Replaces fund analysts.</div>
+      </div>
+      <div class="agent-card atlas">
+        <div class="agent-id">ERC-8004 · ID 44</div>
+        <div class="agent-name">Atlas</div>
+        <div class="agent-role">Sovereign AI · Voice</div>
+        <div class="agent-desc">Orchestrates all agents. Voice interface executes real on-chain allocations.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 4 — HOW IT WORKS ═══════════════ -->
+  <div class="slide" id="slide-4">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+    </div>
+
+    <div class="label">04 / how it works</div>
+    <h2>From <em>document</em> to<br>tokenized yield in 8 steps.</h2>
+    <p class="sub">The pipeline is fully autonomous. Submit an asset document — four agents handle everything else, logging each step on Mantle.</p>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num">01</div>
+        <div class="pipe-label">INGEST</div>
+        <div style="font-size:11px;color:var(--fg1);">parse_pdf()</div>
+        <div class="pipe-agent pa-nexus">nexus</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">02</div>
+        <div class="pipe-label">VALUATE</div>
+        <div style="font-size:11px;color:var(--fg1);">price_model()</div>
+        <div class="pipe-agent pa-nexus">nexus</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">03</div>
+        <div class="pipe-label">KYC</div>
+        <div style="font-size:11px;color:var(--fg1);">verify_owner()</div>
+        <div class="pipe-agent pa-shield">shield</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">04</div>
+        <div class="pipe-label">JURISDICT</div>
+        <div style="font-size:11px;color:var(--fg1);">risk_scan()</div>
+        <div class="pipe-agent pa-shield">shield</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">05</div>
+        <div class="pipe-label">YIELD</div>
+        <div style="font-size:11px;color:var(--fg1);">apy_diff()</div>
+        <div class="pipe-agent pa-yield">yield</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">06</div>
+        <div class="pipe-label">STRATEGY</div>
+        <div style="font-size:11px;color:var(--fg1);">allocate()</div>
+        <div class="pipe-agent pa-atlas">atlas</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">07</div>
+        <div class="pipe-label">DEPLOY</div>
+        <div style="font-size:11px;color:var(--fg1);">deploy_erc20()</div>
+        <div class="pipe-agent pa-nexus">nexus</div>
+      </div>
+      <div class="pipe-step" style="border-right:none;">
+        <div class="pipe-num">08</div>
+        <div class="pipe-label">OBSERVE</div>
+        <div style="font-size:11px;color:var(--fg1);">rebalance()</div>
+        <div class="pipe-agent pa-yield">yield</div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;display:flex;gap:24px;align-items:center;">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--fg2);">Every step logs a transaction →</span>
+      <span class="tag tag-accent">AgentExecutor.executeAllocation()</span>
+      <span class="tag">Mantle Sepolia · chainId 5003</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 5 — TECHNOLOGY ═══════════════ -->
+  <div class="slide" id="slide-5">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:400px;height:400px;background:rgba(56,189,248,0.04);bottom:0;right:0;"></div>
+    </div>
+
+    <div class="label">05 / technology</div>
+    <h2>Built on <em>real</em> standards.<br><span class="dim">Not mock demos.</span></h2>
+
+    <div class="stack-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stack-item">
+        <div class="stack-dot" style="background:var(--accent);"></div>
+        <div>
+          <div class="stack-title">ERC-8004 Agent Identity</div>
+          <div class="stack-desc">Each of the four agents has a unique on-chain ID, reputation score, and run counter. AI identity standard for autonomous agents.</div>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-dot" style="background:var(--atlas);"></div>
+        <div>
+          <div class="stack-title">EIP-712 Typed Consent</div>
+          <div class="stack-desc">HybridVault uses typed data signing so users authorize agent actions — without handing over private keys.</div>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-dot" style="background:var(--shield);"></div>
+        <div>
+          <div class="stack-title">AgentExecutor on-chain</div>
+          <div class="stack-desc">Every AI allocation decision is logged on Mantle via executeAllocation() — auditable, immutable, verifiable.</div>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-dot" style="background:var(--yield);"></div>
+        <div>
+          <div class="stack-title">Pyth Network Price Feeds</div>
+          <div class="stack-desc">YieldOracle uses Pyth Hermes for real-time MNT/USD and RWA asset prices. No mock data — live feeds.</div>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-dot" style="background:var(--nexus);"></div>
+        <div>
+          <div class="stack-title">Mantle L2 + IPFS</div>
+          <div class="stack-desc">All contracts on Mantle Sepolia. Asset documents pinned to IPFS via Pinata. Low-cost, high-throughput.</div>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-dot" style="background:#a78bfa;"></div>
+        <div>
+          <div class="stack-title">Claude + Groq inference</div>
+          <div class="stack-desc">Claude Sonnet for reasoning, Groq (Llama 4) as fallback. Streaming responses, tool use, multi-agent delegation.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="tag">11 contracts deployed</span>
+      <span class="tag tag-accent">YieldOracle · AgentExecutor · HybridVault</span>
+      <span class="tag">ProtocolTreasury · RWAToken · RWAiToken</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 6 — LIVE DEMO ═══════════════ -->
+  <div class="slide" id="slide-6">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:500px;height:500px;background:rgba(0,229,160,0.06);top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;">
+      <div>
+        <div class="label">06 / live traction</div>
+        <h2>Deployed.<br><em>Running now.</em></h2>
+        <p class="sub" style="margin-bottom:32px;">Everything you see here is live on Mantle Sepolia. Not a prototype — real transactions, real agent runs, real revenue.</p>
+
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid rgba(0,229,160,0.2);border-radius:4px;background:rgba(0,229,160,0.04);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--fg);">ProtocolTreasury collecting fees</div>
+              <div style="font-size:11px;color:var(--fg1);margin-top:2px;">0.5% tokenization + 0.15% market fees — live on chain</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid rgba(0,229,160,0.2);border-radius:4px;background:rgba(0,229,160,0.04);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--fg);">Atlas voice executes on-chain allocations</div>
+              <div style="font-size:11px;color:var(--fg1);margin-top:2px;">"Allocate $500 into USDY" → real tx on Mantle</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid rgba(0,229,160,0.2);border-radius:4px;background:rgba(0,229,160,0.04);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--fg);">YieldOracle publishing live APY data</div>
+              <div style="font-size:11px;color:var(--fg1);margin-top:2px;">USDY, mETH, fBTC, mUSD — Pyth-sourced prices</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="traction-grid">
+          <div class="traction-item">
+            <div class="traction-num">11</div>
+            <div class="traction-lbl">contracts deployed</div>
+          </div>
+          <div class="traction-item">
+            <div class="traction-num">4</div>
+            <div class="traction-lbl">live AI agents</div>
+          </div>
+          <div class="traction-item">
+            <div class="traction-num"><em>$0</em></div>
+            <div class="traction-lbl">gas cost for users</div>
+          </div>
+          <div class="traction-item">
+            <div class="traction-num"><em>∞</em></div>
+            <div class="traction-lbl">24/7 autonomous agents</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:14px 16px;border:1px solid var(--line);border-radius:4px;font-family:var(--mono);font-size:10px;color:var(--fg2);">
+          <div style="color:var(--fg1);margin-bottom:6px;">Live contract addresses (Mantle Sepolia)</div>
+          <div>AgentExecutor · 0x3F7b…b823</div>
+          <div>HybridVault   · 0x8Df2…a491</div>
+          <div>YieldOracle   · 0xC4aE…d023</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 7 — BUSINESS MODEL ═══════════════ -->
+  <div class="slide" id="slide-7">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:400px;height:400px;background:rgba(251,191,36,0.04);bottom:0;left:200px;"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;">
+      <div>
+        <div class="label">07 / business model</div>
+        <h2>Revenue on<br><em>every transaction.</em></h2>
+        <p class="sub">Protocol-owned treasury collects fees automatically. No token speculation — pure protocol revenue from real asset activity.</p>
+
+        <div style="margin-top:32px;">
+          <div class="rev-row">
+            <div class="rev-pct">0.5%</div>
+            <div>
+              <div class="rev-label">Tokenization Fee</div>
+              <div class="rev-desc">Charged per asset tokenized through the Nexus pipeline</div>
+            </div>
+            <div class="rev-badge">LIVE</div>
+          </div>
+          <div class="rev-row">
+            <div class="rev-pct">0.15%</div>
+            <div>
+              <div class="rev-label">Market Trade Fee</div>
+              <div class="rev-desc">Charged on each buy/sell in the RWA marketplace</div>
+            </div>
+            <div class="rev-badge">LIVE</div>
+          </div>
+          <div class="rev-row">
+            <div class="rev-pct" style="color:var(--fg2);font-size:28px;padding-top:6px;">future</div>
+            <div>
+              <div class="rev-label">Agent SaaS Subscriptions</div>
+              <div class="rev-desc">White-label agent pipelines for institutions</div>
+            </div>
+            <div class="rev-badge" style="color:var(--fg2);border-color:var(--line);background:none;">ROADMAP</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="border:1px solid var(--line);border-radius:4px;padding:28px;background:rgba(255,255,255,0.015);">
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--fg2);margin-bottom:6px;">TOTAL ADDRESSABLE MARKET</div>
+          <div style="font-family:var(--serif);font-size:72px;color:var(--accent);line-height:1;">$500T</div>
+          <div style="font-size:13px;color:var(--fg1);margin-top:8px;">global illiquid real-world assets</div>
+          <hr class="rule" style="margin:20px 0;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.12em;color:var(--fg2);margin-bottom:4px;">0.1% CAPTURE</div>
+              <div style="font-family:var(--serif);font-size:32px;color:var(--fg);">$500B</div>
+              <div style="font-size:11px;color:var(--fg1);">in tokenized volume</div>
+            </div>
+            <div>
+              <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.12em;color:var(--fg2);margin-bottom:4px;">AT 0.3% BLENDED FEE</div>
+              <div style="font-family:var(--serif);font-size:32px;color:var(--accent);">$1.5B</div>
+              <div style="font-size:11px;color:var(--fg1);">protocol revenue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 8 — MANTLE ECOSYSTEM ═══════════════ -->
+  <div class="slide" id="slide-8">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:600px;height:300px;background:rgba(0,229,160,0.04);top:50%;left:50%;transform:translate(-50%,-50%);border-radius:8px;"></div>
+    </div>
+
+    <div class="label">08 / why mantle</div>
+    <h2>Mantle is the<br><em>natural home</em> for RWAs.</h2>
+
+    <div class="stack-grid" style="grid-template-columns:repeat(4,1fr);margin-top:40px;">
+      <div class="stack-item" style="flex-direction:column;gap:8px;">
+        <div style="font-family:var(--serif);font-size:38px;color:var(--accent);">~0</div>
+        <div class="stack-title">Gas cost for users</div>
+        <div class="stack-desc">Agent wallet pays all gas. Retail investors never touch MNT to participate.</div>
+      </div>
+      <div class="stack-item" style="flex-direction:column;gap:8px;">
+        <div style="font-family:var(--serif);font-size:38px;color:var(--yield);">MNT</div>
+        <div class="stack-title">Native token integration</div>
+        <div class="stack-desc">Agent MNT balance tracked live. Pyth MNT/USD feed integrated. Native ecosystem citizen.</div>
+      </div>
+      <div class="stack-item" style="flex-direction:column;gap:8px;">
+        <div style="font-family:var(--serif);font-size:38px;color:var(--shield);">5</div>
+        <div class="stack-title">Native RWA assets</div>
+        <div class="stack-desc">USDY, mETH, fBTC, mUSD, USDT0 — all verified Mantle mainnet assets in the marketplace.</div>
+      </div>
+      <div class="stack-item" style="flex-direction:column;gap:8px;">
+        <div style="font-family:var(--serif);font-size:38px;color:var(--nexus);">L2</div>
+        <div class="stack-title">EVM-equivalent speed</div>
+        <div class="stack-desc">Fast finality, low latency — critical for AI agents making real-time decisions at scale.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;padding:18px 22px;border:1px solid rgba(0,229,160,0.15);border-radius:4px;background:rgba(0,229,160,0.03);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:13px;color:var(--fg1);">Live on Mantle Sepolia · chainId 5003 · 11 deployed contracts · ProtocolTreasury collecting fees now</span>
+      <span class="tag tag-accent">● Active</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SLIDE 9 — CTA ═══════════════ -->
+  <div class="slide" id="slide-9">
+    <div class="slide-bg">
+      <div class="dot-grid"></div>
+      <div class="glow" style="width:700px;height:700px;background:rgba(0,229,160,0.07);top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:80px;align-items:center;height:100%;">
+      <div>
+        <div class="label">09 / get started</div>
+        <h1 style="font-size:72px;">Bring an asset.<br><em>We bring</em><br>four agents.</h1>
+        <p class="sub" style="margin-bottom:36px;">The entire RWA lifecycle — tokenization, compliance, yield, and portfolio — automated by AI and verified on Mantle.</p>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:10px;">
+            <span style="color:var(--accent);">→</span>
+            <span>Live demo: rwai.app</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:10px;">
+            <span style="color:var(--accent);">→</span>
+            <span>GitHub: ntfound-dev/RWAI</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:10px;">
+            <span style="color:var(--accent);">→</span>
+            <span>Explorer: sepolia.mantlescan.xyz</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="border:1px solid var(--line);border-radius:4px;padding:20px 22px;background:rgba(255,255,255,0.015);">
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;color:var(--fg2);margin-bottom:12px;">WHAT'S LIVE TODAY</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> Voice-to-on-chain allocations (Atlas)</div>
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> Live protocol revenue (ProtocolTreasury)</div>
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> AI compliance scoring on-chain (Shield)</div>
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> Pyth-sourced yield oracle (Yield)</div>
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> IPFS-pinned asset documents (Nexus)</div>
+            <div style="font-size:12px;color:var(--fg1);display:flex;align-items:center;gap:8px;"><span style="color:var(--accent);">✓</span> EIP-712 HybridVault consent flow</div>
+          </div>
+        </div>
+        <div style="border:1px solid rgba(0,229,160,0.2);border-radius:4px;padding:16px 22px;background:rgba(0,229,160,0.04);text-align:center;">
+          <div style="font-family:var(--serif);font-size:28px;color:var(--accent);margin-bottom:4px;">DoraHacks</div>
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--fg2);">TURING TEST HACKATHON · AI & RWA TRACK · 2026</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #deck -->
+
+<!-- ── Navigation ── -->
+<nav id="nav">
+  <button id="btn-prev" onclick="go(-1)" disabled>←</button>
+  <div id="dots"></div>
+  <span id="counter">1 / 9</span>
+  <button id="btn-next" onclick="go(1)">→</button>
+</nav>
+
+<div id="hint">← → ARROW KEYS · F FULLSCREEN · P PRINT/PDF</div>
+
+<script>
+  const TOTAL = 9;
+  let cur = 1;
+
+  const dots = document.getElementById('dots');
+  for (let i = 1; i <= TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 1 ? ' on' : '');
+    d.onclick = () => goTo(i);
+    dots.appendChild(d);
+  }
+
+  function goTo(n) {
+    if (n < 1 || n > TOTAL) return;
+    const prev = document.getElementById('slide-' + cur);
+    prev.classList.remove('active');
+    prev.classList.add('exit');
+    setTimeout(() => prev.classList.remove('exit'), 480);
+    cur = n;
+    const next = document.getElementById('slide-' + cur);
+    next.classList.add('active');
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('on', i + 1 === cur));
+    document.getElementById('counter').textContent = cur + ' / ' + TOTAL;
+    document.getElementById('btn-prev').disabled = cur === 1;
+    document.getElementById('btn-next').disabled = cur === TOTAL;
+  }
+
+  function go(d) { goTo(cur + d); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    go(-1);
+    if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+    if (e.key === 'p' || e.key === 'P') window.print();
+  });
+
+  // Touch swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+  });
+</script>
+</body>
+</html>
