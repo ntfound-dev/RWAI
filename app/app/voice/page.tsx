@@ -33,10 +33,12 @@ export default function VoicePage() {
   const [modelUsed, setModelUsed] = useState("");
   const [atlasScore, setAtlasScore] = useState<number>(75);
 
-  const recRef      = useRef<any>(null);
-  const interimRef  = useRef("");
-  const synthRef    = useRef<SpeechSynthesis | null>(null);
-  const voicesRef   = useRef<SpeechSynthesisVoice[]>([]);
+  const recRef       = useRef<any>(null);
+  const interimRef   = useRef("");
+  const synthRef     = useRef<SpeechSynthesis | null>(null);
+  const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const onChainTxRef = useRef("");
   const [speakWords, setSpeakWords] = useState<string[]>([]);
   const [wordIdx, setWordIdx]       = useState(-1);
   const [hasSR, setHasSR]           = useState(true);
@@ -67,74 +69,53 @@ export default function VoicePage() {
     }, ...p].slice(0, 8));
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback(async (text: string) => {
+    const hasTx = () => !!onChainTxRef.current;
+    // Backend TTS — Web Audio API (works on mobile after AudioContext unlock)
+    try {
+      const res = await fetch("/api/agents/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        const ac = audioCtxRef.current ?? new AC();
+        audioCtxRef.current = ac;
+        if (ac.state === "suspended") await ac.resume();
+        const decoded = await ac.decodeAudioData(buf);
+        const source = ac.createBufferSource();
+        source.buffer = decoded;
+        source.connect(ac.destination);
+        if (!hasTx()) setOrbState("speaking");
+        source.onended = () => { if (!hasTx()) setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
+        source.start(0);
+        return;
+      }
+    } catch { /* fall through */ }
+
+    // Browser TTS fallback
     if (!synthRef.current) return;
     synthRef.current.cancel();
     const words = text.split(/\s+/).filter(Boolean);
     setSpeakWords(words);
     setWordIdx(-1);
     const utt = new SpeechSynthesisUtterance(text);
-
-    // Priority order: best known deep male voices first (desktop + mobile)
-    const MALE_NAMES = [
-      "Daniel",            // iOS UK male — best on iPhone/iPad
-      "Aaron",             // iOS US male
-      "Google UK English Male",
-      "Microsoft David",
-      "Microsoft Mark",
-      "Alex",              // macOS
-      "Tom",               // macOS alternate
-      "Fred",              // macOS fallback
-      "Gordon",            // macOS
-      "Google US English", // Android Chrome (often male)
-    ];
-    // Female voices to avoid
-    const FEMALE_NAMES = [
-      "samantha","karen","moira","victoria","zira","susan","hazel",
-      "linda","fiona","tessa","junior","junior","google uk english female",
-    ];
-
-    // iOS Safari returns empty voices on first call — refresh lazily each time
-    const voices = synthRef.current?.getVoices()?.length
-      ? synthRef.current.getVoices()
-      : (voicesRef.current.length ? voicesRef.current : []);
+    const MALE_NAMES = ["Daniel","Aaron","Google UK English Male","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon","Google US English"];
+    const FEMALE_NAMES = ["samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","google uk english female"];
+    const voices = synthRef.current?.getVoices()?.length ? synthRef.current.getVoices() : (voicesRef.current.length ? voicesRef.current : []);
     if (voices.length) voicesRef.current = voices;
-
     let pick: SpeechSynthesisVoice | undefined;
-
-    // 1st pass: exact name match
-    for (const hint of MALE_NAMES) {
-      pick = voices.find(v => v.name === hint);
-      if (pick) break;
-    }
-    // 2nd pass: partial name match
-    if (!pick) {
-      pick = voices.find(v =>
-        MALE_NAMES.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
-      );
-    }
-    // 3rd pass: any English voice not in female list, prefer non-default
-    if (!pick) {
-      pick = voices.find(v =>
-        v.lang.startsWith("en") &&
-        !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)) &&
-        !v.default
-      ) ?? voices.find(v =>
-        v.lang.startsWith("en") &&
-        !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f))
-      );
-    }
-
+    for (const hint of MALE_NAMES) { pick = voices.find(v => v.name === hint); if (pick) break; }
+    if (!pick) pick = voices.find(v => MALE_NAMES.some(h => v.name.toLowerCase().includes(h.toLowerCase())));
+    if (!pick) pick = voices.find(v => v.lang.startsWith("en") && !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)) && !v.default)
+      ?? voices.find(v => v.lang.startsWith("en") && !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)));
     if (pick) utt.voice = pick;
-    utt.lang  = "en-US";
-    utt.rate  = 0.92;
-    // Pitch: confident male → 0.82, unknown → 0.62 (forces deeper tone on any voice including Samantha)
-    utt.pitch = pick && MALE_NAMES.some(h => pick!.name.toLowerCase().includes(h.toLowerCase()))
-      ? 0.82
-      : 0.62;
-
-    utt.onstart = () => setOrbState("speaking");
-    utt.onend   = () => { setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
+    utt.lang = "en-US"; utt.rate = 0.92;
+    utt.pitch = pick && MALE_NAMES.some(h => pick!.name.toLowerCase().includes(h.toLowerCase())) ? 0.82 : 0.62;
+    utt.onstart = () => { if (!hasTx()) setOrbState("speaking"); };
+    utt.onend   = () => { if (!hasTx()) setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
     utt.onboundary = (e: SpeechSynthesisEvent) => {
       if (e.name !== "word") return;
       let pos = 0;
@@ -179,6 +160,12 @@ export default function VoicePage() {
 
   const startListen = useCallback(() => {
     if (typeof window === "undefined") return;
+    // Unlock AudioContext on first user gesture (required for mobile autoplay)
+    if (!audioCtxRef.current) {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      if (AC) { audioCtxRef.current = new AC(); }
+    }
+    if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume().catch(() => {});
     synthRef.current?.cancel();
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { alert("Voice requires Chrome or Edge."); return; }

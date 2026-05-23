@@ -17,7 +17,20 @@ const C: Record<JState, { p: string; label: string }> = {
 interface ChatMsg { role: "user" | "atlas"; text: string; time: string; isNew?: boolean }
 interface JarvisPanelProps {
   onMessage?: (role: "user" | "atlas", text: string) => void;
-  messages?: { role: string; body: string }[]; // chat history context
+  messages?: { role: string; body: string }[]; // atlas chat history context
+}
+
+const TX_MATCH = /^0x[a-fA-F0-9]{64}$/;
+function renderWithTxLinks(text: string, color = "#f59e0b") {
+  const parts = text.split(/\b(0x[a-fA-F0-9]{64})\b/);
+  return parts.map((part, i) =>
+    TX_MATCH.test(part)
+      ? <a key={i} href={`https://sepolia.mantlescan.xyz/tx/${part}`} target="_blank" rel="noopener noreferrer"
+          style={{ color, textDecoration: "underline", wordBreak: "break-all", fontSize: "inherit" }}>
+          {part}
+        </a>
+      : part
+  );
 }
 
 // ── Typewriter bubble ─────────────────────────────────────────────
@@ -69,7 +82,7 @@ function Bubble({ msg, p, activeWordIdx }: { msg: ChatMsg; p: string; activeWord
               display: "inline-block",
             }}>{w}</span>
           ))
-        ) : shown}
+        ) : isAtlas ? renderWithTxLinks(shown, "#f59e0b") : shown}
         {isAtlas && msg.isNew && shown.length < msg.text.length && activeWordIdx === undefined && (
           <span style={{ display:"inline-block", width:2, height:10, background:p, marginLeft:2, verticalAlign:"middle", animation:"jPanelCaret 0.6s step-end infinite" }}/>
         )}
@@ -103,12 +116,11 @@ function MiniSphere({ state }: { state: JState }) {
 
     const frame = () => {
       const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.40;
-      yaw.current += state==="listening"?0.008:state==="thinking"?0.015:state==="speaking"?0.011:0.003;
+      yaw.current += state==="listening"?0.008:state==="thinking"?0.015:state==="executing"?0.012:state==="speaking"?0.011:0.003;
       const cY=Math.cos(yaw.current), sY=Math.sin(yaw.current), cX=Math.cos(0.2), sX=Math.sin(0.2);
       const fov = 2.4;
       ctx.clearRect(0, 0, W, H);
 
-      // Glow bg
       const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*1.4);
       g.addColorStop(0,c.p+"22"); g.addColorStop(0.5,c.p+"0a"); g.addColorStop(1,"transparent");
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
@@ -120,7 +132,6 @@ function MiniSphere({ state }: { state: JState }) {
         return {sx:cx+rx*R*sc,sy:cy+ry*R*sc,z:rz2};
       };
 
-      // Rings
       rings.forEach((rpts,ri)=>{
         const pp=rpts.map(p=>proj(p.x,p.y,p.z));
         ctx.beginPath(); let pen=false;
@@ -139,12 +150,10 @@ function MiniSphere({ state }: { state: JState }) {
         }
       });
 
-      // Outer ring
       ctx.beginPath();ctx.arc(cx,cy,R+8,0,Math.PI*2);ctx.strokeStyle=c.p+"22";ctx.lineWidth=1;ctx.stroke();
 
-      // Particles
       const pp2=pts.map(p=>proj(p.x,p.y,p.z)); pp2.sort((a,b)=>a.z-b.z);
-      const boost=state==="listening"?1.3:1;
+      const boost=state==="listening"?1.3:state==="executing"?1.2:1;
       for(const p of pp2){
         const zN=(p.z+1.5)/3; if(zN<0.07) continue;
         const dist=Math.hypot(p.sx-cx,p.sy-cy)/R, core=Math.max(0,1-dist*1.5);
@@ -157,7 +166,6 @@ function MiniSphere({ state }: { state: JState }) {
         ctx.beginPath();ctx.arc(p.sx,p.sy,size,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.shadowBlur=0;
       }
 
-      // Core glow
       const g1=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.3);
       g1.addColorStop(0,"rgba(255,255,255,0.9)"); g1.addColorStop(0.2,"rgba(255,255,255,0.5)");
       g1.addColorStop(0.4,c.p+"99"); g1.addColorStop(1,"transparent");
@@ -183,21 +191,24 @@ const SENSITIVE_REFUSAL = "I cannot share private keys, mnemonics, or backend cr
 // ── Main panel ────────────────────────────────────────────────────
 export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPanelProps) {
   const { address, isConnected } = useAccount();
-  const [jState, setJState]   = useState<JState>("idle");
-  const [interim, setInterim] = useState("");
+  const [jState, setJState]     = useState<JState>("idle");
+  const [interim, setInterim]   = useState("");
   const [textInput, setTextInput] = useState("");
-  const [chatLog, setChatLog] = useState<ChatMsg[]>([]);
+  const [chatLog, setChatLog]   = useState<ChatMsg[]>([]);
   const [modelUsed, setModelUsed] = useState("");
-  const [history, setHistory] = useState<{ role: string; body: string }[]>([]);
+  const [history, setHistory]   = useState<{ role: string; body: string }[]>([]);
+  const [onChainTx, setOnChainTx] = useState("");
   const [speakWordIdx, setSpeakWordIdx] = useState(-1);
-  const speakWordsRef = useRef<string[]>([]);
 
-  const recRef     = useRef<any>(null);
-  const synthRef   = useRef<SpeechSynthesis | null>(null);
-  const voicesRef  = useRef<SpeechSynthesisVoice[]>([]);
-  const pendingRef = useRef("");
-  const sendRef    = useRef<(t: string) => void>(() => {});
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const recRef       = useRef<any>(null);
+  const synthRef     = useRef<SpeechSynthesis | null>(null);
+  const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const onChainTxRef = useRef("");
+  const speakWordsRef = useRef<string[]>([]);
+  const pendingRef   = useRef("");
+  const sendRef      = useRef<(t: string) => void>(() => {});
+  const chatEndRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -223,7 +234,45 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
 
   const now = () => new Date().toLocaleTimeString("en-GB", { hour12: false });
 
-  const speak = useCallback((text: string) => {
+  // Unlock AudioContext on first user interaction (mobile autoplay policy)
+  const unlockAudio = useCallback(() => {
+    if (audioCtxRef.current) {
+      if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+      return;
+    }
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    audioCtxRef.current = new AC();
+    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+  }, []);
+
+  const speak = useCallback(async (text: string) => {
+    const hasTx = () => !!onChainTxRef.current;
+    // Backend TTS — Web Audio API (bypasses mobile autoplay restriction)
+    try {
+      const res = await fetch("/api/agents/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = audioCtxRef.current ?? new AC();
+        audioCtxRef.current = ctx;
+        if (ctx.state === "suspended") await ctx.resume();
+        const decoded = await ctx.decodeAudioData(buf);
+        const source = ctx.createBufferSource();
+        source.buffer = decoded;
+        source.connect(ctx.destination);
+        if (!hasTx()) setJState("speaking");
+        source.onended = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+        source.start(0);
+        return;
+      }
+    } catch { /* fall through to browser TTS */ }
+
+    // Browser TTS fallback
     if (!synthRef.current) return;
     synthRef.current.cancel();
     const words = text.split(/\s+/).filter(Boolean);
@@ -239,8 +288,8 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
     );
     if (pick) utt.voice = pick;
     utt.rate = 0.93; utt.pitch = 0.88;
-    utt.onstart = () => setJState("speaking");
-    utt.onend   = () => { setJState("idle"); setSpeakWordIdx(-1); speakWordsRef.current = []; };
+    utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
+    utt.onend   = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); speakWordsRef.current = []; };
     utt.onboundary = (e: SpeechSynthesisEvent) => {
       if (e.name !== "word") return;
       const ws = speakWordsRef.current;
@@ -285,30 +334,40 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
     const next = [...history, { role:"user", body:text }];
     setHistory(next);
     try {
+      // Include atlas chat session context so JARVIS shares Atlas's conversation
+      const apiMessages = [...chatContext, ...next];
       const data = await agentApi<any>("/chat", {
         method:"POST",
-        body: JSON.stringify({ agent_id:"atlas", messages: next }),
+        body: JSON.stringify({ agent_id:"atlas", messages: apiMessages, wallet_address: address || null }),
       });
       const reply = data.reply || data.message || "Understood.";
       const model = data.model_used || data.modelUsed || "";
+      const tx: string = data.on_chain_tx || "";
       setHistory(h => [...h, { role:"atlas", body:reply }]);
       if (model) setModelUsed(model);
-      // Add with typewriter effect
       setChatLog(prev => [...prev, { role:"atlas", text: reply, time: now(), isNew: true }]);
       onMessage?.("atlas", reply);
-      if (data.onChainTx) { setJState("executing"); setTimeout(()=>speak(reply),400); }
-      else { speak(reply); }
+      if (tx) {
+        onChainTxRef.current = tx;
+        setOnChainTx(tx);
+        setJState("executing");
+        speak(reply);
+        setTimeout(() => { onChainTxRef.current = ""; setOnChainTx(""); setJState("idle"); }, 15000);
+      } else {
+        speak(reply);
+      }
     } catch {
       const msg = "Atlas connection failed.";
       setChatLog(prev => [...prev, { role:"atlas", text: msg, time: now(), isNew: true }]);
       onMessage?.("atlas", msg);
       speak(msg); setJState("idle");
     }
-  }, [history, speak, onMessage]);
+  }, [history, chatContext, address, speak, onMessage]);
 
   useEffect(() => { sendRef.current = sendToAtlas; }, [sendToAtlas]);
 
   const toggleListen = useCallback(() => {
+    unlockAudio();
     if (jState==="listening") { recRef.current?.stop(); return; }
     if (jState==="thinking" || jState==="executing") return;
     synthRef.current?.cancel();
@@ -322,7 +381,7 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
     rec.onend    = ()=>{ setInterim(""); const h=pendingRef.current.trim(); pendingRef.current=""; if(h) sendRef.current(h); else setJState("idle"); };
     rec.onerror  = (e:any)=>{ setInterim(""); setJState("idle"); if(e.error==="not-allowed") setChatLog(p=>[...p,{role:"atlas",text:"Mic access denied.",time:now(),isNew:true}]); };
     rec.start();
-  }, [jState]);
+  }, [jState, unlockAudio]);
 
   const c    = C[jState];
   const busy = jState==="thinking"||jState==="executing";
@@ -351,6 +410,20 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
           </span>
         </div>
       </div>
+
+      {/* ON-CHAIN TX banner */}
+      {onChainTx && (
+        <div style={{
+          padding:"6px 14px", background:"#fbbf2410", borderBottom:"1px solid #fbbf2430",
+          flexShrink:0, display:"flex", alignItems:"center", gap:8,
+        }}>
+          <span style={{ fontSize:7, color:"#fbbf24", letterSpacing:"0.12em" }}>⬡ ON-CHAIN LOG</span>
+          <a href={`https://sepolia.mantlescan.xyz/tx/${onChainTx}`} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize:8, color:"#fbbf24", textDecoration:"underline", wordBreak:"break-all" }}>
+            {onChainTx.slice(0,10)}…{onChainTx.slice(-8)} ↗
+          </a>
+        </div>
+      )}
 
       {/* Mini sphere */}
       <div style={{ flexShrink:0, padding:"10px 20px 0", position:"relative" }}>
@@ -438,9 +511,9 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
           <input
             value={textInput}
             onChange={e => setTextInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            onKeyDown={e => { if (e.key === "Enter" && !busy && textInput.trim()) { unlockAudio(); sendRef.current(textInput.trim()); } }}
             disabled={busy}
-            placeholder="Ask JARVIS — Atlas will execute…"
+            placeholder='Try: "invest 100 dollars in USDY"'
             style={{
               background:"transparent", border:"none", outline:"none",
               color:"rgba(255,255,255,0.75)", fontFamily:"var(--font-mono)", fontSize:10,
@@ -448,7 +521,7 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
             }}
           />
           <button
-            onClick={() => !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            onClick={() => { if (!busy && textInput.trim()) { unlockAudio(); sendRef.current(textInput.trim()); } }}
             disabled={busy || !textInput.trim()}
             style={{
               background:"transparent", border:`1px solid ${c.p}30`, color:c.p,

@@ -9,6 +9,19 @@ import { useYieldOracle } from "@/hooks/useYieldOracle";
 import { useAgentSocket } from "@/hooks/useAgentSocket";
 import { mantleTestnet } from "@/lib/mantle";
 
+const TX_MATCH = /^0x[a-fA-F0-9]{64}$/;
+function renderWithTxLinks(text: string, linkColor = "#f59e0b") {
+  const parts = text.split(/\b(0x[a-fA-F0-9]{64})\b/);
+  return parts.map((part, i) =>
+    TX_MATCH.test(part)
+      ? <a key={i} href={`https://sepolia.mantlescan.xyz/tx/${part}`} target="_blank" rel="noopener noreferrer"
+          style={{ color: linkColor, textDecoration:"underline", wordBreak:"break-all", fontSize:"inherit" }}>
+          {part}
+        </a>
+      : part
+  );
+}
+
 interface PortfolioOnChain {
   hasPortfolio: boolean;
   assets?: string[];
@@ -533,7 +546,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
                 <span style={{ fontSize: 8, color: c.p, letterSpacing: "0.1em" }}>● JARVIS · via Atlas</span>
                 <span style={{ fontSize: 8, color: "rgba(255,255,255,0.2)" }}>{msg.time}</span>
               </div>
-              {msg.text}
+              {renderWithTxLinks(msg.text)}
             </div>
           ))}
 

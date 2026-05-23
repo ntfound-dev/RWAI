@@ -379,6 +379,19 @@ function PlanOptions({ plans }: { plans: Plan[] }) {
   );
 }
 
+const TX_MATCH = /^0x[a-fA-F0-9]{64}$/;
+function renderWithTxLinks(text: string) {
+  const parts = text.split(/\b(0x[a-fA-F0-9]{64})\b/);
+  return parts.map((part, i) =>
+    TX_MATCH.test(part)
+      ? <a key={i} href={`https://sepolia.mantlescan.xyz/tx/${part}`} target="_blank" rel="noopener noreferrer"
+          style={{ color:"#f59e0b", textDecoration:"underline", wordBreak:"break-all" }}>
+          {part}
+        </a>
+      : part
+  );
+}
+
 function Message({ m, animKey }: { m: Msg; animKey: number }) {
   if (m.kind === "text") {
     const isUser = m.role === "user";
@@ -389,7 +402,7 @@ function Message({ m, animKey }: { m: Msg; animKey: number }) {
           : <AgentMonogram agent={m.role as "atlas"} active />}
         <div style={{ paddingTop:6 }}>
           <div className="mono-sm" style={{ marginBottom:6 }}>{isUser ? "YOU" : m.role.toUpperCase()}</div>
-          <div style={{ fontSize:14, color:"var(--fg-0)", lineHeight:1.55 }}>{m.body}</div>
+          <div style={{ fontSize:14, color:"var(--fg-0)", lineHeight:1.55 }}>{isUser ? m.body : renderWithTxLinks(m.body ?? "")}</div>
         </div>
       </div>
     );
@@ -774,9 +787,12 @@ export default function ChatPage() {
                 <button onClick={() => setShowJarvis(false)} style={{ background:"transparent", border:"none", color:"var(--fg-3)", cursor:"pointer", fontSize:16 }}>✕</button>
               </div>
               <div style={{ flex:1, minHeight:0 }}>
-                <JarvisPanel onMessage={(role, text) => {
-                  setExtraMessages(m => [...m, { role: role === "user" ? "user" : "atlas", kind:"text" as const, body: text }]);
-                }} />
+                <JarvisPanel
+                  messages={messages.filter(m => m.kind === "text" && m.body).map(m => ({ role: m.role === "user" ? "user" : "atlas", body: m.body! }))}
+                  onMessage={(role, text) => {
+                    setExtraMessages(m => [...m, { role: role === "user" ? "user" : "atlas", kind:"text" as const, body: text }]);
+                  }}
+                />
               </div>
             </div>
           </>
@@ -816,6 +832,7 @@ export default function ChatPage() {
           <div key={showJarvis ? "jarvis" : "orch"} style={{ flex:1, minHeight:0, overflow:"hidden" }}>
             {showJarvis ? (
               <JarvisPanel
+                messages={messages.filter(m => m.kind === "text" && m.body).map(m => ({ role: m.role === "user" ? "user" : "atlas", body: m.body! }))}
                 onMessage={(role, text) => {
                   setExtraMessages(m => [...m, {
                     role: role === "user" ? "user" : "atlas",
