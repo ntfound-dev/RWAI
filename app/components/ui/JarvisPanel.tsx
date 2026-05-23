@@ -249,12 +249,12 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
-    // Stop any currently playing audio to prevent double playback
+    // Stop previous audio to prevent double playback
     try { sourceRef.current?.stop(); } catch {}
     sourceRef.current = null;
     synthRef.current?.cancel();
 
-    // Backend TTS — Web Audio API (bypasses mobile autoplay restriction)
+    // Primary: backend TTS via Web Audio API
     try {
       const res = await fetch("/api/agents/tts", {
         method: "POST",
@@ -263,21 +263,34 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
       });
       if (res.ok) {
         const buf = await res.arrayBuffer();
-        const AC = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = audioCtxRef.current ?? new AC();
-        audioCtxRef.current = ctx;
-        if (ctx.state === "suspended") await ctx.resume();
-        const decoded = await ctx.decodeAudioData(buf);
-        const source = ctx.createBufferSource();
-        source.buffer = decoded;
-        source.connect(ctx.destination);
-        sourceRef.current = source;
-        if (!hasTx()) setJState("speaking");
-        source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
-        source.start(0);
-        return;
+        if (buf.byteLength > 100) {
+          const AC = window.AudioContext || (window as any).webkitAudioContext;
+          if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+            audioCtxRef.current = new AC();
+          }
+          const ac = audioCtxRef.current;
+          if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
+          const decoded = await ac.decodeAudioData(buf.slice(0));
+          const source = ac.createBufferSource();
+          source.buffer = decoded;
+          source.connect(ac.destination);
+          sourceRef.current = source;
+          if (!hasTx()) setJState("speaking");
+          source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+          source.start(0);
+          return;
+        }
       }
-    } catch { /* backend TTS unavailable — stay silent rather than use female browser voice */ }
+    } catch { /* fall through to browser TTS */ }
+
+    // Fallback: browser TTS — pitch 0.1 forces deep robotic voice (not female)
+    if (!synthRef.current) return;
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 0.9;
+    utt.pitch = 0.1;
+    utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
+    utt.onend   = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+    synthRef.current.speak(utt);
   }, []);
 
   // Greeting on mount
