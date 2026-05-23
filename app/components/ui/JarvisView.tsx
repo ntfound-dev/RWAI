@@ -166,13 +166,17 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   const { connected: wsConnected, heartbeat } = useAgentSocket();
   const l2Balance = useBalance({ address, chainId: mantleTestnet.id });
 
-  const [jState, setJState]   = useState<JState>("idle");
-  const [chatLog, setChatLog] = useState<ChatMsg[]>([]);
-  const [teleLog, setTeleLog] = useState<TeleEntry[]>([]);
+  const [jState, setJState]     = useState<JState>("idle");
+  const [onChainTx, setOnChainTx] = useState("");
+  const [chatLog, setChatLog]   = useState<ChatMsg[]>([]);
+  const [teleLog, setTeleLog]   = useState<TeleEntry[]>([]);
   const [textInput, setTextInput] = useState("");
-  const [history, setHistory] = useState<{ role: string; body: string }[]>([]);
-  const [interim, setInterim] = useState("");
+  const [history, setHistory]   = useState<{ role: string; body: string }[]>([]);
+  const [interim, setInterim]   = useState("");
   const [portfolio, setPortfolio] = useState<PortfolioOnChain | null>(null);
+
+  const onChainTxRef = useRef("");
+  useEffect(() => { onChainTxRef.current = onChainTx; }, [onChainTx]);
 
   // ── Fetch on-chain portfolio when wallet connects ─────────────────
   useEffect(() => {
@@ -228,17 +232,42 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     return () => synthRef.current?.removeEventListener("voiceschanged", load);
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback(async (text: string) => {
+    const hasTx = () => !!onChainTxRef.current;
+
+    // Backend TTS first (gTTS UK accent or OpenAI onyx — much better than browser)
+    try {
+      const res = await fetch("/api/agents/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onplay  = () => { if (!hasTx()) setJState("speaking"); };
+        audio.onended = () => { URL.revokeObjectURL(url); if (!hasTx()) setJState("idle"); };
+        await audio.play();
+        return;
+      }
+    } catch { /* fall through to browser TTS */ }
+
+    // Fallback: browser TTS with best available voice
     if (!synthRef.current) return;
     synthRef.current.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     const pick = voicesRef.current.find(v =>
-      v.name.includes("Daniel") || v.name.includes("Google UK English Male") || (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
-    );
+      v.name.includes("Ryan") ||
+      v.name.includes("Guy") ||
+      v.name.includes("Daniel") ||
+      v.name.includes("Google UK English Male") ||
+      (v.lang.startsWith("en") && v.name.toLowerCase().includes("natural") && !v.name.toLowerCase().includes("female"))
+    ) ?? voicesRef.current.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"));
     if (pick) utt.voice = pick;
     utt.rate = 0.85; utt.pitch = 0.74;
-    utt.onstart = () => setJState("speaking");
-    utt.onend   = () => setJState("idle");
+    utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
+    utt.onend   = () => { if (!hasTx()) setJState("idle"); };
     synthRef.current.speak(utt);
   }, []);
 
@@ -282,14 +311,27 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     try {
       const data = await agentApi<any>("/chat", {
         method: "POST",
-        body: JSON.stringify({ agent_id: "atlas", messages: next }),
+        body: JSON.stringify({ agent_id: "atlas", messages: next, wallet_address: address || null }),
       });
-      const reply = data.reply || "Understood.";
+      const reply  = data.reply || "Understood.";
+      const txHash = (data.on_chain_tx as string) || "";
       setHistory(h => [...h, { role: "atlas", body: reply }]);
       const t2 = now();
       setChatLog(prev => [...prev, { role: "atlas", text: reply, time: t2, isNew: true }]);
       setTeleLog(prev => [...prev, { kind: "RESPONSE", text: reply.slice(0, 60) + "…", time: t2 }]);
       onMessage?.("atlas", reply);
+
+      if (txHash) {
+        setOnChainTx(txHash);
+        setJState("executing");
+        setTeleLog(prev => [...prev, {
+          kind: "RESPONSE",
+          text: `ON-CHAIN TX: ${txHash.slice(0, 14)}…`,
+          time: t2,
+        }]);
+        setTimeout(() => { setOnChainTx(""); setJState("idle"); }, 12000);
+      }
+
       speak(reply);
     } catch {
       const msg = "Atlas connection failed.";
@@ -315,7 +357,8 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     rec.start();
   }, [jState]);
 
-  const c = C[jState];
+  const displayState: JState = onChainTx ? "executing" : jState;
+  const c = C[displayState];
   const busy = jState === "thinking" || jState === "executing";
   const addrShort = short(address);
 
@@ -461,6 +504,33 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
               {msg.text}
             </div>
           ))}
+
+          {/* ON-CHAIN LOG — visible when Atlas executes on Mantle */}
+          {onChainTx && (
+            <div style={{
+              width: "calc(100% - 32px)", maxWidth: 460,
+              padding: "10px 14px", marginBottom: 8, flexShrink: 0,
+              border: "1px solid #fbbf2470", background: "#fbbf2410",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 8, color: "#fbbf24", letterSpacing: "0.1em", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", display: "inline-block", animation: "bvPulse 0.8s ease-in-out infinite" }} />
+                  ON-CHAIN LOG · EXECUTING
+                </span>
+                <span style={{ fontSize: 8, color: "#fbbf2460" }}>MANTLE SEPOLIA</span>
+              </div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.04em", marginBottom: 6 }}>
+                TX: {onChainTx.slice(0, 20)}…{onChainTx.slice(-6)}
+              </div>
+              <a
+                href={`https://sepolia.mantlescan.xyz/tx/${onChainTx}`}
+                target="_blank" rel="noreferrer"
+                style={{ fontSize: 8, color: "#fbbf24", letterSpacing: "0.08em", textDecoration: "none" }}
+              >
+                VIEW ON MANTLESCAN ↗
+              </a>
+            </div>
+          )}
 
           {/* Interim voice */}
           {interim && (
