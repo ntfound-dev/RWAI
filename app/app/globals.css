@@ -594,9 +594,11 @@ html, body {
 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ── Mobile overrides for atlas shell ───────────────────────────── */
+.atlas-mobile-tx { display: none; }
 @media (max-width: 768px) {
-  .atlas-hud-left { display: none; }
-  .atlas-log      { display: none; }
+  .atlas-hud-left  { display: none; }
+  .atlas-log       { display: none; }
+  .atlas-mobile-tx { display: flex !important; }
   .atlas-topbar   { font-size: 7px; gap: 5px; letter-spacing: 0.1em; }
   .atlas-orb-wrap { width: 180px; height: 180px; }
   .atlas-orb      { width: 180px; height: 180px; }

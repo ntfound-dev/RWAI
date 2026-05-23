@@ -299,6 +299,27 @@ export default function VoicePage() {
           )}
         </div>
 
+        {/* Mobile TX banner — visible when atlas-log is hidden on small screens */}
+        {actions.find(a => a.tx) && (
+          <a
+            href={`https://sepolia.mantlescan.xyz/tx/${actions.find(a => a.tx)!.tx}`}
+            target="_blank" rel="noopener noreferrer"
+            className="atlas-mobile-tx"
+            style={{
+              display:"flex", alignItems:"center", gap:8,
+              padding:"6px 14px", background:"rgba(251,191,36,0.08)",
+              border:"1px solid rgba(251,191,36,0.3)", borderRadius:4,
+              color:"#fbbf24", fontSize:10, letterSpacing:"0.08em",
+              textDecoration:"none",
+            }}
+          >
+            <span style={{ fontSize:8 }}>⬡ ON-CHAIN LOG</span>
+            <span style={{ fontFamily:"monospace", fontSize:9 }}>
+              {actions.find(a => a.tx)!.tx!.slice(0,8)}…{actions.find(a => a.tx)!.tx!.slice(-6)} ↗
+            </span>
+          </a>
+        )}
+
         {/* Mic button — hidden if no SpeechRecognition support */}
         {!hasSR && (
           <div style={{ fontSize:9, letterSpacing:"0.2em", color:"rgba(255,100,100,0.6)", border:"1px solid rgba(255,100,100,0.2)", padding:"4px 12px", borderRadius:2 }}>

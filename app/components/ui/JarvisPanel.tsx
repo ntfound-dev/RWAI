@@ -279,15 +279,17 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
     speakWordsRef.current = words;
     setSpeakWordIdx(-1);
     const utt = new SpeechSynthesisUtterance(text);
-    const MALE_HINTS = ["Daniel","Google UK English Male","Google US English","Microsoft David","Microsoft Mark","Alex"];
-    const SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa"];
+    const MALE_HINTS = ["Google UK English Male","Daniel","Aaron","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon"];
+    const FEMALE_SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","junior","google uk english female"];
     const pick = voicesRef.current.find(v =>
-      MALE_HINTS.some(h => v.name.includes(h))
+      MALE_HINTS.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
     ) ?? voicesRef.current.find(v =>
-      v.lang.startsWith("en") && !SKIP.some(s => v.name.toLowerCase().includes(s))
+      v.lang.startsWith("en") && !FEMALE_SKIP.some(s => v.name.toLowerCase().includes(s))
     );
     if (pick) utt.voice = pick;
-    utt.rate = 0.93; utt.pitch = 0.88;
+    utt.rate = 0.88;
+    // Force low pitch on any voice — prevents female-sounding output on Android
+    utt.pitch = 0.65;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
     utt.onend   = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); speakWordsRef.current = []; };
     utt.onboundary = (e: SpeechSynthesisEvent) => {

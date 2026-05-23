@@ -266,12 +266,16 @@ export function GlobalJarvisPanel() {
     if (!synthRef.current) return;
     synthRef.current.cancel();
     const utt = new SpeechSynthesisUtterance(text);
+    const MALE_HINTS = ["Google UK English Male","Daniel","Aaron","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon"];
+    const FEMALE_SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","junior","google uk english female"];
     const pick = voicesRef.current.find(v =>
-      v.name.includes("Daniel") || v.name.includes("Google UK English Male") ||
-      (v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"))
+      MALE_HINTS.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
+    ) ?? voicesRef.current.find(v =>
+      v.lang.startsWith("en") && !FEMALE_SKIP.some(s => v.name.toLowerCase().includes(s))
     );
     if (pick) utt.voice = pick;
-    utt.rate=0.85; utt.pitch=0.74;
+    utt.rate = 0.88;
+    utt.pitch = 0.65;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
     utt.onend   = () => { if (!hasTx()) setJState("idle"); };
     synthRef.current.speak(utt);
@@ -373,7 +377,7 @@ export function GlobalJarvisPanel() {
       {/* Panel */}
       <div style={{
         position:"fixed", top:0, right:0, bottom:0, zIndex:999,
-        width:320, background:"#020c16",
+        width:"min(320px, 100vw)", background:"#020c16",
         borderLeft:`1px solid ${c.p}25`,
         display:"flex", flexDirection:"column",
         transform: jarvisOpen ? "translateX(0)" : "translateX(100%)",
