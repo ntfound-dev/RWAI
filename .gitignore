@@ -11,7 +11,8 @@ agents/.env.production
 !agents/.env.example
 !.env.example
 
-# Plan & internal docs
+# Pitch deck & internal docs
+pitch/
 plan.md
 production.md
 backend-design.md
