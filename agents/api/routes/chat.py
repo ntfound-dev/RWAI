@@ -136,7 +136,9 @@ def _detect_execution(messages: list[ChatMessage], wallet: Optional[str]) -> Opt
     assets = [v for k, v in _ASSET_KW.items() if k in last] or ["USDY"]
     assets = list(dict.fromkeys(assets))  # deduplicate, preserve order
     per_asset = amount_usd / len(assets)
-    amounts_wei = [int(per_asset * 1e18)] * len(assets)
+    # Use USD cents as unit — AgentExecutor is a log contract, not ERC-20 transfer.
+    # 1e18 caused _checkAutonomy to always fail (100e18 > agentTransactionLimits default of 0).
+    amounts_wei = [int(per_asset * 100)] * len(assets)  # e.g. $100 → 10000 units
 
     try:
         from ...mantle.executor import execute_allocation, get_agent_wallet_address, AGENT_PRIVATE_KEY
@@ -161,8 +163,23 @@ async def chat(req: ChatRequest):
         raise HTTPException(400, f"Unknown agent: {req.agent_id}")
 
     if req.agent_id == "atlas":
-        reply, model, fallback = await _atlas_with_delegation(req.messages)
+        last_body = req.messages[-1].body.lower() if req.messages else ""
+        execution_attempted = bool(set(re.sub(r"[,.\-!?]", " ", last_body).split()) & _EXECUTE_KW)
         tx = _detect_execution(req.messages, req.wallet_address)
+
+        # Inject TX result before LLM reply — prevents hallucination of fake TX hashes
+        messages_with_ctx = list(req.messages)
+        if tx:
+            messages_with_ctx.append(ChatMessage(
+                role="system",
+                body=f"[SYSTEM] On-chain execution SUCCEEDED. Real TX hash: {tx}. Tell the user this exact hash and that it is live on Mantle Sepolia AgentExecutor.",
+            ))
+        elif execution_attempted:
+            messages_with_ctx.append(ChatMessage(
+                role="system",
+                body="[SYSTEM] On-chain execution FAILED — no transaction was submitted. Do NOT invent or guess a TX hash. Tell the user honestly that the on-chain log could not be written and to retry.",
+            ))
+        reply, model, fallback = await _atlas_with_delegation(messages_with_ctx)
     else:
         reply, model, fallback = await agent_complete(req.agent_id, req.messages)
         tx = None
