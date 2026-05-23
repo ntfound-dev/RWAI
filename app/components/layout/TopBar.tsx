@@ -18,8 +18,9 @@ const NAV = [
 export function TopBar() {
   const pathname  = usePathname();
   const { mode, setMode, openBridge, jarvisOpen, toggleJarvis } = useChatMode();
-  const onChat = pathname === "/chat";
-  const onHome = pathname === "/";
+  const onChat  = pathname === "/chat";
+  const onHome  = pathname === "/";
+  const onVoice = pathname === "/voice";
 
   return (
     <header className="topbar">
@@ -65,8 +66,8 @@ export function TopBar() {
           </div>
         )}
 
-        {/* JARVIS pill — hidden on home page */}
-        {!onHome && (
+        {/* JARVIS pill — hidden on home, /chat (has own JARVIS), /voice (IS JARVIS) */}
+        {!onHome && !onChat && !onVoice && (
           <button
             onClick={toggleJarvis}
             style={{

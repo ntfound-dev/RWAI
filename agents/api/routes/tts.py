@@ -37,31 +37,15 @@ async def text_to_speech(req: TTSRequest):
         except Exception as exc:
             _log.warning("OpenAI TTS failed: %s", exc)
 
-    # Option 2: Groq PlayAI TTS — uses existing OPENAI_COMPAT_API_KEY, no new credentials
-    groq_key = os.getenv("OPENAI_COMPAT_API_KEY", "")
-    groq_base = os.getenv("OPENAI_COMPAT_BASE_URL", "https://api.groq.com/openai").rstrip("/")
-    if groq_key and not groq_key.startswith("your_"):
-        try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                res = await client.post(
-                    f"{groq_base}/v1/audio/speech",
-                    headers={"Authorization": f"Bearer {groq_key}"},
-                    json={"model": "playai-tts", "input": text, "voice": "Fritz-PlayAI", "response_format": "mp3"},
-                )
-                if res.status_code == 200:
-                    _log.info("Groq PlayAI TTS OK")
-                    return StreamingResponse(io.BytesIO(res.content), media_type="audio/mpeg")
-                _log.warning("Groq TTS error %s: %s", res.status_code, res.text[:200])
-        except Exception as exc:
-            _log.warning("Groq TTS failed: %s", exc)
-
-    # Option 3: gTTS fallback — Google Translate TTS, decent quality
+    # Option 2: gTTS — Google Translate TTS (reliable, no API key needed)
+    # Note: Groq playai-tts was decommissioned; frontend lowers pitch via playbackRate
     try:
         from gtts import gTTS
-        tts = gTTS(text=text, lang="en", tld="co.uk")
+        tts = gTTS(text=text, lang="en", tld="com")
         buf = io.BytesIO()
         tts.write_to_fp(buf)
         buf.seek(0)
+        _log.info("gTTS OK, %d chars", len(text))
         return StreamingResponse(buf, media_type="audio/mpeg")
     except Exception as exc:
         _log.warning("gTTS failed: %s", exc)

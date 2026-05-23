@@ -273,6 +273,7 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
           const decoded = await ac.decodeAudioData(buf.slice(0));
           const source = ac.createBufferSource();
           source.buffer = decoded;
+          source.playbackRate.value = 0.82; // lower pitch → masculine voice
           source.connect(ac.destination);
           sourceRef.current = source;
           if (!hasTx()) setJState("speaking");
