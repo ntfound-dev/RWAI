@@ -174,8 +174,15 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   const [history, setHistory]   = useState<{ role: string; body: string }[]>([]);
   const [interim, setInterim]   = useState("");
   const [portfolio, setPortfolio] = useState<PortfolioOnChain | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const onChainTxRef = useRef("");
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   useEffect(() => { onChainTxRef.current = onChainTx; }, [onChainTx]);
 
   // ── Fetch on-chain portfolio when wallet connects ─────────────────
@@ -373,25 +380,27 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     }}>
       {/* ── Row 1: J.A.R.V.I.S. header ── */}
       <div style={{
-        display: "grid", gridTemplateColumns: "280px 1fr 280px",
-        padding: "10px 20px", borderBottom: `1px solid ${c.p}22`,
-        background: `${c.p}06`, alignItems: "center",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: isMobile ? "8px 12px" : "10px 20px",
+        borderBottom: `1px solid ${c.p}22`, background: `${c.p}06`, flexWrap: "wrap", gap: 6,
       }}>
         <div>
-          <div style={{ fontSize: 16, letterSpacing: "0.3em", color: c.p, fontWeight: 600 }}>J.A.R.V.I.S.</div>
-          <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.15em", marginTop: 2 }}>JUST A RATHER VERY INTELLIGENT SYSTEM</div>
+          <div style={{ fontSize: isMobile ? 13 : 16, letterSpacing: "0.3em", color: c.p, fontWeight: 600 }}>J.A.R.V.I.S.</div>
+          {!isMobile && <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.15em", marginTop: 2 }}>JUST A RATHER VERY INTELLIGENT SYSTEM</div>}
         </div>
-        <div style={{ textAlign: "center", fontSize: 11, color: c.p, letterSpacing: "0.12em" }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.p, boxShadow: `0 0 8px ${c.p}`, display: "inline-block", marginRight: 8, verticalAlign: "middle", animation: "bvPulse 1.4s ease-in-out infinite" }} />
-          SESSION · <SessionTimer /> · ATLAS-LINKED
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+        {!isMobile && (
+          <div style={{ textAlign: "center", fontSize: 11, color: c.p, letterSpacing: "0.12em" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.p, boxShadow: `0 0 8px ${c.p}`, display: "inline-block", marginRight: 8, verticalAlign: "middle", animation: "bvPulse 1.4s ease-in-out infinite" }} />
+            SESSION · <SessionTimer /> · ATLAS-LINKED
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 9, color: c.p, border: `1px solid ${c.p}40`, padding: "2px 8px" }}>{c.label}</span>
           <button onClick={closeBridge} style={{
             background: "transparent", border: "1px solid rgba(255,255,255,0.15)",
             color: "rgba(255,255,255,0.5)", fontFamily: "var(--font-mono)", fontSize: 9,
             padding: "4px 12px", cursor: "pointer", letterSpacing: "0.1em",
-          }}>↙ EXIT JARVIS</button>
+          }}>↙ EXIT</button>
         </div>
       </div>
 
@@ -408,11 +417,11 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
         </span>
       </div>
 
-      {/* ── Row 3: 3-column main content ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 240px", minHeight: 0, overflow: "hidden" }}>
+      {/* ── Row 3: main content ── */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr 240px", minHeight: 0, overflow: "hidden" }}>
 
-        {/* LEFT: portfolio + telemetry */}
-        <div style={{ borderRight: `1px solid ${c.p}18`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* LEFT: portfolio + telemetry — hidden on mobile */}
+        <div style={{ borderRight: `1px solid ${c.p}18`, display: isMobile ? "none" : "flex", flexDirection: "column", overflow: "hidden" }}>
           {/* Portfolio */}
           <div style={{ padding: "12px 14px", borderBottom: `1px solid ${c.p}14` }}>
             <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.1em", marginBottom: 8 }}>
@@ -480,7 +489,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
           ))}
 
           {/* Sphere */}
-          <div style={{ width: "min(380px, 90%)", padding: "12px 0 4px", flexShrink: 0 }}>
+          <div style={{ width: isMobile ? "min(300px, 85vw)" : "min(380px, 90%)", padding: "12px 0 4px", flexShrink: 0 }}>
             <BridgeSphere state={jState} onClick={closeBridge} />
           </div>
 
@@ -563,8 +572,8 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
           </div>
         </div>
 
-        {/* RIGHT: agent mesh + yield intelligence */}
-        <div style={{ borderLeft: `1px solid ${c.p}18`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* RIGHT: agent mesh + yield intelligence — hidden on mobile */}
+        <div style={{ borderLeft: `1px solid ${c.p}18`, display: isMobile ? "none" : "flex", flexDirection: "column", overflow: "hidden" }}>
           {/* Agent mesh */}
           <div style={{ padding: "12px 14px", borderBottom: `1px solid ${c.p}14` }}>
             <div style={{ fontSize: 8, color: `${c.p}60`, letterSpacing: "0.1em", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
@@ -631,8 +640,8 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
         </div>
       </div>
 
-      {/* ── Row 4: objectives bar ── */}
-      <div style={{ borderTop: `1px solid ${c.p}18`, display: "grid", gridTemplateColumns: "repeat(5,1fr)", background: `${c.p}04` }}>
+      {/* ── Row 4: objectives bar — hidden on mobile ── */}
+      <div style={{ borderTop: `1px solid ${c.p}18`, display: isMobile ? "none" : "grid", gridTemplateColumns: "repeat(5,1fr)", background: `${c.p}04` }}>
         {([
           {
             label: "PRIMARY OBJECTIVE",
@@ -663,9 +672,9 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
       </div>
 
       {/* ── Row 5: command input ── */}
-      <div style={{ padding: "10px 20px", borderTop: `1px solid ${c.p}18`, display: "flex", gap: 10, alignItems: "center", background: "#010a12" }}>
-        {/* Quick commands */}
-        <div style={{ display: "flex", gap: 5 }}>
+      <div style={{ padding: isMobile ? "8px 10px" : "10px 20px", borderTop: `1px solid ${c.p}18`, display: "flex", gap: 10, alignItems: "center", background: "#010a12" }}>
+        {/* Quick commands — desktop only */}
+        {!isMobile && <div style={{ display: "flex", gap: 5 }}>
           {["Show alternative allocations", "Stress-test against -20% MI4", "Execute on testnet", "Explain CVaR"].map(cmd => (
             <button key={cmd} onClick={() => !busy && sendRef.current(cmd)} disabled={busy} style={{
               background: "transparent", border: `1px solid ${c.p}20`,
@@ -674,7 +683,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
               whiteSpace: "nowrap",
             }}>{cmd}</button>
           ))}
-        </div>
+        </div>}
         {/* Mic + input */}
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "36px 1fr auto", gap: 6, alignItems: "center", border: `1px solid ${c.p}25`, background: `${c.p}05`, padding: "4px 4px 4px 0" }}>
           <button onClick={toggleListen} disabled={busy} style={{
@@ -698,7 +707,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
             onChange={e => setTextInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !busy && textInput.trim() && sendRef.current(textInput.trim())}
             disabled={busy}
-            placeholder="Speak or type — JARVIS will route to Atlas…"
+            placeholder={isMobile ? 'Try: "invest 100 dollars in USDY"' : "Speak or type — JARVIS will route to Atlas…"}
             style={{
               background: "transparent", border: "none", outline: "none",
               color: "rgba(255,255,255,0.75)", fontFamily: "var(--font-mono)", fontSize: 11,
