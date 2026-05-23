@@ -221,12 +221,24 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
       exp: fmtPct(0.15*u + 0.35*m + 0.50*e) },
   ];
 
-  const recRef   = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const recRef    = useRef<any>(null);
+  const synthRef  = useRef<SpeechSynthesis | null>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const pendingRef = useRef("");
-  const sendRef  = useRef<(t: string) => void>(() => {});
+  const sendRef   = useRef<(t: string) => void>(() => {});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Unlock AudioContext on first user tap — required for mobile autoplay
+  const unlockAudio = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+  }, []);
 
   const now = () => new Date().toLocaleTimeString("en-GB", { hour12: false });
   const short = (addr?: string) => addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : "—";
@@ -242,7 +254,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
 
-    // Backend TTS first (gTTS UK accent or OpenAI onyx — much better than browser)
+    // Backend TTS (gTTS UK accent or OpenAI onyx)
     try {
       const res = await fetch("/api/agents/tts", {
         method: "POST",
@@ -250,27 +262,38 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
         body: JSON.stringify({ text }),
       });
       if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onplay  = () => { if (!hasTx()) setJState("speaking"); };
-        audio.onended = () => { URL.revokeObjectURL(url); if (!hasTx()) setJState("idle"); };
-        await audio.play();
+        const arrayBuffer = await res.arrayBuffer();
+        // Use Web Audio API — works on mobile even after async gap
+        const ctx = audioCtxRef.current
+          ?? new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioCtxRef.current = ctx;
+        if (ctx.state === "suspended") await ctx.resume();
+        const decoded = await ctx.decodeAudioData(arrayBuffer);
+        const source  = ctx.createBufferSource();
+        source.buffer = decoded;
+        source.connect(ctx.destination);
+        if (!hasTx()) setJState("speaking");
+        source.onended = () => { if (!hasTx()) setJState("idle"); };
+        source.start(0);
         return;
       }
-    } catch { /* fall through to browser TTS */ }
+    } catch { /* fall through */ }
 
-    // Fallback: browser TTS with best available voice
+    // Fallback: browser TTS
     if (!synthRef.current) return;
     synthRef.current.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     const pick = voicesRef.current.find(v =>
+      v.name.includes("Google UK English Male") ||
       v.name.includes("Ryan") ||
       v.name.includes("Guy") ||
       v.name.includes("Daniel") ||
-      v.name.includes("Google UK English Male") ||
       (v.lang.startsWith("en") && v.name.toLowerCase().includes("natural") && !v.name.toLowerCase().includes("female"))
-    ) ?? voicesRef.current.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("female"));
+    ) ?? voicesRef.current.find(v =>
+      v.lang === "en-GB" && !v.name.toLowerCase().includes("female")
+    ) ?? voicesRef.current.find(v =>
+      v.lang.startsWith("en") && !v.name.toLowerCase().includes("female")
+    );
     if (pick) utt.voice = pick;
     utt.rate = 0.85; utt.pitch = 0.74;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
@@ -686,7 +709,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
         </div>}
         {/* Mic + input */}
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "36px 1fr auto", gap: 6, alignItems: "center", border: `1px solid ${c.p}25`, background: `${c.p}05`, padding: "4px 4px 4px 0" }}>
-          <button onClick={toggleListen} disabled={busy} style={{
+          <button onClick={() => { unlockAudio(); toggleListen(); }} disabled={busy} style={{
             width: 36, height: 36, borderRadius: 0,
             border: "none", borderRight: `1px solid ${c.p}20`,
             background: jState === "listening" ? `${c.p}15` : "transparent",
@@ -705,7 +728,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
           <input
             value={textInput}
             onChange={e => setTextInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            onKeyDown={e => { if (e.key === "Enter" && !busy && textInput.trim()) { unlockAudio(); sendRef.current(textInput.trim()); } }}
             disabled={busy}
             placeholder={isMobile ? 'Try: "invest 100 dollars in USDY"' : "Speak or type — JARVIS will route to Atlas…"}
             style={{
@@ -715,7 +738,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
             }}
           />
           <button
-            onClick={() => !busy && textInput.trim() && sendRef.current(textInput.trim())}
+            onClick={() => { unlockAudio(); !busy && textInput.trim() && sendRef.current(textInput.trim()); }}
             disabled={busy || !textInput.trim()}
             style={{
               background: "transparent", border: `1px solid ${c.p}30`, color: c.p,
