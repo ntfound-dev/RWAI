@@ -46,7 +46,7 @@ async def text_to_speech(req: TTSRequest):
                 res = await client.post(
                     f"{groq_base}/v1/audio/speech",
                     headers={"Authorization": f"Bearer {groq_key}"},
-                    json={"model": "playai-tts", "input": text, "voice": "Fritz-PlayAI"},
+                    json={"model": "playai-tts", "input": text, "voice": "Fritz-PlayAI", "response_format": "mp3"},
                 )
                 if res.status_code == 200:
                     _log.info("Groq PlayAI TTS OK")

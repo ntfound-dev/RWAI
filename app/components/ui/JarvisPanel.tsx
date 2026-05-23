@@ -204,6 +204,7 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   const synthRef     = useRef<SpeechSynthesis | null>(null);
   const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
   const audioCtxRef  = useRef<AudioContext | null>(null);
+  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
   const onChainTxRef = useRef("");
   const speakWordsRef = useRef<string[]>([]);
   const pendingRef   = useRef("");
@@ -248,6 +249,11 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
+    // Stop any currently playing audio to prevent double playback
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    synthRef.current?.cancel();
+
     // Backend TTS — Web Audio API (bypasses mobile autoplay restriction)
     try {
       const res = await fetch("/api/agents/tts", {
@@ -265,43 +271,13 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
         const source = ctx.createBufferSource();
         source.buffer = decoded;
         source.connect(ctx.destination);
+        sourceRef.current = source;
         if (!hasTx()) setJState("speaking");
-        source.onended = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+        source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
         source.start(0);
         return;
       }
-    } catch { /* fall through to browser TTS */ }
-
-    // Browser TTS fallback
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    const words = text.split(/\s+/).filter(Boolean);
-    speakWordsRef.current = words;
-    setSpeakWordIdx(-1);
-    const utt = new SpeechSynthesisUtterance(text);
-    const MALE_HINTS = ["Google UK English Male","Daniel","Aaron","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon"];
-    const FEMALE_SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","junior","google uk english female"];
-    const pick = voicesRef.current.find(v =>
-      MALE_HINTS.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
-    ) ?? voicesRef.current.find(v =>
-      v.lang.startsWith("en") && !FEMALE_SKIP.some(s => v.name.toLowerCase().includes(s))
-    );
-    if (pick) utt.voice = pick;
-    utt.rate = 0.88;
-    // Force low pitch on any voice — prevents female-sounding output on Android
-    utt.pitch = 0.65;
-    utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); speakWordsRef.current = []; };
-    utt.onboundary = (e: SpeechSynthesisEvent) => {
-      if (e.name !== "word") return;
-      const ws = speakWordsRef.current;
-      let pos = 0;
-      for (let i = 0; i < ws.length; i++) {
-        if (e.charIndex >= pos && e.charIndex < pos + ws[i].length) { setSpeakWordIdx(i); break; }
-        pos += ws[i].length + 1;
-      }
-    };
-    synthRef.current.speak(utt);
+    } catch { /* backend TTS unavailable — stay silent rather than use female browser voice */ }
   }, []);
 
   // Greeting on mount

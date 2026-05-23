@@ -209,6 +209,7 @@ export function GlobalJarvisPanel() {
   const synthRef     = useRef<SpeechSynthesis | null>(null);
   const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
   const audioCtxRef  = useRef<AudioContext | null>(null);
+  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
   const onChainTxRef = useRef("");
   const pendingRef   = useRef("");
   const sendRef      = useRef<(t: string) => void>(() => {});
@@ -238,6 +239,11 @@ export function GlobalJarvisPanel() {
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
+    // Stop any currently playing audio to prevent double playback
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    synthRef.current?.cancel();
+
     // Backend TTS via Web Audio API
     try {
       const res = await fetch("/api/agents/tts", {
@@ -255,30 +261,13 @@ export function GlobalJarvisPanel() {
         const source = ac.createBufferSource();
         source.buffer = decoded;
         source.connect(ac.destination);
+        sourceRef.current = source;
         if (!hasTx()) setJState("speaking");
-        source.onended = () => { if (!hasTx()) setJState("idle"); };
+        source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); };
         source.start(0);
         return;
       }
-    } catch { /* fall through */ }
-
-    // Browser TTS fallback
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    const MALE_HINTS = ["Google UK English Male","Daniel","Aaron","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon"];
-    const FEMALE_SKIP = ["female","samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","junior","google uk english female"];
-    const pick = voicesRef.current.find(v =>
-      MALE_HINTS.some(h => v.name.toLowerCase().includes(h.toLowerCase()))
-    ) ?? voicesRef.current.find(v =>
-      v.lang.startsWith("en") && !FEMALE_SKIP.some(s => v.name.toLowerCase().includes(s))
-    );
-    if (pick) utt.voice = pick;
-    utt.rate = 0.88;
-    utt.pitch = 0.65;
-    utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setJState("idle"); };
-    synthRef.current.speak(utt);
+    } catch { /* backend TTS unavailable — stay silent rather than use female browser voice */ }
   }, []);
 
   // Greeting on first open

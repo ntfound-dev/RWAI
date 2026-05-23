@@ -38,6 +38,7 @@ export default function VoicePage() {
   const synthRef     = useRef<SpeechSynthesis | null>(null);
   const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
   const audioCtxRef  = useRef<AudioContext | null>(null);
+  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
   const onChainTxRef = useRef("");
   const [speakWords, setSpeakWords] = useState<string[]>([]);
   const [wordIdx, setWordIdx]       = useState(-1);
@@ -71,6 +72,11 @@ export default function VoicePage() {
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
+    // Stop any currently playing audio to prevent double playback
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    synthRef.current?.cancel();
+
     // Backend TTS — Web Audio API (works on mobile after AudioContext unlock)
     try {
       const res = await fetch("/api/agents/tts", {
@@ -88,43 +94,13 @@ export default function VoicePage() {
         const source = ac.createBufferSource();
         source.buffer = decoded;
         source.connect(ac.destination);
+        sourceRef.current = source;
         if (!hasTx()) setOrbState("speaking");
-        source.onended = () => { if (!hasTx()) setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
+        source.onended = () => { sourceRef.current = null; if (!hasTx()) setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
         source.start(0);
         return;
       }
-    } catch { /* fall through */ }
-
-    // Browser TTS fallback
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    const words = text.split(/\s+/).filter(Boolean);
-    setSpeakWords(words);
-    setWordIdx(-1);
-    const utt = new SpeechSynthesisUtterance(text);
-    const MALE_NAMES = ["Daniel","Aaron","Google UK English Male","Microsoft David","Microsoft Mark","Alex","Tom","Fred","Gordon","Google US English"];
-    const FEMALE_NAMES = ["samantha","karen","moira","victoria","zira","susan","hazel","linda","fiona","tessa","google uk english female"];
-    const voices = synthRef.current?.getVoices()?.length ? synthRef.current.getVoices() : (voicesRef.current.length ? voicesRef.current : []);
-    if (voices.length) voicesRef.current = voices;
-    let pick: SpeechSynthesisVoice | undefined;
-    for (const hint of MALE_NAMES) { pick = voices.find(v => v.name === hint); if (pick) break; }
-    if (!pick) pick = voices.find(v => MALE_NAMES.some(h => v.name.toLowerCase().includes(h.toLowerCase())));
-    if (!pick) pick = voices.find(v => v.lang.startsWith("en") && !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)) && !v.default)
-      ?? voices.find(v => v.lang.startsWith("en") && !FEMALE_NAMES.some(f => v.name.toLowerCase().includes(f)));
-    if (pick) utt.voice = pick;
-    utt.lang = "en-US"; utt.rate = 0.92;
-    utt.pitch = pick && MALE_NAMES.some(h => pick!.name.toLowerCase().includes(h.toLowerCase())) ? 0.82 : 0.62;
-    utt.onstart = () => { if (!hasTx()) setOrbState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setOrbState("idle"); setSpeakWords([]); setWordIdx(-1); };
-    utt.onboundary = (e: SpeechSynthesisEvent) => {
-      if (e.name !== "word") return;
-      let pos = 0;
-      for (let i = 0; i < words.length; i++) {
-        if (e.charIndex >= pos && e.charIndex < pos + words[i].length) { setWordIdx(i); break; }
-        pos += words[i].length + 1;
-      }
-    };
-    synthRef.current.speak(utt);
+    } catch { /* backend TTS unavailable — stay silent rather than use female browser voice */ }
   }, []);
 
   const sendToAtlas = useCallback(async (text: string) => {
