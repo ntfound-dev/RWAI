@@ -355,7 +355,6 @@ export function GlobalJarvisPanel() {
   }, [history, ctx, address, speak]);
 
   useEffect(() => { sendRef.current = sendToAtlas; }, [sendToAtlas]);
-  useEffect(() => { toggleListenRef.current = toggleListen; }, [toggleListen]);
 
   const toggleListen = useCallback(() => {
     unlockAudio();
@@ -372,6 +371,7 @@ export function GlobalJarvisPanel() {
     rec.onerror=()=>{setInterim("");setJState("idle");};
     rec.start();
   }, [jState, unlockAudio]);
+  useEffect(() => { toggleListenRef.current = toggleListen; }, [toggleListen]);
 
   const c = C[jState];
   const busy = jState === "thinking" || jState === "executing";
