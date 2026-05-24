@@ -182,7 +182,7 @@ function MiniSphere({ state }: { state: JState }) {
     return ()=>cancelAnimationFrame(raf.current);
   }, [state]); // eslint-disable-line
 
-  return <canvas ref={ref} width={260} height={260} style={{display:"block",width:"100%",height:"auto"}}/>;
+  return <canvas ref={ref} width={260} height={260} style={{display:"block",width:"100%",height:"auto",maxWidth:180,maxHeight:180,margin:"0 auto"}}/>;
 }
 
 const SENSITIVE_RE = /\b(private[_\s.]?key|AGENT_PRIVATE_KEY|mnemonic|seed[_\s.]?phrase|secret[_\s.]?key|priv[_\s.]?key)\b/i;
@@ -200,16 +200,19 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   const [onChainTx, setOnChainTx] = useState("");
   const [speakWordIdx, setSpeakWordIdx] = useState(-1);
 
-  const recRef       = useRef<any>(null);
-  const synthRef     = useRef<SpeechSynthesis | null>(null);
-  const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
-  const audioCtxRef  = useRef<AudioContext | null>(null);
-  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
-  const onChainTxRef = useRef("");
+  const recRef        = useRef<any>(null);
+  const synthRef      = useRef<SpeechSynthesis | null>(null);
+  const voicesRef     = useRef<SpeechSynthesisVoice[]>([]);
+  const audioCtxRef   = useRef<AudioContext | null>(null);
+  const sourceRef     = useRef<AudioBufferSourceNode | null>(null);
+  const onChainTxRef  = useRef("");
   const speakWordsRef = useRef<string[]>([]);
-  const pendingRef   = useRef("");
-  const sendRef      = useRef<(t: string) => void>(() => {});
-  const chatEndRef   = useRef<HTMLDivElement>(null);
+  const pendingRef    = useRef("");
+  const pendingSpeakRef = useRef<string | null>(null);
+  const speakRef      = useRef<(t: string) => void>(() => {});
+  const audioUnlockedRef = useRef(false);
+  const sendRef       = useRef<(t: string) => void>(() => {});
+  const chatEndRef    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -235,24 +238,53 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
 
   const now = () => new Date().toLocaleTimeString("en-GB", { hour12: false });
 
-  // Unlock AudioContext on first user interaction (mobile autoplay policy)
   const unlockAudio = useCallback(() => {
+    // Prime SpeechSynthesis once from user gesture
+    if (synthRef.current && !audioUnlockedRef.current) {
+      audioUnlockedRef.current = true;
+      const s = new SpeechSynthesisUtterance(" ");
+      s.volume = 0; s.rate = 2;
+      synthRef.current.speak(s);
+    }
+    const playPending = () => {
+      if (pendingSpeakRef.current) {
+        const t = pendingSpeakRef.current;
+        pendingSpeakRef.current = null;
+        speakRef.current(t);
+      }
+    };
     if (audioCtxRef.current) {
-      if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().then(playPending).catch(() => {});
+      } else { playPending(); }
       return;
     }
     const AC = window.AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
     audioCtxRef.current = new AC();
-    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+    audioCtxRef.current.resume().then(playPending).catch(() => {});
   }, []);
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
-    // Stop previous audio to prevent double playback
     try { sourceRef.current?.stop(); } catch {}
     sourceRef.current = null;
     synthRef.current?.cancel();
+
+    // Ensure AudioContext exists
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (AC && (!audioCtxRef.current || audioCtxRef.current.state === "closed")) {
+      audioCtxRef.current = new AC();
+    }
+    const ac = audioCtxRef.current;
+
+    // If AC still suspended (no user gesture), queue and wait for mic/send tap
+    if (ac && ac.state === "suspended") {
+      pendingSpeakRef.current = text;
+      return;
+    }
+
+    const onEnd = () => { if (!hasTx()) { setJState("idle"); setSpeakWordIdx(-1); } };
 
     // Primary: backend TTS via Web Audio API
     try {
@@ -263,34 +295,28 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
       });
       if (res.ok) {
         const buf = await res.arrayBuffer();
-        if (buf.byteLength > 100) {
-          const AC = window.AudioContext || (window as any).webkitAudioContext;
-          if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-            audioCtxRef.current = new AC();
-          }
-          const ac = audioCtxRef.current;
+        if (buf.byteLength > 100 && ac) {
           if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
           const decoded = await ac.decodeAudioData(buf.slice(0));
           const source = ac.createBufferSource();
           source.buffer = decoded;
-          source.playbackRate.value = 0.82; // lower pitch → masculine voice
+          source.playbackRate.value = 0.82;
           source.connect(ac.destination);
           sourceRef.current = source;
           if (!hasTx()) setJState("speaking");
-          source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+          source.onended = () => { sourceRef.current = null; onEnd(); };
           source.start(0);
           return;
         }
       }
     } catch { /* fall through to browser TTS */ }
 
-    // Fallback: browser TTS — pitch 0.1 forces deep robotic voice (not female)
+    // Fallback: browser SpeechSynthesis (primed via unlockAudio)
     if (!synthRef.current) return;
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9;
-    utt.pitch = 0.1;
+    utt.rate = 0.9; utt.pitch = 0.1;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setJState("idle"); setSpeakWordIdx(-1); };
+    utt.onend   = onEnd;
     synthRef.current.speak(utt);
   }, []);
 
@@ -357,6 +383,7 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
   }, [history, chatContext, address, speak, onMessage]);
 
   useEffect(() => { sendRef.current = sendToAtlas; }, [sendToAtlas]);
+  useEffect(() => { speakRef.current = speak; }, [speak]);
 
   const toggleListen = useCallback(() => {
     unlockAudio();
@@ -418,18 +445,19 @@ export function JarvisPanel({ onMessage, messages: chatContext = [] }: JarvisPan
       )}
 
       {/* Mini sphere */}
-      <div style={{ flexShrink:0, padding:"10px 20px 0", position:"relative" }}>
-        {(jState==="listening"||jState==="speaking"||jState==="executing") && (
-          [1,2].map(i=>(
-            <div key={i} style={{
-              position:"absolute", top: `${10 - i*12}px`, left:`${20 - i*12}px`, right:`${20 - i*12}px`,
-              bottom: `${0 - i*12}px`, borderRadius:"50%",
-              border:`1px solid ${c.p}`, pointerEvents:"none",
-              animation:`jPanelPulse ${0.9+i*0.4}s ease-out ${i*0.25}s infinite`,
-            }}/>
-          ))
-        )}
-        <MiniSphere state={jState}/>
+      <div style={{ flexShrink:0, padding:"8px 0 0", display:"flex", justifyContent:"center" }}>
+        <div style={{ position:"relative", width:180, flexShrink:0 }}>
+          {(jState==="listening"||jState==="speaking"||jState==="executing") && (
+            [1,2].map(i=>(
+              <div key={i} style={{
+                position:"absolute", top:`${-i*12}px`, left:`${-i*12}px`, right:`${-i*12}px`, bottom:`${-i*12}px`,
+                borderRadius:"50%", border:`1px solid ${c.p}`, pointerEvents:"none",
+                animation:`jPanelPulse ${0.9+i*0.4}s ease-out ${i*0.25}s infinite`,
+              }}/>
+            ))
+          )}
+          <MiniSphere state={jState}/>
+        </div>
       </div>
 
       {/* Interim (live voice text) */}

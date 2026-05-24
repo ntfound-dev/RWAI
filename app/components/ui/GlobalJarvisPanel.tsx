@@ -404,6 +404,9 @@ export function GlobalJarvisPanel() {
   const c = C[jState];
   const busy = jState === "thinking" || jState === "executing";
 
+  // /chat and /voice already have their own dedicated JARVIS panels
+  if (pathname === "/chat" || pathname === "/voice") return null;
+
   return (
     <>
       {/* Backdrop */}
