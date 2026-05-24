@@ -1507,20 +1507,27 @@ const META: Record<string, { title: string; subtitle: string; tag: string }> = {
 
 export default function DocsPage() {
   const [active, setActive] = useState("getting-started");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const meta     = META[active] ?? META["getting-started"];
   const flatIdx  = FLAT.findIndex(i => i.id === active);
   const prev     = flatIdx > 0 ? FLAT[flatIdx - 1] : null;
   const next     = flatIdx < FLAT.length - 1 ? FLAT[flatIdx + 1] : null;
 
+  const navTo = (id: string) => { setActive(id); setSidebarOpen(false); };
+
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"240px 1fr", maxWidth:1300, margin:"0 auto", height:"calc(100vh - 48px)", overflow:"hidden" }}>
+    <div className="docs-outer">
+
+      {/* ── Mobile sidebar overlay backdrop ── */}
+      {sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{
+          position:"fixed", inset:0, zIndex:199,
+          background:"rgba(0,0,0,0.55)", backdropFilter:"blur(2px)",
+        }}/>
+      )}
 
       {/* ── Sidebar ── */}
-      <aside style={{
-        borderRight:"1px solid var(--line)", overflowY:"auto",
-        padding:"24px 0",
-        scrollbarWidth:"thin",
-      }}>
+      <aside className={`docs-sidebar${sidebarOpen ? " docs-sidebar--open" : ""}`}>
         {/* Search bar (UI only) */}
         <div style={{ padding:"0 16px 20px" }}>
           <div style={{
@@ -1548,7 +1555,7 @@ export default function DocsPage() {
               {group.group}
             </div>
             {group.items.map(item => (
-              <button key={item.id} onClick={() => setActive(item.id)} style={{
+              <button key={item.id} onClick={() => navTo(item.id)} style={{
                 display:"block", width:"100%", textAlign:"left",
                 padding:"7px 16px 7px 20px",
                 fontFamily:"var(--font-mono)", fontSize:11.5, letterSpacing:"0.03em",
@@ -1592,6 +1599,14 @@ export default function DocsPage() {
       {/* ── Main content ── */}
       <main style={{ overflowY:"auto", padding:"32px 48px 60px", scrollbarWidth:"thin" }}>
 
+        {/* Mobile menu button */}
+        <button className="docs-menu-btn" onClick={() => setSidebarOpen(true)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          SECTIONS
+        </button>
+
         {/* Breadcrumb */}
         <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:20, fontFamily:"var(--font-mono)", fontSize:10, color:"var(--fg-3)" }}>
           <span>DOCS</span>
@@ -1618,7 +1633,7 @@ export default function DocsPage() {
           marginTop:48, paddingTop:24, borderTop:"1px solid var(--line)",
         }}>
           {prev ? (
-            <button onClick={()=>setActive(prev.id)} style={{
+            <button onClick={()=>navTo(prev.id)} style={{
               background:"rgba(255,255,255,0.03)", border:"1px solid var(--line)",
               borderRadius:4, padding:"14px 16px", cursor:"pointer",
               textAlign:"left", transition:"border-color 0.15s",
@@ -1632,7 +1647,7 @@ export default function DocsPage() {
           ) : <div/>}
 
           {next ? (
-            <button onClick={()=>setActive(next.id)} style={{
+            <button onClick={()=>navTo(next.id)} style={{
               background:"rgba(255,255,255,0.03)", border:"1px solid var(--line)",
               borderRadius:4, padding:"14px 16px", cursor:"pointer",
               textAlign:"right", transition:"border-color 0.15s",

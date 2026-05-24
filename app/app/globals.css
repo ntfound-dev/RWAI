@@ -841,6 +841,29 @@ html, body {
 .mobile-stack   { display: contents; }
 .mobile-hide    { display: block; }
 
+/* ── Docs page layout ────────────────────────────────────────────── */
+.docs-outer       { display: grid; grid-template-columns: 240px 1fr; max-width: 1300px; margin: 0 auto; height: calc(100vh - 48px); overflow: hidden; }
+.docs-sidebar     { border-right: 1px solid var(--line); overflow-y: auto; padding: 24px 0; scrollbar-width: thin; }
+.docs-menu-btn    { display: none; }
+
+@media (max-width: 760px) {
+  .docs-outer   { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .docs-sidebar {
+    position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; z-index: 200;
+    background: var(--bg-0); border-right: 1px solid var(--line-strong);
+    transition: left 0.25s ease; overflow-y: auto; padding: 24px 0;
+  }
+  .docs-sidebar--open { left: 0 !important; }
+  .docs-menu-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+    color: var(--fg-2); font-family: var(--font-mono); font-size: 9px;
+    letter-spacing: 0.12em; padding: 5px 12px; cursor: pointer;
+    margin-bottom: 16px; border-radius: 2px;
+  }
+  main[style] { padding: 20px 18px 48px !important; }
+}
+
 /* ── Portfolio page layout ───────────────────────────────────────── */
 .pf-stats-4   { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
 .pf-plans-3   { display: grid; grid-template-columns: repeat(3,1fr); gap: 0; }
