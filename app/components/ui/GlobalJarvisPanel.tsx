@@ -187,7 +187,7 @@ function TinySphere({ state }: { state: JState }) {
     return ()=>cancelAnimationFrame(raf.current);
   }, [state]); // eslint-disable-line
 
-  return <canvas ref={ref} width={160} height={160} style={{ display:"block", width:"100%", height:"auto" }}/>;
+  return <canvas ref={ref} width={160} height={160} style={{ display:"block", width:"100%", height:"auto", maxWidth:180, maxHeight:180, margin:"0 auto" }}/>;
 }
 
 // ── Main GlobalJarvisPanel ────────────────────────────────────────
@@ -212,10 +212,11 @@ export function GlobalJarvisPanel() {
   const sourceRef       = useRef<AudioBufferSourceNode | null>(null);
   const onChainTxRef    = useRef("");
   const toggleListenRef = useRef<() => void>(() => {});
-  const pendingRef   = useRef("");
-  const sendRef      = useRef<(t: string) => void>(() => {});
-  const endRef       = useRef<HTMLDivElement>(null);
-  const prevPath     = useRef(pathname);
+  const pendingRef      = useRef("");
+  const pendingSpeakRef = useRef<string | null>(null);
+  const sendRef         = useRef<(t: string) => void>(() => {});
+  const endRef          = useRef<HTMLDivElement>(null);
+  const prevPath        = useRef(pathname);
 
   const now = () => new Date().toLocaleTimeString("en-GB", { hour12: false });
 
@@ -227,15 +228,39 @@ export function GlobalJarvisPanel() {
     return () => synthRef.current?.removeEventListener("voiceschanged", load);
   }, []);
 
+  const speakRef = useRef<(t: string) => void>(() => {});
+
   const unlockAudio = useCallback(() => {
+    // Prime SpeechSynthesis (requires user gesture on mobile)
+    if (synthRef.current) {
+      const silent = new SpeechSynthesisUtterance(" ");
+      silent.volume = 0; silent.rate = 2;
+      synthRef.current.speak(silent);
+      setTimeout(() => synthRef.current?.cancel(), 50);
+    }
     if (audioCtxRef.current) {
-      if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().then(() => {
+          // Play any greeting that was queued before audio was unlocked
+          if (pendingSpeakRef.current) {
+            const t = pendingSpeakRef.current;
+            pendingSpeakRef.current = null;
+            speakRef.current(t);
+          }
+        }).catch(() => {});
+      }
       return;
     }
     const AC = window.AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
     audioCtxRef.current = new AC();
-    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume().catch(() => {});
+    audioCtxRef.current.resume().then(() => {
+      if (pendingSpeakRef.current) {
+        const t = pendingSpeakRef.current;
+        pendingSpeakRef.current = null;
+        speakRef.current(t);
+      }
+    }).catch(() => {});
   }, []);
 
   const speak = useCallback(async (text: string) => {
@@ -260,7 +285,11 @@ export function GlobalJarvisPanel() {
             audioCtxRef.current = new AC();
           }
           const ac = audioCtxRef.current;
-          if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
+          // On mobile, AudioContext may still be suspended if user hasn't interacted yet
+          if (ac.state === "suspended") {
+            pendingSpeakRef.current = text;
+            return;
+          }
           const decoded = await ac.decodeAudioData(buf.slice(0));
           const source = ac.createBufferSource();
           source.buffer = decoded;
@@ -355,6 +384,7 @@ export function GlobalJarvisPanel() {
   }, [history, ctx, address, speak]);
 
   useEffect(() => { sendRef.current = sendToAtlas; }, [sendToAtlas]);
+  useEffect(() => { speakRef.current = speak; }, [speak]);
 
   const toggleListen = useCallback(() => {
     unlockAudio();
@@ -391,8 +421,8 @@ export function GlobalJarvisPanel() {
         }}
       />
 
-      {/* Panel */}
-      <div style={{
+      {/* Panel — onClick unlocks AudioContext from user gesture */}
+      <div onClick={unlockAudio} style={{
         position:"fixed", top:0, right:0, bottom:0, zIndex:999,
         width:"min(320px, 100vw)", background:"#020c16",
         borderLeft:`1px solid ${c.p}25`,
@@ -443,14 +473,14 @@ export function GlobalJarvisPanel() {
 
         {/* Sphere — tappable to toggle mic */}
         <div
-          style={{ flexShrink:0, padding:"10px 30px 0", position:"relative", cursor: busy ? "default" : "pointer" }}
+          style={{ flexShrink:0, padding:"8px 0 0", position:"relative", cursor: busy ? "default" : "pointer", display:"flex", flexDirection:"column", alignItems:"center" }}
           onClick={() => { if (!busy) toggleListen(); }}
           title={jState==="listening" ? "Tap to stop" : "Tap to speak"}
         >
           {(jState==="listening"||jState==="speaking"||jState==="executing") && [1,2].map(i=>(
             <div key={i} style={{
-              position:"absolute", top:`${10-i*10}px`, left:`${30-i*10}px`, right:`${30-i*10}px`,
-              aspectRatio:"1", borderRadius:"50%", border:`1px solid ${c.p}`,
+              position:"absolute", top:`${-i*12}px`, left:`${-i*12}px`, right:`${-i*12}px`, bottom:`${-i*12}px`,
+              borderRadius:"50%", border:`1px solid ${c.p}`,
               pointerEvents:"none", animation:`gjPanelPulse ${0.9+i*0.4}s ease-out ${i*0.25}s infinite`,
             }}/>
           ))}
