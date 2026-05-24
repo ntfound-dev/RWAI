@@ -814,10 +814,10 @@ export default function ChatPage() {
                 <div style={{ fontFamily:"var(--font-display)", fontSize:22 }}>
                   {activeSession ? activeSession.title : "Conservative $10k plan"}
                 </div>
-                <div className="mono-sm">
+                <div className="mono-sm" style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth: isMobile ? 160 : "none" }}>
                   {activeSession
                     ? (activeSession.agents.length > 0 ? activeSession.agents.join(" · ") + " · ACTIVE" : "ATLAS · READY")
-                    : "JARVIS · VIA ATLAS · ORCHESTRATING YIELD, SHIELD, NEXUS"}
+                    : isMobile ? "VIA ATLAS · ORCHESTRATING" : "JARVIS · VIA ATLAS · ORCHESTRATING YIELD, SHIELD, NEXUS"}
                 </div>
               </div>
             </div>

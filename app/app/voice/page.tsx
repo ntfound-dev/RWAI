@@ -43,12 +43,14 @@ export default function VoicePage() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [hasSR, setHasSR]           = useState(true);
 
-  const recRef       = useRef<any>(null);
-  const interimRef   = useRef("");
-  const synthRef     = useRef<SpeechSynthesis | null>(null);
-  const audioCtxRef  = useRef<AudioContext | null>(null);
-  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
-  const onChainTxRef = useRef("");
+  const recRef          = useRef<any>(null);
+  const interimRef      = useRef("");
+  const synthRef        = useRef<SpeechSynthesis | null>(null);
+  const audioCtxRef     = useRef<AudioContext | null>(null);
+  const sourceRef       = useRef<AudioBufferSourceNode | null>(null);
+  const onChainTxRef    = useRef("");
+  const sessionStartedRef = useRef(false);
+  const toggleListenRef   = useRef<() => void>(() => {});
 
   useEffect(() => {
     fetch("/api/agents/status", { cache: "no-store" })
@@ -107,7 +109,16 @@ export default function VoicePage() {
           source.connect(ac.destination);
           sourceRef.current = source;
           if (!hasTx()) setOrbState("speaking");
-          source.onended = () => { sourceRef.current = null; if (!hasTx()) setOrbState("idle"); };
+          source.onended = () => {
+            sourceRef.current = null;
+            if (!hasTx()) {
+              setOrbState("idle");
+              // Auto-restart listening after JARVIS finishes speaking
+              if (sessionStartedRef.current) {
+                setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 900);
+              }
+            }
+          };
           source.start(0);
           return;
         }
@@ -118,7 +129,14 @@ export default function VoicePage() {
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate = 0.9; utt.pitch = 0.1;
     utt.onstart = () => { if (!hasTx()) setOrbState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setOrbState("idle"); };
+    utt.onend   = () => {
+      if (!hasTx()) {
+        setOrbState("idle");
+        if (sessionStartedRef.current) {
+          setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 900);
+        }
+      }
+    };
     synthRef.current.speak(utt);
   }, []);
 
@@ -197,6 +215,10 @@ export default function VoicePage() {
     rec.start();
   }, [orbState, unlockAudio, stopSpeaking, sendToAtlas]);
 
+  // Keep refs in sync so speak() callbacks can call current toggleListen
+  useEffect(() => { toggleListenRef.current = toggleListen; }, [toggleListen]);
+  useEffect(() => { sessionStartedRef.current = sessionStarted; }, [sessionStarted]);
+
   const s    = STATE[orbState];
   const busy = orbState === "thinking" || orbState === "executing";
 
@@ -234,8 +256,14 @@ export default function VoicePage() {
       <div className="atlas-centre">
 
         {/* Orb */}
-        <div className="atlas-orb-wrap" onClick={sessionStarted && orbState === "speaking" ? stopSpeaking : undefined}
-          style={{ cursor: orbState === "speaking" ? "pointer" : "default" }}>
+        <div className="atlas-orb-wrap"
+          onClick={
+            !sessionStarted ? startSession :
+            orbState === "speaking" ? stopSpeaking :
+            orbState === "idle" && hasSR ? toggleListen :
+            undefined
+          }
+          style={{ cursor: (!sessionStarted || orbState === "speaking" || (orbState === "idle" && hasSR)) ? "pointer" : "default" }}>
           <div className="atlas-deco-ring atlas-deco-ring-1" style={{ borderColor: `${s.color}12` }} />
           <div className="atlas-deco-ring atlas-deco-ring-2" style={{ borderColor: `${s.color}08` }} />
           {(orbState === "listening" || orbState === "speaking" || orbState === "executing") && (
@@ -263,12 +291,15 @@ export default function VoicePage() {
               <div className="atlas-tick-mark" style={{ background: deg % 90 === 0 ? s.color : `${s.color}50` }} />
             </div>
           ))}
-          {/* Tap-to-stop hint when speaking */}
+          {/* Orb tap hint */}
+          {!sessionStarted && (
+            <div style={{ position:"absolute", bottom:-28, left:"50%", transform:"translateX(-50%)", fontSize:7, color:`${s.color}80`, letterSpacing:"0.2em", whiteSpace:"nowrap" }}>TAP ORB TO START</div>
+          )}
+          {sessionStarted && orbState === "idle" && hasSR && (
+            <div style={{ position:"absolute", bottom:-28, left:"50%", transform:"translateX(-50%)", fontSize:7, color:`${s.color}80`, letterSpacing:"0.2em", whiteSpace:"nowrap", animation:"pulse-dot 1.5s ease-in-out infinite" }}>TAP ORB TO SPEAK</div>
+          )}
           {orbState === "speaking" && (
-            <div style={{
-              position:"absolute", bottom:-28, left:"50%", transform:"translateX(-50%)",
-              fontSize:7, color:`${s.color}80`, letterSpacing:"0.2em", whiteSpace:"nowrap",
-            }}>TAP ORB TO STOP</div>
+            <div style={{ position:"absolute", bottom:-28, left:"50%", transform:"translateX(-50%)", fontSize:7, color:`${s.color}80`, letterSpacing:"0.2em", whiteSpace:"nowrap" }}>TAP ORB TO STOP</div>
           )}
         </div>
 

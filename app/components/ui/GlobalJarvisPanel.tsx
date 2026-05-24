@@ -205,12 +205,13 @@ export function GlobalJarvisPanel() {
   const [history, setHistory]   = useState<{ role: string; body: string }[]>([]);
   const [onChainTx, setOnChainTx] = useState("");
 
-  const recRef       = useRef<any>(null);
-  const synthRef     = useRef<SpeechSynthesis | null>(null);
-  const voicesRef    = useRef<SpeechSynthesisVoice[]>([]);
-  const audioCtxRef  = useRef<AudioContext | null>(null);
-  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
-  const onChainTxRef = useRef("");
+  const recRef          = useRef<any>(null);
+  const synthRef        = useRef<SpeechSynthesis | null>(null);
+  const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
+  const audioCtxRef     = useRef<AudioContext | null>(null);
+  const sourceRef       = useRef<AudioBufferSourceNode | null>(null);
+  const onChainTxRef    = useRef("");
+  const toggleListenRef = useRef<() => void>(() => {});
   const pendingRef   = useRef("");
   const sendRef      = useRef<(t: string) => void>(() => {});
   const endRef       = useRef<HTMLDivElement>(null);
@@ -267,7 +268,14 @@ export function GlobalJarvisPanel() {
           source.connect(ac.destination);
           sourceRef.current = source;
           if (!hasTx()) setJState("speaking");
-          source.onended = () => { sourceRef.current = null; if (!hasTx()) setJState("idle"); };
+          source.onended = () => {
+            sourceRef.current = null;
+            if (!hasTx()) {
+              setJState("idle");
+              // Auto-restart listening after JARVIS speaks
+              setTimeout(() => toggleListenRef.current(), 700);
+            }
+          };
           source.start(0);
           return;
         }
@@ -280,7 +288,12 @@ export function GlobalJarvisPanel() {
     utt.rate = 0.9;
     utt.pitch = 0.1;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
-    utt.onend   = () => { if (!hasTx()) setJState("idle"); };
+    utt.onend   = () => {
+      if (!hasTx()) {
+        setJState("idle");
+        setTimeout(() => toggleListenRef.current(), 700);
+      }
+    };
     synthRef.current.speak(utt);
   }, []);
 
@@ -342,6 +355,7 @@ export function GlobalJarvisPanel() {
   }, [history, ctx, address, speak]);
 
   useEffect(() => { sendRef.current = sendToAtlas; }, [sendToAtlas]);
+  useEffect(() => { toggleListenRef.current = toggleListen; }, [toggleListen]);
 
   const toggleListen = useCallback(() => {
     unlockAudio();
@@ -427,8 +441,12 @@ export function GlobalJarvisPanel() {
           </div>
         )}
 
-        {/* Sphere */}
-        <div style={{ flexShrink:0, padding:"10px 30px 0", position:"relative" }}>
+        {/* Sphere — tappable to toggle mic */}
+        <div
+          style={{ flexShrink:0, padding:"10px 30px 0", position:"relative", cursor: busy ? "default" : "pointer" }}
+          onClick={() => { if (!busy) toggleListen(); }}
+          title={jState==="listening" ? "Tap to stop" : "Tap to speak"}
+        >
           {(jState==="listening"||jState==="speaking"||jState==="executing") && [1,2].map(i=>(
             <div key={i} style={{
               position:"absolute", top:`${10-i*10}px`, left:`${30-i*10}px`, right:`${30-i*10}px`,
@@ -440,12 +458,12 @@ export function GlobalJarvisPanel() {
         </div>
 
         {/* Status hint */}
-        <div style={{ textAlign:"center", fontSize:7, color:`${c.p}40`, letterSpacing:"0.1em", padding:"4px 0 6px", flexShrink:0 }}>
-          {jState==="listening" ? "LISTENING — CLICK TO STOP"
+        <div style={{ textAlign:"center", fontSize:7, color:`${c.p}${jState==="idle"?"90":"40"}`, letterSpacing:"0.1em", padding:"4px 0 6px", flexShrink:0, animation: jState==="idle" ? "gjPulse 2s ease-in-out infinite" : "none" }}>
+          {jState==="listening" ? "LISTENING — TAP ORB TO STOP"
            : jState==="thinking" ? "ATLAS PROCESSING…"
-           : jState==="speaking" ? "SPEAKING…"
+           : jState==="speaking" ? "SPEAKING — TAP TO INTERRUPT"
            : jState==="executing" ? "EXECUTING ON MANTLE…"
-           : "CLICK MIC · OR TYPE BELOW"}
+           : "TAP ORB TO SPEAK"}
         </div>
 
         {/* Conversation log */}
