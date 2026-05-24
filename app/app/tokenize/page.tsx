@@ -161,19 +161,19 @@ export default function TokenizePage() {
   const stepIdx = STEPS.indexOf(step);
 
   return (
-    <div style={{ maxWidth:1280, margin:"0 auto", padding:"32px", display:"grid", gridTemplateColumns:"1fr 360px", gap:24, alignItems:"start" }}>
+    <div className="tok-grid">
 
       {/* Left: main flow */}
       <div>
         {/* Header */}
         <div style={{ marginBottom:24 }}>
           <div className="mono" style={{ color:"var(--accent)", marginBottom:8 }}>§ tokenize · path A</div>
-          <h1 className="display" style={{ fontSize:56, marginBottom:8 }}>Tokenize your asset.</h1>
+          <h1 className="display tok-h1">Tokenize your asset.</h1>
           <p style={{ color:"var(--fg-1)", fontSize:14 }}>Upload documents. Nexus analyzes. Shield reviews. Deploy ERC-20 on Mantle.</p>
         </div>
 
         {/* Step tracker */}
-        <div style={{ display:"flex", alignItems:"center", gap:0, marginBottom:32, border:"1px solid var(--line)" }}>
+        <div className="tok-steps">
           {STEPS.map((s, i) => {
             const done = i < stepIdx;
             const active = s === step;
@@ -272,7 +272,7 @@ export default function TokenizePage() {
         {/* Review step */}
         {step === "review" && nexusResult && shieldResult && (
           <div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20 }}>
+            <div className="tok-review-2">
               {/* Nexus result */}
               <div className="panel">
                 <div className="panel-header">
@@ -474,7 +474,7 @@ export default function TokenizePage() {
       </div>
 
       {/* Right: agent log panel */}
-      <div className="panel" style={{ position:"sticky", top:72 }}>
+      <div className="panel tok-sidebar">
         <div className="panel-header">
           <span className="mono">Agent trace log</span>
           <span className="live-dot"/>

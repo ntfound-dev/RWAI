@@ -841,6 +841,13 @@ html, body {
 .mobile-stack   { display: contents; }
 .mobile-hide    { display: block; }
 
+/* ── Tokenize page layout ────────────────────────────────────────── */
+.tok-grid     { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; max-width: 1280px; margin: 0 auto; padding: 32px; }
+.tok-h1       { font-size: 56px; margin-bottom: 8px; }
+.tok-steps    { display: flex; align-items: center; gap: 0; margin-bottom: 32px; border: 1px solid var(--line); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tok-review-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.tok-sidebar  { position: sticky; top: 72px; }
+
 /* ── Page wrapper ────────────────────────────────────────────────── */
 .rp-page-wrap {
   box-sizing: border-box;
@@ -883,4 +890,14 @@ html, body {
   .topbar-right > span { display: none; }
   .topbar { padding: 8px 12px; gap: 6px; }
   .topbar-nav button { font-size: 9px; padding: 4px 6px; }
+  /* Tokenize responsive */
+  .tok-grid     { grid-template-columns: 1fr !important; padding: 16px 14px !important; }
+  .tok-h1       { font-size: 30px !important; line-height: 1.1 !important; }
+  .tok-steps > div { min-width: 54px !important; flex: 0 0 54px !important; padding: 8px 6px !important; }
+  .tok-review-2 { grid-template-columns: 1fr !important; }
+  .tok-sidebar  { display: none !important; }
+  /* TopBar: shrink right-side action buttons on narrow screens */
+  .topbar-jarvis-pill { font-size: 8px !important; padding: 3px 7px !important; }
+  .topbar-jarvis-pill > span:first-child { width: 4px !important; height: 4px !important; }
+  .topbar-wrong-net { font-size: 8px !important; padding: 3px 7px !important; letter-spacing: 0.04em !important; }
 }

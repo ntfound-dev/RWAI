@@ -82,6 +82,7 @@ export function TopBar() {
         {/* JARVIS pill — hidden on home, /chat (has own JARVIS), /voice (IS JARVIS) */}
         {!onHome && !onChat && !onVoice && (
           <button
+            className="topbar-jarvis-pill"
             onClick={toggleJarvis}
             style={{
               display:"flex", alignItems:"center", gap:5,
@@ -116,7 +117,7 @@ export function TopBar() {
             );
             if (chain?.unsupported) return (
               <button
-                className="btn btn-sm"
+                className="btn btn-sm topbar-wrong-net"
                 style={{ color:"var(--error,#f87171)", borderColor:"rgba(248,113,113,0.4)", animation: isSwitching ? "none" : "wrongNetPulse 1.2s ease-in-out infinite" }}
                 onClick={() => switchChain({ chainId: mantleTestnet.id })}
               >
