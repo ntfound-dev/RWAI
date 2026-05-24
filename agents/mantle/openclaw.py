@@ -92,10 +92,10 @@ async def run_skill(agent_id: str, user_prompt: str) -> Optional[str]:
             if result.success and result.text:
                 log.info("OpenClaw skill '%s' succeeded", skill_name)
                 return result.text
-            log.warning("OpenClaw skill '%s' failed: %s", skill_name, result.error)
+            log.info("OpenClaw skill '%s' unavailable: %s", skill_name, result.error)
             return None
     except Exception as e:
-        log.warning("OpenClaw run_skill error: %s", e)
+        log.info("OpenClaw run_skill unavailable: %s", e)
         return None
 
 
