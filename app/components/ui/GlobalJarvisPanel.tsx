@@ -265,10 +265,29 @@ export function GlobalJarvisPanel() {
 
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
-    // Stop previous audio to prevent double playback
     try { sourceRef.current?.stop(); } catch {}
     sourceRef.current = null;
     synthRef.current?.cancel();
+
+    // Ensure AudioContext exists
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (AC && (!audioCtxRef.current || audioCtxRef.current.state === "closed")) {
+      audioCtxRef.current = new AC();
+    }
+    const ac = audioCtxRef.current;
+
+    // If AC still suspended (no user gesture yet), queue text and wait for unlock tap
+    if (ac && ac.state === "suspended") {
+      pendingSpeakRef.current = text;
+      return;
+    }
+
+    const onEnd = () => {
+      if (!hasTx()) {
+        setJState("idle");
+        setTimeout(() => toggleListenRef.current(), 700);
+      }
+    };
 
     // Primary: backend TTS via Web Audio API
     try {
@@ -279,50 +298,29 @@ export function GlobalJarvisPanel() {
       });
       if (res.ok) {
         const buf = await res.arrayBuffer();
-        if (buf.byteLength > 100) {
-          const AC = window.AudioContext || (window as any).webkitAudioContext;
-          if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-            audioCtxRef.current = new AC();
-          }
-          const ac = audioCtxRef.current;
-          // On mobile, AudioContext may still be suspended if user hasn't interacted yet
-          if (ac.state === "suspended") {
-            pendingSpeakRef.current = text;
-            return;
-          }
+        if (buf.byteLength > 100 && ac) {
+          // Resume in case AC was suspended during async fetch gap (iOS)
+          if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
           const decoded = await ac.decodeAudioData(buf.slice(0));
           const source = ac.createBufferSource();
           source.buffer = decoded;
-          source.playbackRate.value = 0.82; // lower pitch → masculine voice
+          source.playbackRate.value = 0.82;
           source.connect(ac.destination);
           sourceRef.current = source;
           if (!hasTx()) setJState("speaking");
-          source.onended = () => {
-            sourceRef.current = null;
-            if (!hasTx()) {
-              setJState("idle");
-              // Auto-restart listening after JARVIS speaks
-              setTimeout(() => toggleListenRef.current(), 700);
-            }
-          };
+          source.onended = () => { sourceRef.current = null; onEnd(); };
           source.start(0);
           return;
         }
       }
     } catch { /* fall through to browser TTS */ }
 
-    // Fallback: browser TTS — pitch 0.1 forces deep robotic voice (not female)
+    // Fallback: browser SpeechSynthesis (unlockAudio() must have primed it first)
     if (!synthRef.current) return;
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9;
-    utt.pitch = 0.1;
+    utt.rate = 0.9; utt.pitch = 0.1;
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
-    utt.onend   = () => {
-      if (!hasTx()) {
-        setJState("idle");
-        setTimeout(() => toggleListenRef.current(), 700);
-      }
-    };
+    utt.onend   = onEnd;
     synthRef.current.speak(utt);
   }, []);
 
