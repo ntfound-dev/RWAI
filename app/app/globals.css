@@ -841,6 +841,11 @@ html, body {
 .mobile-stack   { display: contents; }
 .mobile-hide    { display: block; }
 
+/* ── Portfolio page layout ───────────────────────────────────────── */
+.pf-stats-4   { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
+.pf-plans-3   { display: grid; grid-template-columns: repeat(3,1fr); gap: 0; }
+.pf-consent-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+
 /* ── Tokenize page layout ────────────────────────────────────────── */
 .tok-grid     { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; max-width: 1280px; margin: 0 auto; padding: 32px; }
 .tok-h1       { font-size: 56px; margin-bottom: 8px; }
@@ -890,6 +895,15 @@ html, body {
   .topbar-right > span { display: none; }
   .topbar { padding: 8px 12px; gap: 6px; }
   .topbar-nav button { font-size: 9px; padding: 4px 6px; }
+  /* Portfolio responsive */
+  .pf-stats-4 { grid-template-columns: repeat(2,1fr) !important; }
+  .pf-stats-4 > div:nth-child(2) { border-right: none !important; }
+  .pf-stats-4 > div:nth-child(1),
+  .pf-stats-4 > div:nth-child(2) { border-bottom: 1px solid var(--line) !important; }
+  .pf-plans-3 { grid-template-columns: 1fr !important; }
+  .pf-plans-3 > div { border-right: none !important; border-bottom: 1px solid var(--line) !important; }
+  .pf-plans-3 > div:last-child { border-bottom: none !important; }
+  .pf-consent-3 { grid-template-columns: 1fr !important; }
   /* Tokenize responsive */
   .tok-grid     { grid-template-columns: 1fr !important; padding: 16px 14px !important; }
   .tok-h1       { font-size: 30px !important; line-height: 1.1 !important; }

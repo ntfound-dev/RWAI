@@ -293,7 +293,7 @@ export default function PortfolioPage() {
           : allocations.reduce((s, a) => s + (a.pct / 100) * a.apy, 0);
         const isDemo  = !isConnected;
         return (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, border:`1px solid ${isDemo ? "rgba(245,158,11,0.4)" : "var(--line)"}`, marginBottom:24, position:"relative" }}>
+          <div className="pf-stats-4" style={{ border:`1px solid ${isDemo ? "rgba(245,158,11,0.4)" : "var(--line)"}`, marginBottom:24, position:"relative" }}>
             {isDemo && (
               <div style={{ position:"absolute", top:-10, left:16, background:"rgba(245,158,11,0.15)", border:"1px solid rgba(245,158,11,0.4)", borderRadius:2, padding:"1px 8px", zIndex:1 }}>
                 <span style={{ fontFamily:"var(--font-mono)", fontSize:9, color:"#fbbf24", letterSpacing:"0.1em" }}>DEMO — connect wallet to see real balance</span>
@@ -332,7 +332,7 @@ export default function PortfolioPage() {
             {planBusy && <span className="mono-sm" style={{ color:"var(--atlas)" }}>Writing to chain…</span>}
           </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:0 }}>
+        <div className="pf-plans-3">
           {PLANS.map((plan, i) => {
             const blended = plan.allocations.reduce((s,a) => s + (a.pct/100)*((apyMap[a.symbol] ?? ASSET_META[a.symbol]?.apy) ?? 0), 0);
             const active = selectedPlan === plan.id;
@@ -457,7 +457,7 @@ export default function PortfolioPage() {
             </div>
           ) : (
             <>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
+              <div className="pf-consent-3">
                 <label style={{ display:"grid", gap:6 }}>
                   <span className="mono-sm">USDY allowance</span>
                   <input className="input-field" value={autonomyAmount} onChange={e => setAutonomyAmount(e.target.value.replace(/[^\d.]/g, ""))}/>
