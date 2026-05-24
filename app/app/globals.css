@@ -761,6 +761,18 @@ html, body {
 }
 @keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
 @keyframes wrongNetPulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(248,113,113,0.4);}50%{opacity:0.7;box-shadow:0 0 0 4px rgba(248,113,113,0);} }
+/* Chat history item delete button */
+.chat-hist-item .chat-hist-del { display:none; }
+.chat-hist-item:hover .chat-hist-del { display:flex; }
+.chat-hist-del {
+  position:absolute; top:50%; right:8px; transform:translateY(-50%);
+  align-items:center; justify-content:center;
+  width:18px; height:18px; border-radius:2px;
+  background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3);
+  color:rgba(239,68,68,0.7); font-size:9px; cursor:pointer; line-height:1;
+  transition:all 0.15s;
+}
+.chat-hist-del:hover { background:rgba(239,68,68,0.25); color:#f87171; }
 .voice-log {
   position: absolute;
   right: 28px;

@@ -516,6 +516,7 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sideTab, setSideTab] = useState<"CHAT"|"SYSTEM">("CHAT");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { connected: wsConnected, heartbeat } = useAgentSocket();
   const { apyMap } = useYieldOracle();
@@ -564,6 +565,16 @@ export default function ChatPage() {
     const sess: ChatSession = { id, title: "New conversation", agents: [], messages: [], createdAt: Date.now(), updatedAt: Date.now() };
     setSessions(prev => { const u = [sess, ...prev]; saveSessions(u); return u; });
     setActiveId(id);
+  }, []);
+
+  const deleteSession = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSessions(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      saveSessions(updated);
+      return updated;
+    });
+    setActiveId(prev => prev === id ? null : prev);
   }, []);
 
   const send = useCallback(async (text?: string) => {
@@ -652,11 +663,11 @@ export default function ChatPage() {
         }}>
           {/* CHAT / SYSTEM tabs */}
           <div style={{ display:"flex", borderBottom:"1px solid var(--line)", flexShrink:0 }}>
-            {["CHAT","SYSTEM"].map(tab => (
-              <button key={tab} style={{
+            {(["CHAT","SYSTEM"] as const).map(tab => (
+              <button key={tab} onClick={() => setSideTab(tab)} style={{
                 flex:1, padding:"10px 0", background:"transparent", border:"none",
-                borderBottom: tab === "CHAT" ? "2px solid var(--accent)" : "2px solid transparent",
-                color: tab === "CHAT" ? "var(--accent)" : "var(--fg-3)",
+                borderBottom: sideTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
+                color: sideTab === tab ? "var(--accent)" : "var(--fg-3)",
                 fontFamily:"var(--font-mono)", fontSize:10, letterSpacing:"0.1em",
                 cursor:"pointer",
               }}>{tab}</button>
@@ -665,6 +676,9 @@ export default function ChatPage() {
               <button onClick={() => setShowSidebar(false)} style={{ padding:"10px 14px", background:"transparent", border:"none", color:"var(--fg-3)", cursor:"pointer", fontSize:16 }}>✕</button>
             )}
           </div>
+
+          {/* ── CHAT tab ── */}
+          {sideTab === "CHAT" && (<>
           <div style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
             <div className="mono-sm" style={{ color:"var(--fg-3)" }}>YOUR CONVERSATIONS WITH AGENTS</div>
             <button className="btn btn-sm" onClick={newConversation}>+ NEW</button>
@@ -678,18 +692,104 @@ export default function ChatPage() {
             ) : (
               sessions.map(s => (
                 <div key={s.id} onClick={() => setActiveId(s.id)}
-                  style={{ padding:"10px 14px", borderBottom:"1px solid var(--line)", borderLeft: s.id === activeId ? "2px solid var(--accent)" : "2px solid transparent", background: s.id === activeId ? "var(--bg-2)" : "transparent", cursor:"pointer" }}>
-                  <div style={{ fontSize:12, fontWeight:500, color:"var(--fg-0)", marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.title}</div>
+                  style={{ position:"relative", padding:"10px 14px", borderBottom:"1px solid var(--line)", borderLeft: s.id === activeId ? "2px solid var(--accent)" : "2px solid transparent", background: s.id === activeId ? "var(--bg-2)" : "transparent", cursor:"pointer" }}
+                  className="chat-hist-item"
+                >
+                  <div style={{ fontSize:12, fontWeight:500, color:"var(--fg-0)", marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:20 }}>{s.title}</div>
                   <div style={{ display:"flex", justifyContent:"space-between" }}>
                     <span className="mono-sm" style={{ color: s.id === activeId ? "var(--accent)" : "var(--fg-3)", textTransform:"uppercase" }}>
                       {s.agents.length > 0 ? s.agents.join(" + ") : "ATLAS"}
                     </span>
                     <span className="mono-sm">{relTime(s.updatedAt)}</span>
                   </div>
+                  <button
+                    className="chat-hist-del"
+                    onClick={e => deleteSession(s.id, e)}
+                    title="Delete conversation"
+                  >✕</button>
                 </div>
               ))
             )}
           </div>
+          </>)}
+
+          {/* ── SYSTEM tab ── */}
+          {sideTab === "SYSTEM" && (
+          <div style={{ flex:1, overflow:"auto", padding:"12px 14px", display:"flex", flexDirection:"column", gap:12 }}>
+            {/* Backend */}
+            <div>
+              <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>BACKEND</div>
+              {[
+                ["API",    process.env.NEXT_PUBLIC_AGENT_API_URL ?? "/api/agents"],
+                ["STATUS", wsConnected ? "CONNECTED" : "OFFLINE"],
+              ].map(([k,v]) => (
+                <div key={k} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{k}</span>
+                  <span className="mono-sm" style={{ color: k === "STATUS" ? (wsConnected ? "var(--accent)" : "var(--warn)") : "var(--fg-1)", maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", textAlign:"right" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {/* Chain */}
+            <div style={{ borderTop:"1px solid var(--line)", paddingTop:10 }}>
+              <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>CHAIN</div>
+              {[
+                ["NETWORK", "Mantle Sepolia"],
+                ["CHAIN ID", "5003"],
+                ["RPC",      "rpc.sepolia.mantle.xyz"],
+              ].map(([k,v]) => (
+                <div key={k} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span className="mono-sm" style={{ color:"var(--fg-3)" }}>{k}</span>
+                  <span className="mono-sm" style={{ color:"var(--fg-1)" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {/* Agents */}
+            <div style={{ borderTop:"1px solid var(--line)", paddingTop:10 }}>
+              <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>ERC-8004 AGENTS</div>
+              {[
+                { id:"atlas",  nft:"#44", color:"var(--atlas)" },
+                { id:"nexus",  nft:"#41", color:"var(--nexus)" },
+                { id:"shield", nft:"#42", color:"var(--shield)" },
+                { id:"yield",  nft:"#43", color:"var(--yield,#f59e0b)" },
+              ].map(a => (
+                <div key={a.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ width:5, height:5, borderRadius:"50%", background:a.color, display:"inline-block", boxShadow:`0 0 4px ${a.color}` }}/>
+                    <span className="mono-sm" style={{ color:"var(--fg-1)", textTransform:"uppercase" }}>{a.id}</span>
+                  </div>
+                  <span className="mono-sm" style={{ color:a.color }}>{a.nft} · ONLINE</span>
+                </div>
+              ))}
+            </div>
+            {/* Live APY */}
+            <div style={{ borderTop:"1px solid var(--line)", paddingTop:10 }}>
+              <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>LIVE APY · YIELDORACLE.SOL</div>
+              {Object.entries(apyMap).length > 0
+                ? Object.entries(apyMap).map(([sym, apy]) => (
+                    <div key={sym} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                      <span className="mono-sm" style={{ color:"var(--fg-2)" }}>{sym}</span>
+                      <span className="mono-sm" style={{ color:"var(--accent)" }}>{(apy as number).toFixed(2)}%</span>
+                    </div>
+                  ))
+                : <span className="mono-sm" style={{ color:"var(--fg-3)" }}>Awaiting oracle…</span>
+              }
+            </div>
+            {/* Sessions */}
+            <div style={{ borderTop:"1px solid var(--line)", paddingTop:10 }}>
+              <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>LOCAL STORAGE</div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span className="mono-sm" style={{ color:"var(--fg-3)" }}>SESSIONS</span>
+                <span className="mono-sm" style={{ color:"var(--fg-1)" }}>{sessions.length} / {MAX_SESSIONS}</span>
+              </div>
+              {sessions.length > 0 && (
+                <button className="btn btn-sm" style={{ marginTop:4, fontSize:9, color:"var(--warn)", borderColor:"rgba(245,158,11,0.3)", width:"100%" }}
+                  onClick={() => { setSessions([]); saveSessions([]); setActiveId(null); }}>
+                  CLEAR ALL HISTORY
+                </button>
+              )}
+            </div>
+          </div>
+          )}
           <div style={{ padding:14, borderTop:"1px solid var(--line)", flexShrink:0 }}>
             <div className="mono-sm" style={{ marginBottom:8 }}>CONNECTED AGENTS</div>
             <div style={{ display:"flex", gap:6 }}>
