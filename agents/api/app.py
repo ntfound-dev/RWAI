@@ -2,6 +2,7 @@
 RWAi Agent API — FastAPI backend
 """
 import os
+import sys
 import time
 import asyncio
 import secrets
@@ -10,6 +11,16 @@ from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
+
+# Railway classifies stderr→error, stdout→info regardless of log level.
+# Route all logs to stdout so Railway shows correct severity.
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
+    datefmt="%m/%d/%y %H:%M:%S",
+    force=True,
+)
 
 # Railway tags WebSocket access log lines as severity:error regardless of log level.
 # Suppress them entirely — connection lifecycle adds no diagnostic value.
