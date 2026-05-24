@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useChainId, useSwitchChain } from "wagmi";
 import { useChatMode, type ChatMode } from "@/lib/chat-mode-context";
+import { mantleTestnet } from "@/lib/wagmi";
 
 const NAV = [
   { href: "/",          label: "Home" },
@@ -21,6 +24,16 @@ export function TopBar() {
   const onChat  = pathname === "/chat";
   const onHome  = pathname === "/";
   const onVoice = pathname === "/voice";
+
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
+
+  // Auto-switch to Mantle Sepolia when wrong network detected
+  useEffect(() => {
+    if (chainId && chainId !== mantleTestnet.id) {
+      switchChain({ chainId: mantleTestnet.id });
+    }
+  }, [chainId]); // eslint-disable-line
 
   return (
     <header className="topbar">
@@ -102,8 +115,12 @@ export function TopBar() {
               <button className="btn btn-sm btn-primary" onClick={openConnectModal}>Connect</button>
             );
             if (chain?.unsupported) return (
-              <button className="btn btn-sm" style={{ color:"var(--error,#f87171)", borderColor:"rgba(248,113,113,0.4)" }} onClick={openChainModal}>
-                Wrong Network
+              <button
+                className="btn btn-sm"
+                style={{ color:"var(--error,#f87171)", borderColor:"rgba(248,113,113,0.4)", animation: isSwitching ? "none" : "wrongNetPulse 1.2s ease-in-out infinite" }}
+                onClick={() => switchChain({ chainId: mantleTestnet.id })}
+              >
+                {isSwitching ? "SWITCHING…" : "⚠ SWITCH TO MANTLE"}
               </button>
             );
             return (
