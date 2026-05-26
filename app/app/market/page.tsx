@@ -176,7 +176,7 @@ export default function MarketPage() {
     : 0;
 
   return (
-    <div style={{ maxWidth:1480, margin:"0 auto", padding:"32px" }}>
+    <div className="app-page">
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:24 }}>

@@ -58,7 +58,7 @@ export default function HubPage() {
   }, [selected]);
 
   return (
-    <div style={{ maxWidth:1480, margin:"0 auto", padding:"32px" }}>
+    <div className="app-page">
       <div style={{ marginBottom:32 }}>
         <div className="mono" style={{ color:"var(--accent)", marginBottom:8 }}>§ agent hub · ERC-8004 registered</div>
         <h1 className="display" style={{ fontSize:64 }}>Four sovereign agents. <span style={{ fontStyle:"italic", color:"var(--fg-2)" }}>One platform.</span></h1>

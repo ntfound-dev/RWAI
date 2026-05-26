@@ -272,7 +272,7 @@ export default function PortfolioPage() {
   };
 
   return (
-    <div style={{ maxWidth:1480, margin:"0 auto", padding:"32px" }}>
+    <div className="app-page">
       <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:32 }}>
         <div>
           <div className="mono" style={{ color:"var(--accent)", marginBottom:8 }}>§ portfolio · atlas managed</div>
