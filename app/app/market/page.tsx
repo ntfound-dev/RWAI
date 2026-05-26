@@ -25,6 +25,17 @@ interface Listing {
   _source: string;
 }
 
+interface MarketHolding {
+  owner: string;
+  token_address: string;
+  token_symbol: string;
+  token_name: string;
+  balance_tokens: number;
+  price_usd: number;
+  updated_ts: number;
+  last_tx_hash?: string;
+}
+
 const TYPE_COLOR: Record<string, string> = {
   real_estate:    "var(--nexus)",
   bond:           "var(--accent)",
@@ -67,6 +78,7 @@ export default function MarketPage() {
   const [sellError, setSellError] = useState<Record<string, string>>({});
   const [buyStatus, setBuyStatus] = useState<Record<string, string>>({});
   const [sellStatus, setSellStatus] = useState<Record<string, string>>({});
+  const [holdings, setHoldings] = useState<MarketHolding[]>([]);
 
   useEffect(() => {
     agentApi<{ listings: Listing[] }>("/market/listings")
@@ -76,6 +88,18 @@ export default function MarketPage() {
   }, []);
 
   const listingKey = (l: Listing) => `${l.token_symbol}-${l.ts}`;
+  const holdingKey = (tokenAddress: string, symbol: string) => `${tokenAddress.toLowerCase()}:${symbol.toUpperCase()}`;
+
+  const refreshHoldings = (owner: string) => {
+    agentApi<{ holdings: MarketHolding[] }>(`/market/holdings?owner=${owner}`)
+      .then(d => setHoldings(d.holdings ?? []))
+      .catch(() => setHoldings([]));
+  };
+
+  useEffect(() => {
+    if (address) refreshHoldings(address);
+    else setHoldings([]);
+  }, [address]);
 
   const executeBuy = async (listing: Listing) => {
     if (!address || !isConnected) return;
@@ -86,7 +110,7 @@ export default function MarketPage() {
     setBuyError(s => ({ ...s, [key]: "" }));
     setBuyTx(s => ({ ...s, [key]: "" }));
     try {
-      const d = await agentApi<{ success: boolean; onChainTx: string; tokens: number; reasoning: string }>("/market/buy", {
+      const d = await agentApi<{ success: boolean; onChainTx: string; tokens: number; reasoning: string; position?: MarketHolding }>("/market/buy", {
         method: "POST",
         body: JSON.stringify({
           buyer_address:   address,
@@ -104,6 +128,7 @@ export default function MarketPage() {
       } else {
         setBuyStatus(s => ({ ...s, [key]: "Order logged. Waiting for on-chain confirmation." }));
       }
+      if (address) refreshHoldings(address);
     } catch (err) {
       setBuyError(s => ({ ...s, [key]: err instanceof Error ? err.message : "Buy failed." }));
       setBuyStatus(s => ({ ...s, [key]: "" }));
@@ -119,7 +144,7 @@ export default function MarketPage() {
     setSellError(s => ({ ...s, [key]: "" }));
     setSellTx(s => ({ ...s, [key]: "" }));
     try {
-      const d = await agentApi<{ success: boolean; onChainTx: string; usd_value: number; reasoning: string }>("/market/sell", {
+      const d = await agentApi<{ success: boolean; onChainTx: string; usd_value: number; reasoning: string; position?: MarketHolding }>("/market/sell", {
         method: "POST",
         body: JSON.stringify({
           seller_address:  address,
@@ -137,6 +162,7 @@ export default function MarketPage() {
       } else {
         setSellStatus(s => ({ ...s, [key]: "Sell logged. Waiting for on-chain confirmation." }));
       }
+      if (address) refreshHoldings(address);
     } catch (err) {
       setSellError(s => ({ ...s, [key]: err instanceof Error ? err.message : "Sell failed." }));
       setSellStatus(s => ({ ...s, [key]: "" }));
@@ -236,6 +262,9 @@ export default function MarketPage() {
           {listings.map(listing => {
             const key = listingKey(listing);
             const isOwner = listing.owner?.toLowerCase() === address?.toLowerCase() && listing.owner !== "unknown";
+            const holding = holdings.find(h => holdingKey(h.token_address, h.token_symbol) === holdingKey(listing.token_address, listing.token_symbol));
+            const holdingBalance = holding?.balance_tokens ?? 0;
+            const canSell = isOwner || holdingBalance > 0;
             const color = TYPE_COLOR[listing.asset_type] ?? "var(--fg-2)";
             const symbol = listing.token_symbol || "RWA";
             const name = listing.token_name || listing.asset_type?.replace(/_/g," ") || "Real World Asset";
@@ -269,8 +298,10 @@ export default function MarketPage() {
                       <span className="tag" style={{ fontSize:9, color, borderColor:`${color}44` }}>
                         {listing.asset_type.replace(/_/g," ")}
                       </span>
-                      {isOwner && (
-                        <div className="mono-sm" style={{ color:"var(--nexus)", marginTop:4 }}>Your listing</div>
+                      {canSell && (
+                        <div className="mono-sm" style={{ color:"var(--nexus)", marginTop:4 }}>
+                          {isOwner ? "Your listing" : `${holdingBalance.toLocaleString(undefined,{maximumFractionDigits:2})} owned`}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -317,7 +348,7 @@ export default function MarketPage() {
 
                 {/* Buy panel */}
                 <div style={{ padding:"14px 16px", marginTop:"auto" }}>
-                  {isOwner ? (
+                  {canSell ? (
                     selling === key ? (
                       <div>
                         <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8, marginBottom:8, alignItems:"end" }}>
@@ -338,6 +369,11 @@ export default function MarketPage() {
                             = ${((parseFloat(sellAmount)||0) * listing.price_usd).toLocaleString(undefined,{maximumFractionDigits:2})} USD
                           </div>
                         )}
+                        {!isOwner && holdingBalance > 0 && (
+                          <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>
+                            Available: {holdingBalance.toLocaleString(undefined,{maximumFractionDigits:4})} {symbol}
+                          </div>
+                        )}
                         {sellStatus[key] && !sellTx[key] && (
                           <div className="mono-sm" style={{ color:"var(--warn)", marginBottom:8, textTransform:"none", letterSpacing:0 }}>{sellStatus[key]}</div>
                         )}
@@ -353,7 +389,7 @@ export default function MarketPage() {
                           </div>
                         ) : (
                           <div style={{ display:"flex", gap:8 }}>
-                            <button className="btn btn-primary" style={{ flex:1, fontSize:11, background:"var(--warn)", borderColor:"var(--warn)" }} onClick={() => executeSell(listing)} disabled={!(parseFloat(sellAmount) > 0)}>
+                            <button className="btn btn-primary" style={{ flex:1, fontSize:11, background:"var(--warn)", borderColor:"var(--warn)" }} onClick={() => executeSell(listing)} disabled={!(parseFloat(sellAmount) > 0) || (!isOwner && parseFloat(sellAmount) > holdingBalance)}>
                               Confirm sell →
                             </button>
                             <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={() => setSelling(null)}>Cancel</button>
@@ -363,7 +399,12 @@ export default function MarketPage() {
                     ) : (
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <div>
-                          <div className="mono-sm" style={{ color:"var(--nexus)", marginBottom:2 }}>Your listing</div>
+                          <div className="mono-sm" style={{ color:"var(--nexus)", marginBottom:2 }}>{isOwner ? "Your listing" : "Your holding"}</div>
+                          {!isOwner && holdingBalance > 0 && (
+                            <div className="mono-sm" style={{ color:"var(--fg-3)", textTransform:"none", letterSpacing:0 }}>
+                              Holding {holdingBalance.toLocaleString(undefined,{maximumFractionDigits:4})} {symbol}
+                            </div>
+                          )}
                           {sellTx[key] && (
                             <div className="mono-sm" style={{ color:"var(--accent)", textTransform:"none", letterSpacing:0 }}>{sellStatus[key]}</div>
                           )}
@@ -371,7 +412,7 @@ export default function MarketPage() {
                         <button
                           className="btn btn-ghost"
                           style={{ fontSize:11, borderColor:"var(--warn)", color:"var(--warn)" }}
-                          onClick={() => { setSelling(key); setSellAmount("500"); }}
+                          onClick={() => { setSelling(key); setSellAmount(isOwner ? "500" : String(Math.min(holdingBalance, 500))); }}
                           disabled={!isConnected}
                         >
                           Sell →

@@ -22,6 +22,8 @@ def _load() -> dict:
                 data = json.load(f)
                 if "user_tokenizations" not in data:
                     data["user_tokenizations"] = []
+                if "market_positions" not in data:
+                    data["market_positions"] = {}
                 return data
         except Exception:
             pass
@@ -30,6 +32,7 @@ def _load() -> dict:
         "assets": {},           # asset_id -> asset dict (from chain indexer)
         "agent_actions": {},    # action_id -> action dict
         "user_tokenizations": [],  # user-initiated tokenizations (off-chain metadata)
+        "market_positions": {}, # wallet+token+symbol -> market holding
         "tvl_snapshots": [],
         "yield_snapshots": [],
     }
@@ -244,6 +247,48 @@ def get_listings(limit: int = 100) -> list:
         data = _load()
     listings = sorted(data.get("user_tokenizations", []), key=lambda a: a.get("ts", 0), reverse=True)
     return listings[:limit]
+
+
+def _position_key(owner: str, token_address: str, token_symbol: str) -> str:
+    symbol = (token_symbol or "").upper()
+    return f"{(owner or '').lower()}:{(token_address or '').lower()}:{symbol}"
+
+
+def record_market_trade(owner: str, token_address: str, token_symbol: str, token_name: str,
+                        delta_tokens: float, price_usd: float, tx_hash: str = "") -> dict:
+    """Update a buyer/seller market holding after an app-level market trade."""
+    with _lock:
+        data = _load()
+        positions = data.setdefault("market_positions", {})
+        key = _position_key(owner, token_address, token_symbol)
+        existing = positions.get(key, {})
+        balance = float(existing.get("balance_tokens", 0)) + float(delta_tokens or 0)
+        entry = {
+            "owner":          owner,
+            "token_address":  token_address,
+            "token_symbol":   token_symbol,
+            "token_name":     token_name,
+            "balance_tokens": max(balance, 0),
+            "price_usd":      float(price_usd or existing.get("price_usd", 0) or 0),
+            "updated_ts":     int(time.time()),
+            "last_tx_hash":   tx_hash or existing.get("last_tx_hash", ""),
+        }
+        if entry["balance_tokens"] <= 0:
+            positions.pop(key, None)
+        else:
+            positions[key] = entry
+        _save(data)
+        return entry
+
+
+def get_market_positions(owner: str = None) -> list:
+    with _lock:
+        data = _load()
+    positions = list(data.get("market_positions", {}).values())
+    if owner:
+        owner_lc = owner.lower()
+        positions = [p for p in positions if (p.get("owner") or "").lower() == owner_lc]
+    return sorted(positions, key=lambda p: p.get("updated_ts", 0), reverse=True)
 
 
 def get_assets(limit: int = 50, owner: str = None) -> list:
