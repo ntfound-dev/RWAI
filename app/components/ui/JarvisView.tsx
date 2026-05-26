@@ -8,6 +8,7 @@ import { useChatMode } from "@/lib/chat-mode-context";
 import { useYieldOracle } from "@/hooks/useYieldOracle";
 import { useAgentSocket } from "@/hooks/useAgentSocket";
 import { mantleTestnet } from "@/lib/mantle";
+import { configureAtlasUtterance, fetchTtsAudio, VOICE_AUDIO } from "@/lib/voice-audio";
 
 const TX_MATCH = /^0x[a-fA-F0-9]{64}$/;
 function renderWithTxLinks(text: string, linkColor = "#f59e0b") {
@@ -267,15 +268,10 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
   const speak = useCallback(async (text: string) => {
     const hasTx = () => !!onChainTxRef.current;
 
-    // Backend TTS (gTTS UK accent or OpenAI onyx)
+    // Backend TTS (OpenAI/gTTS), with quick browser fallback if the network stalls.
     try {
-      const res = await fetch("/api/agents/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (res.ok) {
-        const arrayBuffer = await res.arrayBuffer();
+      const arrayBuffer = await fetchTtsAudio(text);
+      if (arrayBuffer) {
         // Use Web Audio API — works on mobile even after async gap
         const ctx = audioCtxRef.current
           ?? new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -284,6 +280,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
         const decoded = await ctx.decodeAudioData(arrayBuffer);
         const source  = ctx.createBufferSource();
         source.buffer = decoded;
+        source.playbackRate.value = VOICE_AUDIO.backendPlaybackRate;
         source.connect(ctx.destination);
         if (!hasTx()) setJState("speaking");
         source.onended = () => { if (!hasTx()) setJState("idle"); };
@@ -307,8 +304,7 @@ export function JarvisView({ messages: chatContext = [], onMessage }: JarvisView
     ) ?? voicesRef.current.find(v =>
       v.lang.startsWith("en") && !v.name.toLowerCase().includes("female")
     );
-    if (pick) utt.voice = pick;
-    utt.rate = 0.85; utt.pitch = 0.74;
+    configureAtlasUtterance(utt, pick ? [pick] : voicesRef.current);
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
     utt.onend   = () => { if (!hasTx()) setJState("idle"); };
     synthRef.current.speak(utt);

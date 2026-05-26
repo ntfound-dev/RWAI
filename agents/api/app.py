@@ -45,6 +45,7 @@ from .routes.stats         import router as stats_router
 from .routes.extract       import router as extract_router
 from .routes.market        import router as market_router
 from .routes.tts           import router as tts_router
+from .market_data          import yield_snapshot
 from ..mantle.client       import get_addresses, is_connected, get_block_number, get_agent_ids, _load_deployments
 from ..mantle.reputation   import get_agent_reputation_scores
 from ..mantle              import indexer
@@ -66,16 +67,7 @@ async def _yield_scheduler():
     await asyncio.sleep(30)  # let startup settle
     while True:
         try:
-            import json as _json
-            from .core import agent_complete, ChatMessage
-
-            prompt = (
-                "Fetch current yield data for: USDY, mETH, MI4, fBTC, mUSD. "
-                "Respond ONLY with the JSON format defined in your skill."
-            )
-            reply, _, _ = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
-            start = reply.find("{"); end = reply.rfind("}") + 1
-            result = _json.loads(reply[start:end]) if start >= 0 and end > start else {}
+            result = yield_snapshot(["USDY", "mETH", "MI4", "fBTC", "mUSD"])
 
             yields_bps: dict[str, int] = {
                 a["symbol"]: int(a["apyBps"])

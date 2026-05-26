@@ -10,10 +10,31 @@ import httpx
 
 log = logging.getLogger("rwai.core")
 
+
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        log.warning("Invalid %s; using %s", name, default)
+        return default
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        log.warning("Invalid %s; using %s", name, default)
+        return default
+
 CLAUDE_API_KEY      = os.getenv("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY        = os.getenv("OPENAI_COMPAT_API_KEY", "")
 GROQ_URL            = os.getenv("OPENAI_COMPAT_BASE_URL", "https://api.groq.com/openai")
 GROQ_MODEL          = os.getenv("OPENAI_COMPAT_MODEL", "llama-3.3-70b-versatile")
+GROQ_FALLBACK_MODEL = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+CLAUDE_MODEL        = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
+LLM_TEMPERATURE     = _float_env("LLM_TEMPERATURE", 0.2)
+LLM_MAX_TOKENS      = _int_env("LLM_MAX_TOKENS", 420)
 
 # Ollama is opt-in local only — not used in cloud deployments
 OLLAMA_ENABLED      = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
@@ -42,10 +63,38 @@ class ChatResponse(BaseModel):
     on_chain_tx: str = ""
 
 
-async def call_groq(system: str, user: str) -> str:
+_PRODUCTION_GUARDRAILS = """
+## Production Answer Rules
+- Do not invent live APYs, prices, wallet balances, tx hashes, legal status, or contract state.
+- Only say an execution succeeded when the context includes a real tx hash.
+- If required data is missing, say exactly what is unavailable and give the next safe step.
+- Keep chat/voice answers to 1-3 short sentences unless the user asks for detail.
+- For JSON-only tasks, return valid JSON only: no markdown, no prose wrapper.
+- This is Mantle Sepolia/testnet unless production network context is explicitly provided.
+- Do not promise profit or guaranteed yield; frame outputs as analysis, not financial advice.
+""".strip()
+
+
+def _system_prompt(agent_id: str, skill: str) -> str:
+    base = skill.strip() or f"You are {agent_id.capitalize()}, an RWAi agent."
+    return f"{base}\n\n{_PRODUCTION_GUARDRAILS}"
+
+
+def _role_label(role: str, agent_id: str) -> str:
+    r = role.lower().strip()
+    if r == "user":
+        return "User"
+    if r == "system":
+        return "Context"
+    if r in {"assistant", "atlas", "nexus", "shield", "yield", agent_id.lower()}:
+        return agent_id.capitalize()
+    return "Context"
+
+
+async def call_groq(system: str, user: str, model: str = GROQ_MODEL) -> str:
     if not GROQ_API_KEY or GROQ_API_KEY.startswith("your_"):
         raise ValueError("OPENAI_COMPAT_API_KEY (Groq) not configured")
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=18) as client:
         res = await client.post(
             f"{GROQ_URL}/v1/chat/completions",
             headers={
@@ -53,8 +102,9 @@ async def call_groq(system: str, user: str) -> str:
                 "Content-Type":  "application/json",
             },
             json={
-                "model":      GROQ_MODEL,
-                "max_tokens": 1024,
+                "model":       model,
+                "temperature": LLM_TEMPERATURE,
+                "max_tokens":  LLM_MAX_TOKENS,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user",   "content": user},
@@ -71,16 +121,17 @@ async def call_claude(system: str, user: str) -> str:
         raise ValueError("ANTHROPIC_API_KEY not configured")
     try:
         import anthropic
-        client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY)
+        client = anthropic.AsyncAnthropic(api_key=CLAUDE_API_KEY, timeout=20)
         msg = await client.messages.create(
-            model="claude-opus-4-7",
-            max_tokens=1024,
+            model=CLAUDE_MODEL,
+            max_tokens=LLM_MAX_TOKENS,
+            temperature=LLM_TEMPERATURE,
             system=system,
             messages=[{"role": "user", "content": user}],
         )
         return msg.content[0].text
     except ImportError:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=20) as client:
             res = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -89,10 +140,11 @@ async def call_claude(system: str, user: str) -> str:
                     "Content-Type":       "application/json",
                 },
                 json={
-                    "model":      "claude-opus-4-7",
-                    "max_tokens": 1024,
-                    "system":     system,
-                    "messages":   [{"role": "user", "content": user}],
+                    "model":       CLAUDE_MODEL,
+                    "max_tokens":  LLM_MAX_TOKENS,
+                    "temperature": LLM_TEMPERATURE,
+                    "system":      system,
+                    "messages":    [{"role": "user", "content": user}],
                 },
             )
             if res.status_code != 200:
@@ -122,17 +174,17 @@ async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tupl
     Fallback chain: OpenClaw → Groq → Claude → Ollama (local opt-in)
     Returns: (reply, model_used, is_fallback)
     """
-    skill = load_skill(agent_id)
+    skill = _system_prompt(agent_id, load_skill(agent_id))
     # Cap history to prevent prompt bloat / cost abuse
     capped = conversation[-_MAX_MESSAGES:]
     history = "\n".join(
-        f"{'User' if m.role == 'user' else agent_id.capitalize()}: {m.body[:_MAX_MSG_CHARS]}"
+        f"{_role_label(m.role, agent_id)}: {m.body[:_MAX_MSG_CHARS]}"
         for m in capped
     )
     prompt = (
         f"{history}\n\n"
-        f"Reply as {agent_id.capitalize()}, staying in character. "
-        f"Be concise (3-5 sentences max)."
+        f"Reply as {agent_id.capitalize()}. Follow the production answer rules. "
+        f"If the latest user asks for JSON, output JSON only."
     )
 
     # 1. OpenClaw (primary when API key configured)
@@ -147,29 +199,25 @@ async def agent_complete(agent_id: str, conversation: list[ChatMessage]) -> tupl
 
     # 2. Groq primary model
     try:
-        r = await call_groq(skill, prompt)
+        r = await call_groq(skill, prompt, GROQ_MODEL)
         if r and len(r.strip()) > 10:
             return r.strip(), GROQ_MODEL, False
     except Exception as e:
         log.info("Groq unavailable: %s", e)
 
-    # 2b. Groq fallback model — llama-4-scout smarter than 8b, still free tier
-    _groq_fallback = os.getenv("GROQ_FALLBACK_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
-    if _groq_fallback != GROQ_MODEL:
+    # 2b. Groq fallback model — explicit model argument, no global env mutation.
+    if GROQ_FALLBACK_MODEL and GROQ_FALLBACK_MODEL != GROQ_MODEL:
         try:
-            orig_model = os.environ.get("OPENAI_COMPAT_MODEL", "")
-            os.environ["OPENAI_COMPAT_MODEL"] = _groq_fallback
-            r = await call_groq(skill, prompt)
-            os.environ["OPENAI_COMPAT_MODEL"] = orig_model or GROQ_MODEL
+            r = await call_groq(skill, prompt, GROQ_FALLBACK_MODEL)
             if r and len(r.strip()) > 10:
-                return r.strip(), _groq_fallback, True
+                return r.strip(), GROQ_FALLBACK_MODEL, True
         except Exception as e:
             log.info("Groq fallback unavailable: %s", e)
 
     # 3. Claude — reliable but paid
     try:
         r = await call_claude(skill, prompt)
-        return r.strip(), "claude-opus-4-7", True
+        return r.strip(), CLAUDE_MODEL, True
     except Exception as e:
         log.info("Claude unavailable: %s", e)
 

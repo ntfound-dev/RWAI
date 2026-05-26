@@ -5,6 +5,7 @@ import { useAccount } from "wagmi";
 import { useBlockNumber } from "wagmi";
 import { mantleTestnet } from "@/lib/wagmi";
 import { agentApi } from "@/lib/agent-api";
+import { configureAtlasUtterance, fetchTtsAudio, VOICE_AUDIO } from "@/lib/voice-audio";
 
 type OrbState = "idle" | "listening" | "thinking" | "speaking" | "executing";
 
@@ -48,6 +49,7 @@ export default function VoicePage() {
   const synthRef        = useRef<SpeechSynthesis | null>(null);
   const audioCtxRef     = useRef<AudioContext | null>(null);
   const sourceRef       = useRef<AudioBufferSourceNode | null>(null);
+  const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
   const onChainTxRef    = useRef("");
   const sessionStartedRef = useRef(false);
   const toggleListenRef   = useRef<() => void>(() => {});
@@ -62,8 +64,12 @@ export default function VoicePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     synthRef.current = window.speechSynthesis;
+    const loadVoices = () => { voicesRef.current = synthRef.current?.getVoices() ?? []; };
+    loadVoices();
+    synthRef.current?.addEventListener("voiceschanged", loadVoices);
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     setHasSR(!!SR);
+    return () => synthRef.current?.removeEventListener("voiceschanged", loadVoices);
   }, []);
 
   const pushAction = useCallback((type: Action["type"], text: string, tx?: string) => {
@@ -90,50 +96,43 @@ export default function VoicePage() {
     synthRef.current?.cancel();
 
     try {
-      const res = await fetch("/api/agents/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        if (buf.byteLength > 100) {
-          const AC = window.AudioContext || (window as any).webkitAudioContext;
-          if (!audioCtxRef.current || audioCtxRef.current.state === "closed") audioCtxRef.current = new AC();
-          const ac = audioCtxRef.current;
-          if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
-          const decoded = await ac.decodeAudioData(buf.slice(0));
-          const source = ac.createBufferSource();
-          source.buffer = decoded;
-          source.playbackRate.value = 0.82;
-          source.connect(ac.destination);
-          sourceRef.current = source;
-          if (!hasTx()) setOrbState("speaking");
-          source.onended = () => {
-            sourceRef.current = null;
-            if (!hasTx()) {
-              setOrbState("idle");
-              // Auto-restart listening after JARVIS finishes speaking
-              if (sessionStartedRef.current) {
-                setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 900);
-              }
+      const buf = await fetchTtsAudio(text);
+      if (buf) {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (!audioCtxRef.current || audioCtxRef.current.state === "closed") audioCtxRef.current = new AC();
+        const ac = audioCtxRef.current;
+        if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
+        const decoded = await ac.decodeAudioData(buf.slice(0));
+        const source = ac.createBufferSource();
+        source.buffer = decoded;
+        source.playbackRate.value = VOICE_AUDIO.backendPlaybackRate;
+        source.connect(ac.destination);
+        sourceRef.current = source;
+        if (!hasTx()) setOrbState("speaking");
+        source.onended = () => {
+          sourceRef.current = null;
+          if (!hasTx()) {
+            setOrbState("idle");
+            // Auto-restart listening after JARVIS finishes speaking
+            if (sessionStartedRef.current) {
+              setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 700);
             }
-          };
-          source.start(0);
-          return;
-        }
+          }
+        };
+        source.start(0);
+        return;
       }
     } catch { /* fall through */ }
 
     if (!synthRef.current) return;
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9; utt.pitch = 0.1;
+    configureAtlasUtterance(utt, voicesRef.current);
     utt.onstart = () => { if (!hasTx()) setOrbState("speaking"); };
     utt.onend   = () => {
       if (!hasTx()) {
         setOrbState("idle");
         if (sessionStartedRef.current) {
-          setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 900);
+          setTimeout(() => { if (sessionStartedRef.current) toggleListenRef.current(); }, 700);
         }
       }
     };

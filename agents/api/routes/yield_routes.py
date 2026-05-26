@@ -1,6 +1,7 @@
 import json
 from fastapi import APIRouter
 from ..core import agent_complete, ChatMessage
+from ..market_data import yield_snapshot as configured_yield_snapshot
 from ...mantle.executor import (
     publish_yield_snapshot,
     publish_market_snapshot,
@@ -26,12 +27,8 @@ def _parse_json(text: str) -> dict:
 async def yield_snapshot(assets: str = "USDY,mETH,MI4"):
     """Yield agent fetches current APY and writes snapshot to Mantle."""
     asset_list = [a.strip() for a in assets.split(",")]
-    prompt = (
-        f"Fetch current yield data for: {', '.join(asset_list)}. "
-        "Respond ONLY with the JSON format defined in your skill."
-    )
-    reply, model, fallback = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
-    result = _parse_json(reply)
+    result = configured_yield_snapshot(asset_list)
+    model, fallback = "configured-yield-snapshot", False
 
     # Build bps map from structured response
     yields_bps: dict = {}
@@ -75,13 +72,9 @@ async def price_snapshot(assets: str = "USDY,mETH,fBTC"):
 @router.get("/yield/market-analysis")
 async def market_analysis():
     """Yield agent produces a broader market analysis and snapshot."""
-    prompt = (
-        "Generate a comprehensive market analysis for all tracked Mantle RWA assets "
-        "(USDY, mETH, fBTC, MI4). Include yield trends, market conditions, and a "
-        "brief investment thesis. Respond ONLY with the JSON format defined in your skill."
-    )
-    reply, model, fallback = await agent_complete("yield", [ChatMessage(role="user", body=prompt)])
-    result = _parse_json(reply)
+    result = configured_yield_snapshot(["USDY", "mETH", "fBTC", "MI4", "mUSD"])
+    result["marketSummary"] = "Configured Mantle Sepolia snapshot. Use live oracle/indexer feeds before making production investment claims."
+    model, fallback = "configured-yield-snapshot", False
 
     yields_bps: dict = {}
     if "assets" in result:

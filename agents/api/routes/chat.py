@@ -1,9 +1,11 @@
 import re
+import asyncio
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage, ChatResponse
+from ..market_data import yield_context
 
 router = APIRouter()
 _log = logging.getLogger("rwai.chat")
@@ -36,13 +38,7 @@ async def _atlas_with_delegation(messages: list[ChatMessage]) -> tuple[str, str,
 
     try:
         if words & _YIELD_KW:
-            _log.info("Atlas delegating to Yield (market data)")
-            y_prompt = (
-                "Provide a brief current yield snapshot for USDY, mETH, MI4, fBTC, mUSD. "
-                "Respond ONLY with the JSON format defined in your skill."
-            )
-            y_reply, _, _ = await agent_complete("yield", [ChatMessage(role="user", body=y_prompt)])
-            enrichment = f"\n\n[Yield agent data]:\n{y_reply[:800]}"
+            enrichment = f"\n\n[Yield context]:\n{yield_context()}"
 
         elif words & _SHIELD_KW:
             _log.info("Atlas delegating to Shield (compliance context)")
@@ -109,10 +105,10 @@ def _words_to_usd(text: str) -> Optional[float]:
     return float(total) if found and total > 0 else None
 
 
-def _detect_execution(messages: list[ChatMessage], wallet: Optional[str]) -> Optional[str]:
+def _parse_execution(messages: list[ChatMessage]) -> Optional[tuple[float, list[str], list[int]]]:
     """
-    If the user's last message is an execution command, call execute_allocation on-chain.
-    Returns tx hash or None.
+    Parse voice/text execution commands such as "invest 100 USDY".
+    Returns (amount_usd, assets, contract_amounts) or None.
     """
     if not messages:
         return None
@@ -123,7 +119,12 @@ def _detect_execution(messages: list[ChatMessage], wallet: Optional[str]) -> Opt
 
     # Parse USD amount — "$1000", "1000 dollars", "1k dollars", "one thousand dollars"
     m = re.search(r"\$?([\d,]+(?:\.\d+)?)\s*(k)?\s*(?:dollars?|usd)?", last, re.IGNORECASE)
+    has_money_marker = bool(re.search(r"(\$|\busd\b|\bdollars?\b|\d+\s*k\b)", last, re.IGNORECASE))
+    has_asset_marker = any(k in last for k in _ASSET_KW)
+    has_direct_allocation = bool(words & {"invest", "investing", "allocate", "allocation"})
     if m:
+        if not (has_money_marker or has_asset_marker or has_direct_allocation):
+            return None
         amount_usd = float(m.group(1).replace(",", ""))
         if m.group(2):
             amount_usd *= 1000
@@ -139,7 +140,10 @@ def _detect_execution(messages: list[ChatMessage], wallet: Optional[str]) -> Opt
     # Use USD cents as unit — AgentExecutor is a log contract, not ERC-20 transfer.
     # 1e18 caused _checkAutonomy to always fail (100e18 > agentTransactionLimits default of 0).
     amounts_wei = [int(per_asset * 100)] * len(assets)  # e.g. $100 → 10000 units
+    return amount_usd, assets, amounts_wei
 
+
+def _submit_execution(wallet: Optional[str], amount_usd: float, assets: list[str], amounts_wei: list[int]) -> Optional[str]:
     try:
         from ...mantle.executor import execute_allocation, get_agent_wallet_address, AGENT_PRIVATE_KEY
         if not AGENT_PRIVATE_KEY:
@@ -165,7 +169,28 @@ async def chat(req: ChatRequest):
     if req.agent_id == "atlas":
         last_body = req.messages[-1].body.lower() if req.messages else ""
         execution_attempted = bool(set(re.sub(r"[,.\-!?]", " ", last_body).split()) & _EXECUTE_KW)
-        tx = _detect_execution(req.messages, req.wallet_address)
+        intent = _parse_execution(req.messages)
+        if intent:
+            amount_usd, assets, amounts_wei = intent
+            tx = await asyncio.to_thread(_submit_execution, req.wallet_address, amount_usd, assets, amounts_wei)
+            asset_text = ", ".join(assets)
+            if tx:
+                return ChatResponse(
+                    reply=f"Executed ${amount_usd:,.0f} into {asset_text}. On-chain log is live on Mantle Sepolia: {tx}",
+                    model_used="atlas-execution-fastpath",
+                    fallback=False,
+                    on_chain_tx=tx,
+                )
+            return ChatResponse(
+                reply=(
+                    f"I understood the execution command for ${amount_usd:,.0f} into {asset_text}, "
+                    "but no on-chain transaction was submitted. Check the agent signer and contract configuration, then retry."
+                ),
+                model_used="atlas-execution-fastpath",
+                fallback=True,
+                on_chain_tx="",
+            )
+        tx = None
 
         # Inject TX result before LLM reply — prevents hallucination of fake TX hashes
         messages_with_ctx = list(req.messages)

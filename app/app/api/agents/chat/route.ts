@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
       agentId?: string;
       agent_id?: string;
       messages?: Array<{ role: string; body: string }>;
+      walletAddress?: string | null;
+      wallet_address?: string | null;
     };
 
     const agentId = body.agent_id ?? body.agentId;
@@ -26,13 +28,17 @@ export async function POST(req: NextRequest) {
     };
     const apiKey = process.env.BACKEND_API_KEY;
     if (apiKey) headers["x-internal-api-key"] = apiKey;
+    const realIp = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
+    if (realIp) headers["x-forwarded-for"] = realIp;
 
     const backend = await fetch(`${backendUrl}/api/agents/chat`, {
       method: "POST",
       headers,
       body: JSON.stringify({
+        ...body,
         agent_id: agentId,
         messages: body.messages ?? [],
+        wallet_address: body.wallet_address ?? body.walletAddress ?? null,
       }),
       cache: "no-store",
     });
@@ -50,7 +56,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reply: data.reply ?? "No response.",
       modelUsed: data.model_used,
+      model_used: data.model_used,
       fallback: data.fallback ?? false,
+      on_chain_tx: data.on_chain_tx ?? "",
+      onChainTx: data.on_chain_tx ?? "",
     });
   } catch (error) {
     return NextResponse.json(

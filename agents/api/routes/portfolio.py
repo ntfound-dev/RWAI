@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from ..core import agent_complete, ChatMessage
+from ..market_data import yield_context
 from ...mantle.executor import execute_allocation, execute_rebalance
 from ...mantle.contracts import get_portfolio_vault, get_yield_oracle
 from ...mantle.client import get_w3, get_addresses
@@ -80,7 +81,7 @@ async def portfolio_plan(body: PlanRequest):
     yield_context = (
         f"\nCurrent live yields from Yield oracle on Mantle:\n{live}\n"
         if live else
-        "\nUse your default APY estimates for USDY, mETH, mUSD, fBTC.\n"
+        f"\n{yield_context()}\n"
     )
     prompt = f"""Build a portfolio strategy for this investor:
 - Goal: {body.goal}
@@ -108,8 +109,9 @@ Respond ONLY with valid JSON containing: allocations (list of {{asset, bps}}), r
         symbols  = [a["asset"] for a in allocations if "asset" in a]
         bps_list = [a.get("bps", 0) for a in allocations]
         total    = body.amount
-        # Convert bps → simulated wei amounts (1e18 scale, no real value on testnet)
-        amounts  = [int(total * bps / 10000 * 1e18) for bps in bps_list]
+        # AgentExecutor/PortfolioVault records demo allocation units, not ERC-20 transfers.
+        # Use USD cents to stay within autonomy limits and keep logs human-scale.
+        amounts  = [int(total * bps / 10000 * 100) for bps in bps_list]
 
         reasoning = result.get("reasoning", reply[:500])
         tx = execute_allocation(body.user_address, symbols, amounts, reasoning)
@@ -129,7 +131,7 @@ async def portfolio_rebalance(body: RebalanceRequest):
     )
     reply, model, fallback = await agent_complete("atlas", [ChatMessage(role="user", body=prompt)])
 
-    amounts_wei = [int(a * 1e18) for a in body.amounts_usd]
+    amounts_wei = [int(a * 100) for a in body.amounts_usd]
     tx = execute_rebalance(
         body.user_address,
         body.from_assets,

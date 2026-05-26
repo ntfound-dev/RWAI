@@ -36,6 +36,7 @@ app/node_modules/
 app/.next/
 app/.env.local
 app/.env*.local
+app/.env*.tmp
 *.tsbuildinfo
 
 # Hardhat

@@ -27,6 +27,7 @@ log = logging.getLogger("rwai.openclaw")
 
 CMDOP_API_KEY   = os.getenv("CMDOP_API_KEY", "")
 CMDOP_SERVER    = os.getenv("CMDOP_SERVER", "grpc.cmdop.com:443")
+OPENCLAW_ENABLED = os.getenv("OPENCLAW_ENABLED", "false").lower() == "true"
 
 # Map our agent IDs to OpenClaw skill names
 SKILL_MAP = {
@@ -40,8 +41,8 @@ _client = None
 
 
 def is_available() -> bool:
-    """True if CMDOP API key is configured."""
-    return bool(CMDOP_API_KEY and not CMDOP_API_KEY.startswith("your_"))
+    """True when OpenClaw is explicitly enabled and API key is configured."""
+    return bool(OPENCLAW_ENABLED and CMDOP_API_KEY and not CMDOP_API_KEY.startswith("your_"))
 
 
 def _get_client():

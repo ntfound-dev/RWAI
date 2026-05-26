@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAccount } from "wagmi";
 import { agentApi } from "@/lib/agent-api";
 import { useChatMode } from "@/lib/chat-mode-context";
+import { configureAtlasUtterance, fetchTtsAudio, VOICE_AUDIO } from "@/lib/voice-audio";
 
 // ── Page context registry ─────────────────────────────────────────
 const PAGE_CTX: Record<string, {
@@ -291,34 +292,27 @@ export function GlobalJarvisPanel() {
 
     // Primary: backend TTS via Web Audio API
     try {
-      const res = await fetch("/api/agents/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        if (buf.byteLength > 100 && ac) {
-          // Resume in case AC was suspended during async fetch gap (iOS)
-          if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
-          const decoded = await ac.decodeAudioData(buf.slice(0));
-          const source = ac.createBufferSource();
-          source.buffer = decoded;
-          source.playbackRate.value = 0.82;
-          source.connect(ac.destination);
-          sourceRef.current = source;
-          if (!hasTx()) setJState("speaking");
-          source.onended = () => { sourceRef.current = null; onEnd(); };
-          source.start(0);
-          return;
-        }
+      const buf = await fetchTtsAudio(text);
+      if (buf && ac) {
+        // Resume in case AC was suspended during async fetch gap (iOS)
+        if (ac.state === "suspended") { try { await ac.resume(); } catch {} }
+        const decoded = await ac.decodeAudioData(buf.slice(0));
+        const source = ac.createBufferSource();
+        source.buffer = decoded;
+        source.playbackRate.value = VOICE_AUDIO.backendPlaybackRate;
+        source.connect(ac.destination);
+        sourceRef.current = source;
+        if (!hasTx()) setJState("speaking");
+        source.onended = () => { sourceRef.current = null; onEnd(); };
+        source.start(0);
+        return;
       }
     } catch { /* fall through to browser TTS */ }
 
     // Fallback: browser SpeechSynthesis (unlockAudio() must have primed it first)
     if (!synthRef.current) return;
     const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9; utt.pitch = 0.1;
+    configureAtlasUtterance(utt, voicesRef.current);
     utt.onstart = () => { if (!hasTx()) setJState("speaking"); };
     utt.onend   = onEnd;
     synthRef.current.speak(utt);
