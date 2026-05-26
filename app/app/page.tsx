@@ -250,7 +250,7 @@ export default function LandingPage() {
         <section style={{ marginBottom:56 }}>
           <div style={{ marginBottom:24 }}>
             <div className="mono" style={{ color:"var(--accent)", marginBottom:8 }}>§ 02 · the pipeline</div>
-            <h2 className="display" style={{ fontSize:56 }}>
+            <h2 className="display rp-section-title" style={{ fontSize:56 }}>
               From <span style={{ fontStyle:"italic" }}>document</span> to <span style={{ fontStyle:"italic", color:"var(--accent)" }}>tokenized yield</span> in 8 steps.
             </h2>
           </div>
@@ -261,7 +261,7 @@ export default function LandingPage() {
                   <div className="mono-sm" style={{ color:"var(--fg-3)", marginBottom:6 }}>{num}</div>
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
                     <AgentMonogram agent={agent as AgentId}/>
-                    {i < 7 && <div style={{ position:"absolute", top:38, left:"60%", right:"-60%", height:1, background:"var(--line-strong)", zIndex:0 }}/>}
+                    {i < 7 && <div className="rp-pipeline-link" style={{ position:"absolute", top:38, left:"60%", right:"-60%", height:1, background:"var(--line-strong)", zIndex:0 }}/>}
                   </div>
                   <div style={{ fontFamily:"var(--font-mono)", fontSize:11, fontWeight:500, letterSpacing:"0.04em", color:"var(--fg-0)" }}>{label}</div>
                   <div className="mono-sm" style={{ textTransform:"none", letterSpacing:0, color:"var(--fg-2)", marginTop:2, fontFamily:"var(--font-mono)" }}>{fn}()</div>
